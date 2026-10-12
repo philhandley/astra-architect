@@ -7,6 +7,20 @@ export const CLIP = [];                    // shared clipping planes for the sec
 export const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 100);
 
 export const ISO_DIR = new THREE.Vector3(1, 1.05, 1).normalize();
+const ISO_FOG = new THREE.Fog('#f4e9dc', 92, 150);
+let GRAD = null;
+function gradientTexture() {
+  if (GRAD) return GRAD;
+  const c = document.createElement('canvas');
+  c.width = 4; c.height = 256;
+  const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, '#bfe0ea'); gr.addColorStop(0.55, '#e6efe8'); gr.addColorStop(1, '#f7e3d2');
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+  GRAD = new THREE.CanvasTexture(c);
+  GRAD.colorSpace = THREE.SRGBColorSpace;
+  return GRAD;
+}
 let world = null;
 if (typeof window !== "undefined") Object.defineProperty(window, "__world", { get: () => world });
 export function getWorld() {
@@ -174,11 +188,18 @@ class World {
       c.object = this.ortho;
       c.minZoom = 0.3; c.maxZoom = 7;
       c.update();
+      // A little world floating in soft space, like Monument Valley.
+      this.sky.visible = false;
+      this.scene.background = gradientTexture();
+      this.scene.fog = ISO_FOG;
     } else {
       this.iso = false;
       this.camera = this.cam;
       c.object = this.cam;
       c.update();
+      if (this.scene.background && this.scene.background.isTexture) this.scene.background = null;
+      if (this.scene.fog === ISO_FOG) this.scene.fog = null;
+      this.sky.visible = true;
     }
   }
   placeIso(target) {
@@ -188,7 +209,7 @@ class World {
   }
 
   start() {
-    if (this.running || document.hidden) return;
+    if (this.running || document.hidden || this.hold) return;
     this.running = true;
     this.clock.getDelta();
     requestAnimationFrame(this._loop);

@@ -27,6 +27,7 @@ export function windowIcon(type, c = '#f4a261') {
     slot: `<path d="M16 16h4v28h-4zM30 16h4v28h-4zM44 16h4v28h-4z" fill="${g}" stroke="#fff" stroke-width="1.5"/>`,
     strip: `<path d="M12 24h40v8H12z" fill="${g}" stroke="#fff" stroke-width="2"/>`,
     grid: `<path d="M16 18h12v12H16zM30 18h12v12H30zM16 32h12v12H16zM30 32h12v12H30z" fill="${g}" stroke="#fff" stroke-width="2"/>`,
+    face: `<circle cx="22" cy="26" r="7" fill="${g}" stroke="#fff" stroke-width="3"/><circle cx="42" cy="26" r="7" fill="${g}" stroke="#fff" stroke-width="3"/><circle cx="22" cy="27" r="2.5" fill="#3d405b"/><circle cx="42" cy="27" r="2.5" fill="#3d405b"/><path d="M20 39q12 9 24 0" fill="none" stroke="${g}" stroke-width="5" stroke-linecap="round"/>`,
     none: `<path d="M20 22l24 16M44 22 20 38" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/>`,
   };
   return svg(wall + (w[type] || ''));
@@ -52,6 +53,7 @@ export function moreIcon(type, c = '#f4a261') {
     chimney: `${house(c, `<path d="M10 30h44v5H10z" fill="#f7f4ee" stroke="${INK}" stroke-width="2"/>`)}<path d="M40 10h8v20h-8z" fill="#4a4e69" stroke="${INK}" stroke-width="2"/><path d="M39 8h10v5H39z" fill="${c}" stroke="${INK}" stroke-width="2"/>`,
     flag: `${house(c, `<path d="M10 30h44v5H10z" fill="#f7f4ee" stroke="${INK}" stroke-width="2"/>`)}<path d="M32 30V6" stroke="${INK}" stroke-width="2.5"/><path d="M32 7l16 6-16 6z" fill="#e76f51" stroke="${INK}" stroke-width="1.5" stroke-linejoin="round"/>`,
     beak: `<path d="M10 14h36v40H10z" fill="${c}" stroke="${INK}" stroke-width="2"/><path d="M22 36h12v18H22z" fill="#ffd166" stroke="${INK}" stroke-width="2"/><path d="M18 30h20l-10 6z" fill="#4a4e69"/><path d="M46 24l12 8-12 6z" fill="#4a4e69" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>`,
+    creature: `<path d="M14 20h32v22H14z" fill="${c}" stroke="${INK}" stroke-width="2"/><path d="M20 42v12M40 42v12" stroke="${INK}" stroke-width="4" stroke-linecap="round"/><circle cx="24" cy="28" r="4" fill="#cdeaf5" stroke="#fff" stroke-width="2"/><circle cx="36" cy="28" r="4" fill="#cdeaf5" stroke="#fff" stroke-width="2"/><path d="M46 28l12 4-12 4z" fill="#4a4e69"/><path d="M30 20V6" stroke="${INK}" stroke-width="2"/><path d="M30 7l12 4-12 4z" fill="#e76f51"/>`,
     turn: `<path d="M48 32a16 16 0 1 1-6-12.5" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/><path d="M44 10l-2 10 10 1" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`,
   };
   return svg(m[type] || '');

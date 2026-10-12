@@ -25,7 +25,7 @@ export const PRESETS = {
       { text: 'Turn the site round', emoji: '🔄', say: 'Drag your finger across the site to turn it round.', check: (a, ev) => ev === 'orbit', praise: 'Now you can see the site from every side.' },
       { text: 'Move the sun', emoji: '☀️', say: 'Slide the sun along the bar at the top. Watch the shadows move.', check: (a, ev) => ev === 'sun', praise: 'Morning sun in the east, evening sun in the west.' },
       { text: 'Tap the best view', emoji: '🔭', say: 'Tap the place on the site with the best view. Architects stand there to look.', check: (a, ev) => ev === 'flag' },
-      { text: 'Build your chill-out room', emoji: '🧘', say: 'Choose the chill-out room, then tap where it should go. Tap again to build it.', check: (a, ev, d) => ev === 'build' && d.cell.room === 'yoga' },
+      { text: 'Build your chill-out room', emoji: '🧘', say: 'Choose the chill-out room. Put your finger where it should go, then lift your finger to build it.', check: (a, ev, d) => ev === 'build' && d.cell.room === 'yoga' },
     ],
     async setup(api) { api.toggleSun(true); },
     onGroundTap(t, api) { lookFrom(api, t); },
@@ -104,7 +104,7 @@ export const PRESETS = {
     day: { pupils: 1, codeOnly: true },
     tasks: [
       { text: 'Make sure there is a classroom and a pool', emoji: '🏫', say: 'Your school needs a classroom and a swimming pool for this. Build them if they are missing.', check: a => has(a, 'classroom') && has(a, 'pool') },
-      { text: 'Code: Go to the classroom', emoji: '🧩', say: 'Tap Day. Give your pupil the tile Go to the classroom, then press Try.', check: (a, ev, d) => ev === 'tryDone' && d.ended === 'classroom' },
+      { text: 'Code: Go to the classroom', emoji: '🧩', say: 'Tap Day. Give your pupil the tile Go to the classroom, then press Go.', check: (a, ev, d) => ev === 'tryDone' && d.ended === 'classroom' },
       { text: 'Guess before you press Go', emoji: '🤔', check: (a, ev, d) => ev === 'tryDone' && d.predicted },
       { text: 'Code a swim: Go to the pool, then Swim', emoji: '🏊', check: (a, ev, d) => ev === 'tryDone' && (d.did.swim || 0) >= 1 },
     ],
@@ -212,14 +212,17 @@ function fillButton(api) {
       view.update(day, dt, {});
       if (t > 11) {
         api.world.updaters.delete(tick);
+        api.fillTick = null;
+        if (api.S.destroyed) return;
         const waiting = day.pupils.filter(p => p.stuck && p.stuck.why === 'full').length;
         const ok = waiting === 0;
         if (ok) { sfx.tada(); toast('Everyone fits!', '🎉'); sayAuto('Everyone fits! Eight pupils, in a classroom of two blocks.'); }
         else { sfx.no(); toast(`${waiting} pupil${waiting > 1 ? 's' : ''} had to wait outside`, '😟'); sayAuto(`Oh no, ${waiting} pupils had to wait outside. The classroom is too small. Make it bigger!`); }
         api.emit('fill', { ok, waiting });
-        setTimeout(() => { view.clear(); api.setCutaway(false); b.disabled = false; }, 2500);
+        setTimeout(() => { if (api.S.destroyed) return; view.clear(); api.setCutaway(false); b.disabled = false; }, 2500);
       }
     };
+    api.fillTick = tick;
     api.world.updaters.add(tick);
   });
 }
@@ -227,6 +230,12 @@ function fillButton(api) {
 export async function mount(host, ctx) {
   const preset = PRESETS[ctx.data.preset] || {};
   const api = await mountStudio(host, { preset, ctx });
+  const destroy = api.destroy;
+  api.destroy = () => {
+    if (api.flag) { api.world.groups.fx.remove(api.flag); api.flag = null; }
+    if (api.fillTick) { api.world.updaters.delete(api.fillTick); api.fillTick = null; if (api.world.pupilsView) api.world.pupilsView.clear(); }
+    destroy();
+  };
   if (preset.tools && preset.tools.includes('bubbles')) {
     const rail = api.root.querySelector('.rail.right');
     const b = h(`<button class="rbtn" type="button" aria-label="Bubbles">${icon('bubbles')}<span>Bubbles</span></button>`);

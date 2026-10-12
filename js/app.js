@@ -1,5 +1,6 @@
 // Astra Architect: router, home, crew setup, mission runner and the free Studio.
 import { sentences, canSpeak } from './core/speak.js';
+import { formIcon } from './ui/formicons.js';
 import { store } from './core/store.js';
 import { patchSVG } from './core/patch.js';
 import { icon } from './core/icons.js';
@@ -135,13 +136,15 @@ function renderHome() {
       </div>
       <div class="card brief-card">
         <div class="headrow"><h3>${esc(c.commander)}'s wishes</h3><span class="sp"></span></div>
-        <div class="brief-list">${s.brief.map(id => WISHES[id] ? `<div class="brief-item ${brief[id] ? 'done' : ''}" data-id="${id}">${emo(WISHES[id].emoji)}<span>${esc(WISHES[id].name)}</span><span class="tick">${brief[id] ? icon('check') : ''}</span></div>` : '').join('')}</div>
+        <div class="brief-list">${s.brief.map(id => WISHES[id] ? `<div class="brief-item ${brief[id] ? 'done' : ''}" data-id="${id}">${emo(WISHES[id].emoji)}<span>${esc(WISHES[id].name)}</span><span class="tick ${brief[id] ? '' : 'say'}">${brief[id] ? icon('check') : icon('speaker')}</span></div>` : '').join('')}</div>
       </div>
     </div>
     <div class="section-title"><h2>Missions</h2><span class="muted">Ten minutes each. Every mission adds to your school.</span></div>
     <div class="missions">${missionIds.map((id, i) => {
       const m = missions[id];
-      return `<div class="mission-tile" role="button" tabindex="0" data-go="${id}" style="--mc:${ACCENT[m.accent] || ACCENT.blue}">
+      const isNext = id === missionIds.find(x => !s.done[x]);
+      return `<div class="mission-tile ${isNext ? 'next' : ''}" role="button" tabindex="0" data-go="${id}" style="--mc:${ACCENT[m.accent] || ACCENT.blue}">
+        ${isNext ? `<span class="ribbon">${icon('play')} Play</span>` : ''}
         <div class="num">Mission ${i + 1}</div>
         <div class="pic">${emoRow(m.emoji || '🏫')}</div>
         <h3>${esc(m.title)}</h3><div class="idea">${esc(m.idea || m.tagline || '')}</div>
@@ -312,7 +315,8 @@ function go(i) {
   if (!runner) return;
   location.hash = `#/m/${runner.id}/${clamp(i, 0, runner.mission.steps.length - 1)}`;
 }
-function setReady(on = true) { if (runner) runner.nextBtn.classList.toggle('glow', on); }
+// Next looks like an outline until the step is done, then fills in and glows.
+function setReady(on = true) { if (runner) { runner.nextBtn.classList.toggle('glow', on); runner.nextBtn.classList.toggle('wait', !on); } }
 
 function showStep(i) {
   const r = runner;
@@ -366,9 +370,19 @@ function renderStory(el, s) {
 function choiceHTML(ch, i, showKey) {
   return `<button class="choice" type="button" data-i="${i}">
     <span class="badges"></span>${showKey ? `<span class="key">${'ABCD'[i] || ''}</span>` : ''}
-    ${ch.emoji ? emo(splitEmoji(ch.emoji)[0], 'cemo') : ''}
+    ${choicePic(ch)}
     <span>${esc(ch.label)}</span>${ch.detail ? `<span class="detail">${esc(ch.detail)}</span>` : ''}
   </button>`;
+}
+// A choice's picture: a block shape, a crop of Finn's painted site, a compass, or an emoji.
+function choicePic(ch) {
+  if (ch.form) return `<span class="cpic">${formIcon(ch.form, 'iso', ch.colour || '#2a9d8f')}</span>`;
+  if (ch.crop) return `<span class="cpic crop" style="background-position:${ch.crop[0]}% ${ch.crop[1]}%"></span>`;
+  if (ch.compass) {
+    const a = { N: 0, E: 90, S: 180, W: 270 }[ch.compass] || 0;
+    return `<span class="cpic"><svg viewBox="0 0 80 80" class="compass"><circle cx="40" cy="40" r="34" fill="#fff" stroke="#3d405b" stroke-width="3"/><text x="40" y="17" text-anchor="middle" font-size="11" font-weight="800" fill="#8a8f9c">N</text><g transform="rotate(${a} 40 40)"><path d="M40 12 50 44H30z" fill="#e5483d"/><path d="M30 44h20L40 66z" fill="#cfd6dc"/></g><circle cx="40" cy="44" r="4" fill="#3d405b"/></svg></span>`;
+  }
+  return ch.emoji ? emo(splitEmoji(ch.emoji)[0], 'cemo') : '';
 }
 function setBadges(btns, cmd, eng) {
   const c = crew();

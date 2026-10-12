@@ -1,5 +1,6 @@
 // Geometry and materials for the forms, in Blocks mode (wooden toy blocks) and Building mode.
 import * as THREE from 'three';
+import { KEEP } from './character.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { FORMS, ROOMS, MATERIALS, LEVEL_H, mix } from './catalogue.js';
 import { CLIP } from './scene.js';
@@ -179,7 +180,7 @@ export function materialTexture(id) {
 
 // ---------- Materials ----------
 const matCache = new Map();
-function cached(k, make) { if (!matCache.has(k)) matCache.set(k, make()); return matCache.get(k); }
+function cached(k, make) { if (!matCache.has(k)) matCache.set(k, KEEP.keep(make())); return matCache.get(k); }
 
 export function blockMaterial(roomId, colour = null) {
   const col = colour || ROOMS[roomId]?.colour || '#cccccc';

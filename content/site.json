@@ -6,7 +6,10 @@
   "emoji": "🗺️",
   "accent": "green",
   "minutes": 10,
-  "patch": { "name": "Site Surveyor", "icon": "map" },
+  "patch": {
+    "name": "Site Surveyor",
+    "icon": "map"
+  },
   "grownUp": [
     "This mission is about where a building goes: the sun, the wind, the slope and the views. Start by pointing out the sunny meadow and the shady corner on the map together.",
     "The Big Question has no right answer. Listen to the reasons the Architect gives, and say that architects weigh up warmth, shade and quiet in different ways.",
@@ -32,9 +35,18 @@
       "title": "Which way does the sun come up?",
       "prompt": "Where does the sun come up in the morning?",
       "choices": [
-        { "label": "West", "emoji": "🌇" },
-        { "label": "East", "emoji": "🌅" },
-        { "label": "South", "emoji": "🧭" }
+        {
+          "label": "West",
+          "compass": "W"
+        },
+        {
+          "label": "East",
+          "compass": "E"
+        },
+        {
+          "label": "South",
+          "compass": "S"
+        }
       ],
       "answer": 1,
       "reveal": "The sun comes up in the east and goes down in the west. That is why a room with a window facing east gets the morning sun.",
@@ -45,16 +57,42 @@
       "module": "studio",
       "title": "Build your chill-out room",
       "intro": "Turn the site, move the sun, find the best view and build your chill-out room.",
-      "data": { "preset": "site" }
+      "data": {
+        "preset": "site"
+      }
     },
     {
       "type": "question",
       "title": "Sunny meadow or cool corner?",
       "scenario": "Your chill-out room could go in the sunny meadow, or in the cool misty corner by the waterfall. A third choice is under the trees at the edge of the forest.",
       "options": [
-        { "label": "Sunny meadow", "emoji": "🌼", "detail": "It is warm and bright, with a big view across the grass." },
-        { "label": "Misty corner by the waterfall", "emoji": "🌫️", "detail": "It is cool and quiet, with the sound of the water to listen to." },
-        { "label": "Under the trees", "emoji": "🌳", "detail": "It is shady and sheltered, with leaves to look up at." }
+        {
+          "label": "Sunny meadow",
+          "emoji": "🌼",
+          "detail": "It is warm and bright, with a big view across the grass.",
+          "crop": [
+            28,
+            62
+          ]
+        },
+        {
+          "label": "Misty corner by the waterfall",
+          "emoji": "🌫️",
+          "detail": "It is cool and quiet, with the sound of the water to listen to.",
+          "crop": [
+            62,
+            30
+          ]
+        },
+        {
+          "label": "Under the trees",
+          "emoji": "🌳",
+          "detail": "It is shady and sheltered, with leaves to look up at.",
+          "crop": [
+            38,
+            28
+          ]
+        }
       ],
       "reveal": "Architects think about sun, shade, wind and quiet, and every site has a different mix of them. Some architects choose the sunny spot for warmth, and others choose the shady spot to keep cool.",
       "followUp": "Where would you go to rest on a hot day, and why?"
@@ -62,7 +100,11 @@
     {
       "type": "athome",
       "title": "Map the sun and the shade",
-      "need": ["A piece of paper", "A pencil", "A sunny garden or yard, with a grown-up"],
+      "need": [
+        "A piece of paper",
+        "A pencil",
+        "A sunny garden or yard, with a grown-up"
+      ],
       "steps": [
         "Draw a simple map of the garden or yard, with a box for the house.",
         "In the morning, colour in the sunny parts and the shady parts, and draw an arrow for the wind.",

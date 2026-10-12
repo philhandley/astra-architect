@@ -96,17 +96,23 @@
         {
           "label": "A tunnel",
           "emoji": "🚇",
-          "detail": "You walk right through the water, with fish above, beside and below you."
+          "detail": "You walk right through the water, with fish above, beside and below you.",
+          "form": "arch",
+          "colour": "#2a9d8f"
         },
         {
           "label": "A dome",
           "emoji": "🫧",
-          "detail": "A round roof with no pillars inside lets the fish swim in one big bowl."
+          "detail": "A round roof with no pillars inside lets the fish swim in one big bowl.",
+          "form": "dome",
+          "colour": "#2a9d8f"
         },
         {
           "label": "A tower",
           "emoji": "🗼",
-          "detail": "A tall shape lets you look down through the layers of water as you climb."
+          "detail": "A tall shape lets you look down through the layers of water as you climb.",
+          "form": "tower",
+          "colour": "#2a9d8f"
         }
       ],
       "reveal": "Architects think about how people move, how the fish live and how the building looks from outside. Aquariums around the world come in many different shapes.",

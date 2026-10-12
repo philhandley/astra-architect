@@ -9,14 +9,14 @@ import { formGeometry, placeObject, materialFor, wallMaterial, interiorMaterial,
 import { emojiImage } from './emoji.js';
 import { CLIP } from './scene.js';
 import { staticParts } from './models.js';
-import { styleOf, layoutGroup, bodyGeometry, openBody, roofObject, slabFollowing, glassMat, setClip, shade, DOOR_ACCENT, liftOf, LIFT } from './character.js';
+import { styleOf, layoutGroup, bodyGeometry, openBody, roofObject, slabFollowing, glassMat, setClip, shade, DOOR_ACCENT, liftOf, LIFT, splitParts, KEEP } from './character.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 let PATH_GEO = null;
 
-const LINE_MAT = new THREE.LineBasicMaterial({ color: '#3d405b', transparent: true, opacity: 0.42, clippingPlanes: CLIP });
+const LINE_MAT = KEEP.keep(new THREE.LineBasicMaterial({ color: '#3d405b', transparent: true, opacity: 0.42, clippingPlanes: CLIP }));
 const lamCache = new Map();
-const lam = hex => { if (!lamCache.has(hex)) lamCache.set(hex, new THREE.MeshLambertMaterial({ color: hex, clippingPlanes: CLIP })); return lamCache.get(hex); };
+const lam = hex => { if (!lamCache.has(hex)) lamCache.set(hex, KEEP.keep(new THREE.MeshLambertMaterial({ color: hex, clippingPlanes: CLIP }))); return lamCache.get(hex); };
 const once = (make) => { let g = null; return () => { if (!g) { g = make(); g.userData.cached = true; } return g; }; };
 const BOX1 = once(() => new THREE.BoxGeometry(1, 1, 1));
 const DOORFRAME = once(() => mergeBoxes([new THREE.BoxGeometry(0.04, 0.54, 0.045).translate(-0.17, 0.27, 0), new THREE.BoxGeometry(0.04, 0.54, 0.045).translate(0.17, 0.27, 0), new THREE.BoxGeometry(0.38, 0.05, 0.045).translate(0, 0.54, 0)]));
@@ -29,6 +29,21 @@ const CHIMNEY_TOP = once(() => new THREE.CylinderGeometry(0.075, 0.075, 0.06, 12
 const POLE = once(() => new THREE.CylinderGeometry(0.012, 0.012, 0.72, 6));
 const FLAG = once(() => { const s = new THREE.Shape(); s.moveTo(0, 0.1); s.lineTo(0.3, 0); s.lineTo(0, -0.1); s.lineTo(0, 0.1); return new THREE.ShapeGeometry(s); });
 const SIGN_GEO = once(() => new THREE.CircleGeometry(0.13, 24));
+
+function courtyard(hole, y0) {
+  const g = new THREE.Group();
+  const toV = p => new THREE.Vector2(p[0], -p[1]);
+  const geo = new THREE.ShapeGeometry(new THREE.Shape(hole.map(toV)));
+  geo.rotateX(-Math.PI / 2); geo.translate(0, y0 + 0.012, 0);
+  const lawn = new THREE.Mesh(geo, lam('#8cc76a'));
+  lawn.receiveShadow = true;
+  g.add(lawn);
+  const cx = hole.reduce((a, p) => a + p[0], 0) / hole.length, cz = hole.reduce((a, p) => a + p[1], 0) / hole.length;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.3, 6), lam('#8d6e52')); trunk.position.set(cx, y0 + 0.15, cz);
+  const crown = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), lam('#5aa34a')); crown.position.set(cx, y0 + 0.48, cz); crown.scale.y = 0.9;
+  for (const m of [trunk, crown]) { m.castShadow = true; g.add(m); }
+  return g;
+}
 
 // Points round an outline, every `step`, pulled in a little (for legs).
 function perimeterPoints(loop, step, inset) {
@@ -72,7 +87,7 @@ const stickerGeo = new THREE.CircleGeometry(0.3, 24).rotateX(-Math.PI / 2);
 stickerGeo.userData.cached = true;
 const stickerMats = new Map();
 function stickerMat(ch) {
-  if (!stickerMats.has(ch)) stickerMats.set(ch, new THREE.MeshBasicMaterial({ map: emojiTexture(ch), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, clippingPlanes: CLIP }));
+  if (!stickerMats.has(ch)) stickerMats.set(ch, KEEP.keep(new THREE.MeshBasicMaterial({ map: emojiTexture(ch), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, clippingPlanes: CLIP })));
   return stickerMats.get(ch);
 }
 export function fishTexture(ch) { return emojiTexture(ch, true); }
@@ -117,7 +132,12 @@ export class DesignView {
     for (const o of [...this.group.children]) {
       this.group.remove(o);
       // Free every geometry made for this build; shared, cached shapes are kept.
-      o.traverse(m => { if ((m.isMesh || m.isLineSegments) && m.geometry && !m.geometry.userData.cached) m.geometry.dispose(); });
+      o.traverse(m => {
+        if ((m.isMesh || m.isLineSegments) && m.geometry && !m.geometry.userData.cached) m.geometry.dispose();
+        if (m.isInstancedMesh) m.dispose();
+        const mats = m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : [];
+        for (const mt of mats) if (!KEEP.has(mt)) mt.dispose();
+      });
     }
     this.byId.clear();
     this.fish = [];
@@ -137,6 +157,29 @@ export class DesignView {
   }
 
   pickables() { return [...this.byId.values()]; }
+
+  // A new block lands with a squash and a stretch (it bounces back to normal in a third of a second).
+  bounce(id) {
+    const objs = this.group.children.filter(o => o.userData.cellId === id || (o.userData.cells && o.userData.cells.includes(id)));
+    if (!objs.length) return;
+    let t = 0;
+    const base = objs.map(o => ({ o, y: o.position.y, sy: o.scale.y, sx: o.scale.x, sz: o.scale.z }));
+    let low = Infinity;
+    objs.forEach(o => { const b = new THREE.Box3().setFromObject(o); if (isFinite(b.min.y)) low = Math.min(low, b.min.y); });
+    if (!isFinite(low)) low = 0;
+    const fn = dt => {
+      t += dt;
+      const k = Math.min(1, t / 0.34);
+      const sq = k < 0.35 ? 1 - 0.18 * Math.sin(k / 0.35 * Math.PI / 2) : 1 + 0.1 * Math.sin((k - 0.35) / 0.65 * Math.PI) * (1 - k);
+      const wide = 1 + (1 - sq) * 0.5;
+      for (const b of base) {
+        b.o.scale.set(b.sx * wide, b.sy * sq, b.sz * wide);
+        b.o.position.y = low + (b.y - low) * sq;
+      }
+      if (k >= 1) { for (const b of base) { b.o.scale.set(b.sx, b.sy, b.sz); b.o.position.y = b.y; } this.world.updaters.delete(fn); }
+    };
+    this.world.updaters.add(fn);
+  }
 
   // Overlapping sandy octagons make a soft, continuous path.
   drawPaths(idx) {
@@ -185,16 +228,17 @@ export class DesignView {
   buildBuilding(idx, cut = false) {
     this.cut = cut;
     setClip(CLIP);
-    const P = { glass: [], frames: [], rings: [], discs: [], doors: [], doorFrames: [], steps: [], legs: [] };
+    const P = { glass: [], frames: [], rings: [], discs: [], pupils: [], doors: [], doorFrames: [], steps: [], legs: [] };
     this.layouts = [];
     for (const g of roomGroups(idx)) {
-      const box = g.cells.filter(c => { const o = idx.occ.get(key(c.x, c.z, g.level)); return o && BOX.has(o.form); });
-      if (!box.length) continue;
+      const allBox = g.cells.filter(c => { const o = idx.occ.get(key(c.x, c.z, g.level)); return o && BOX.has(o.form); });
+      for (const box of splitParts(allBox)) {
       const dcells = [...new Set(box.map(c => idx.occ.get(key(c.x, c.z, g.level))))];
       const style = styleOf(dcells);
       const L = layoutGroup({ room: g.room, level: g.level, cells: box }, idx, this.doors, style, { cut });
       if (!L) continue;
       this.layouts.push(L);
+      const mark = this.group.children.length;
       const c0 = dcells[0];
       const colour = c0.colour || ROOMS[g.room].colour;
       const y0 = g.level * LEVEL_H + (g.level === 0 ? cellGround(box[0].x, box[0].z) : 0) + 0.004;
@@ -236,9 +280,13 @@ export class DesignView {
           const h = 0.42 * f, cy = yb + 0.12 * f + h / 2;
           P.glass.push({ ...at(0, cy), sx: w.w, sy: h, sz: 0.03 });
           P.frames.push({ ...at(0, cy + h / 2), sx: w.w + 0.04, sy: 0.03, sz: 0.045 }, { ...at(0, cy - h / 2), sx: w.w + 0.06, sy: 0.03, sz: 0.07 }, { ...at(0, cy), sx: 0.022, sy: h, sz: 0.04 });
-        } else if (w.type === 'round') {
-          const cy = yb + 0.44 * f;
-          P.discs.push({ ...at(0, cy), r: 0.1 }); P.rings.push({ ...at(0, cy), r: 0.1 });
+        } else if (w.type === 'round' || w.type === 'eye') {
+          const cy = yb + (w.type === 'eye' ? 0.52 : 0.44) * f, r = w.type === 'eye' ? 0.115 : 0.1;
+          P.discs.push({ ...at(0, cy), r }); P.rings.push({ ...at(0, cy), r });
+          if (w.type === 'eye') P.pupils.push({ ...at(0, cy - 0.02, 0.02), r: 0.045 });
+        } else if (w.type === 'smile') {
+          const cy = yb + 0.24 * f;
+          for (let k = -3; k <= 3; k++) { const u = k / 3 * w.w / 2; P.glass.push({ ...at(u, cy + Math.pow(k / 3, 2) * 0.07), sx: w.w / 7 + 0.01, sy: 0.07, sz: 0.03 }); }
         } else if (w.type === 'slot') {
           const h = 0.52 * f, cy = yb + 0.1 * f + h / 2;
           P.glass.push({ ...at(0, cy), sx: 0.075, sy: h, sz: 0.03 });
@@ -256,9 +304,9 @@ export class DesignView {
       // Doors, with steps if the room stands on legs, and a beak if Finn added one.
       for (const d of L.doorPts) {
         const a = Math.atan2(d.nx, d.nz);
-        if (!d.outside) continue;
         P.doors.push({ x: d.x + d.nx * 0.004, y: yb + 0.25, z: d.z + d.nz * 0.004, a, colour: DOOR_ACCENT(colour) });
         P.doorFrames.push({ x: d.x, y: yb + 0.27, z: d.z, a });
+        if (!d.outside) continue;
         if (L.lift) for (let k = 0; k < 2; k++) P.steps.push({ x: d.x + d.nx * (0.08 + k * 0.1), y: yb - 0.07 - k * 0.1, z: d.z + d.nz * (0.08 + k * 0.1), a, w: 0.34 });
         if (style.beak) {
           const bk = new THREE.Mesh(BEAK(), new THREE.MeshLambertMaterial({ color: shade(colour, 0.65), clippingPlanes: CLIP }));
@@ -307,8 +355,10 @@ export class DesignView {
         this.group.add(fl);
         this.flags.push(cloth);
       }
+      // A courtyard closed in by the room becomes a little garden with a tree (like Townscaper).
+      for (const hole of L.holes) this.group.add(courtyard(hole, y0));
       // A round sign with the room's picture high on the sunny side.
-      if (g.room !== 'stairs') {
+      if (g.room !== 'stairs' && style.win !== 'face' && !cut) {
         const seg = L.segs.filter(sg => sg.len > 0.35).sort((p2, q2) => (q2.n[0] * 0.6 + q2.n[1] * 0.8) - (p2.n[0] * 0.6 + p2.n[1] * 0.8))[0];
         if (seg) {
           const sx = (seg.a[0] + seg.b[0]) / 2, sz = (seg.a[1] + seg.b[1]) / 2;
@@ -318,6 +368,22 @@ export class DesignView {
           this.group.add(sign);
         }
       }
+      const ids = dcells.map(o => o.id);
+      for (let k = mark; k < this.group.children.length; k++) this.group.children[k].userData.cells = ids;
+      }
+    }
+    // Round rooms get a real door where the door map puts one.
+    for (const d of this.doors.values()) {
+      const c = idx.occ.get(key(d.x, d.z, d.l));
+      if (!c || (c.form !== 'cylinder' && c.form !== 'dome')) continue;
+      const ps = footprint(c);
+      const cx = ps.reduce((a, q) => a + q.x + 0.5, 0) / ps.length, cz = ps.reduce((a, q) => a + q.z + 0.5, 0) / ps.length;
+      const r = c.form === 'cylinder' ? 0.48 : 0.97;
+      const ex = d.x + 0.5 + d.dx * 0.5 - cx, ez = d.z + 0.5 + d.dz * 0.5 - cz, el = Math.hypot(ex, ez) || 1;
+      const x = cx + ex / el * r, z = cz + ez / el * r, a = Math.atan2(ex, ez);
+      const y = d.l * LEVEL_H + (d.l === 0 ? cellGround(d.x, d.z) : 0);
+      P.doors.push({ x, y: y + 0.25, z, a, colour: DOOR_ACCENT(c.colour || ROOMS[c.room].colour) });
+      P.doorFrames.push({ x, y: y + 0.27, z, a });
     }
     this.instanced(P);
 
@@ -326,7 +392,7 @@ export class DesignView {
     for (const c of idx.design.cells) {
       if (BOX.has(c.form)) {
         const p = new THREE.Mesh(formGeometry(c.form, 'building'), proxyMat);
-        placeObject(p, c, (c.level === 0 ? cellGround(c.x, c.z) : 0) + liftOf(c));
+        placeObject(p, c, (c.level === 0 ? cellGround(c.x, c.z) : 0) + liftOf(c, idx));
         p.userData.cellId = c.id;
         this.group.add(p);
         this.byId.set(c.id, p);
@@ -364,6 +430,7 @@ export class DesignView {
     make(BOX1(), shared.frame, P.frames, it => { faced(it); s.set(it.sx, it.sy, it.sz); });
     make(DISC(), glassMat(), P.discs, it => { faced(it); s.set(it.r / 0.1, it.r / 0.1, 1); });
     make(RING(), shared.frame, P.rings, it => { faced(it); s.set(it.r / 0.1, it.r / 0.1, 1); });
+    make(DISC(), shared.dark, P.pupils, it => { faced(it); s.set(it.r / 0.1, it.r / 0.1, 1.2); });
     make(BOX1(), new THREE.MeshLambertMaterial({ color: '#ffffff', clippingPlanes: CLIP }), P.doors, it => { faced(it); s.set(0.3, 0.5, 0.035); }, it => it.colour);
     make(DOORFRAME(), shared.frame, P.doorFrames, it => { faced(it); p.y -= 0.27; });
     make(BOX1(), shared.frame, P.steps, it => { faced(it); s.set(it.w, 0.05, 0.12); });
@@ -490,7 +557,7 @@ export class DesignView {
       if (!plan || !isRoomCell(c) || c.form === 'dome' && false) continue;
       const [x, z, l] = k.split(',').map(Number);
       if (FORMS[c.form].levels > 1 && l > c.level) continue;
-      const y = l * LEVEL_H + (l === 0 ? cellGround(x, z) : 0) + 0.014 + liftOf(c);
+      const y = l * LEVEL_H + (l === 0 ? cellGround(x, z) : 0) + 0.014 + liftOf(c, idx);
       for (const [model, hgt, u, v, turn] of plan) {
         if (!want.has(model)) want.set(model, []);
         height[model] = hgt;
@@ -501,7 +568,7 @@ export class DesignView {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3();
     for (const [model, list] of want) {
       let parts;
-      try { parts = await staticParts(F + model + '.glb', height[model], { clippingPlanes: CLIP }); } catch (e) { continue; }
+      try { parts = await staticParts(F + model + '.glb', height[model], { clippingPlanes: CLIP, maxW: model.startsWith('rug') ? 0.6 : 0.85 }); } catch (e) { continue; }
       if (gen !== this.gen) return;      // the design changed while loading
       for (const part of parts) {
         const im = new THREE.InstancedMesh(part.geometry, part.material, list.length);
@@ -597,7 +664,7 @@ function seeThrough(m) {
   if (!stCache.has(m.uuid)) {
     const c = m.clone();
     c.transparent = true; c.opacity = Math.min(m.opacity ?? 1, 0.38); c.depthWrite = false;
-    stCache.set(m.uuid, c);
+    stCache.set(m.uuid, KEEP.keep(c));
   }
   return stCache.get(m.uuid);
 }

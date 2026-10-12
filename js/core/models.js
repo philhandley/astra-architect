@@ -1,6 +1,7 @@
 // GLB loading with a cache. Kenney models use unlit materials, so they are swapped for lit ones.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { KEEP } from './character.js';
 
 const loader = new GLTFLoader();
 const cache = new Map();
@@ -36,7 +37,7 @@ export function litMaterial(m, extra = {}) {
 // and its height is `height` units. Returns [{ geometry, material }].
 const partsCache = new Map();
 export function staticParts(url, height = 1, extra = {}) {
-  const k = url + '|' + height + '|' + (extra.tint || '');
+  const k = url + '|' + height + '|' + (extra.tint || '') + '|' + (extra.maxW || '');
   if (!partsCache.has(k)) partsCache.set(k, makeParts(url, height, extra));
   return partsCache.get(k);
 }
@@ -46,7 +47,8 @@ async function makeParts(url, height, extra) {
   root.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(root);
   const size = box.getSize(new THREE.Vector3());
-  const s = height / (size.y || 1);
+  // Scale to the wanted height, but never wider than maxW (very flat things like rugs would grow huge).
+  const s = Math.min(height / (size.y || 1), extra.maxW ? extra.maxW / (Math.max(size.x, size.z) || 1) : Infinity);
   const centre = box.getCenter(new THREE.Vector3());
   const norm = new THREE.Matrix4().makeScale(s, s, s).multiply(new THREE.Matrix4().makeTranslation(-centre.x, -box.min.y, -centre.z));
   const byMat = new Map();
@@ -85,7 +87,8 @@ async function makeParts(url, height, extra) {
     const merged = clean.length > 1 ? mergeGeometries(clean, false) : clean[0];
     if (!merged.attributes.normal) merged.computeVertexNormals();
     merged.userData.cached = true;
-    parts.push({ geometry: merged, material: litMaterial(mat, extra) });
+    merged.userData.cached = true;
+    parts.push({ geometry: merged, material: KEEP.keep(litMaterial(mat, extra)) });
   }
   return parts;
 }

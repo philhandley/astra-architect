@@ -55,6 +55,34 @@ export function computeDoors(idx) {
     if (!chosen.length) chosen.push(cands[0]);
     for (const d of chosen) doors.set(dkey(d), d);
   }
+  // Inside doors: one between each pair of rooms that share a wall, near the middle of that wall.
+  const groupAt = new Map();
+  roomGroups(idx).forEach((g, gi) => { for (const p of g.cells) groupAt.set(key(p.x, p.z, g.level), gi); });
+  const shared = new Map();
+  for (const [k, gi] of groupAt) {
+    const [x, z, l] = k.split(',').map(Number);
+    const c = idx.occ.get(k);
+    if (!isRoomCell(c)) continue;
+    for (const [dx, dz] of [[1, 0], [0, 1]]) {
+      const k2 = key(x + dx, z + dz, l);
+      const gj = groupAt.get(k2);
+      if (gj === undefined || gj === gi) continue;
+      const n = idx.occ.get(k2);
+      if (!isRoomCell(n)) continue;
+      if (c.form === 'arch' && !archOpenSide(c, dx, dz)) continue;
+      if (n.form === 'arch' && !archOpenSide(n, dx, dz)) continue;
+      const pk = gi < gj ? `${gi}-${gj}` : `${gj}-${gi}`;
+      if (!shared.has(pk)) shared.set(pk, []);
+      shared.get(pk).push({ x, z, l, dx, dz });
+    }
+  }
+  for (const list of shared.values()) {
+    list.sort((a, b) => a.z - b.z || a.x - b.x);
+    const d = list[Math.floor((list.length - 1) / 2)];
+    const a = { ...d, room: idx.occ.get(key(d.x, d.z, d.l)).room, inside: true };
+    const b = { x: d.x + d.dx, z: d.z + d.dz, l: d.l, dx: -d.dx, dz: -d.dz, room: idx.occ.get(key(d.x + d.dx, d.z + d.dz, d.l)).room, inside: true };
+    doors.set(dkey(a), a); doors.set(dkey(b), b);
+  }
   return doors;
 }
 export const dkey = d => `${d.x},${d.z},${d.l},${d.dx},${d.dz}`;
@@ -91,7 +119,7 @@ export function buildGraph(idx, doors, paths = computePaths(idx, doors)) {
       const c = idx.occ.get(key(x, z, l));
       const k = key(x, z, l);
       if (c) {
-        if (isRoomCell(c)) add(k, { x, z, l, y: l * LEVEL_H + cellGround(x, z) * (l === 0 ? 1 : 0) + 0.01 + (BOX.has(c.form) ? liftOf(c) : 0), kind: 'room', room: c.room, cell: c });
+        if (isRoomCell(c)) add(k, { x, z, l, y: l * LEVEL_H + cellGround(x, z) * (l === 0 ? 1 : 0) + 0.01 + (BOX.has(c.form) ? liftOf(c, idx) : 0), kind: 'room', room: c.room, cell: c });
         else if (FORMS[c.form].flat) add(k, { x, z, l, y: l * LEVEL_H + (l === 0 ? cellGround(x, z) : 0) + 0.07, kind: 'pad', room: c.room, cell: c });
         else if (c.form === 'slab') add(k, { x, z, l, y: l * LEVEL_H + 0.22, kind: c.room === 'pool' ? 'pool' : 'deck', room: c.room, cell: c });
         else if (c.form === 'wedge') add(k, { x, z, l, y: l * LEVEL_H + 0.02, kind: 'slide', room: 'slide', cell: c });
@@ -123,13 +151,13 @@ export function buildGraph(idx, doors, paths = computePaths(idx, doors)) {
         if (n.room === m.room) {
           if (n.cell.form === 'arch' && m.cell.form === 'arch' && !archOpenSide(n.cell, dx, dz)) continue;
           link(k, mk, 1);
-        } else link(k, mk, 1.4, 'door');      // different rooms always have a door between them
+        } else if (doors.has(`${n.x},${n.z},${n.l},${dx},${dz}`)) link(k, mk, 1.4, 'door');   // the one door between two rooms
         continue;
       }
       if (nRoom || mRoom) {
         const r = nRoom ? n : m, out = nRoom ? m : n;
         const ddx = out.x - r.x, ddz = out.z - r.z;
-        const hasDoor = doors.has(`${r.x},${r.z},${r.l},${ddx},${ddz}`) || (OPEN_ROOM.has(r.cell.form) && r.cell.form !== 'arch');
+        const hasDoor = doors.has(`${r.x},${r.z},${r.l},${ddx},${ddz}`);
         if (hasDoor) link(k, mk, 1.2, 'door');
         continue;
       }

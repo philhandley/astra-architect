@@ -284,7 +284,15 @@ img.emo { width: 1.25em; height: 1.25em; vertical-align: -0.25em; display: inlin
 .pill input[type=range] { width: 220px; height: 44px; accent-color: var(--orange); }
 .pill img { width: 30px; height: 30px; }
 
-.tasks { position: absolute; left: 326px; bottom: 14px; z-index: 6; background: rgba(255,255,255,0.96); border-radius: 22px; box-shadow: var(--shadow); padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
+.tasks { order: -1; flex-basis: 100%; max-width: 520px; display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.97); border-radius: 999px; box-shadow: var(--shadow); padding: 6px 18px 6px 6px; cursor: pointer; }
+.tasks .speak-btn { width: 52px; height: 52px; }
+.tasks .tnow { flex: 1; display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; line-height: 1.2; }
+.tasks .tnow img { width: 40px; height: 40px; flex: none; }
+.tasks .tdots { display: flex; gap: 5px; flex: none; }
+.tasks .tdots i { width: 11px; height: 11px; border-radius: 50%; background: var(--line); }
+.tasks .tdots i.done { background: var(--green); }
+.tasks .tdots i.now { background: var(--blue); transform: scale(1.3); }
+.tasks.alldone { background: var(--green-soft); box-shadow: 0 0 0 3px var(--green), var(--shadow); }
 .tasks .tt { font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; min-height: 28px; }
 .tasks .tt .fold svg { width: 20px; height: 20px; transition: transform .2s; }
 .tasks.folded .task { display: none; }
@@ -430,3 +438,58 @@ img.emo { width: 1.25em; height: 1.25em; vertical-align: -0.25em; display: inlin
 .sopt svg.sty { width: 58px; height: 58px; }
 .sopt { min-width: 100px; min-height: 100px; }
 .floatbar .fb.style { background: linear-gradient(135deg, #e76f51, #f4a261 45%, #2a9d8f); color: #fff; }
+
+.ghost-tag.happy { box-shadow: 0 0 0 3px #6ab04c, 0 4px 14px rgba(0,0,0,.2); }
+
+/* Round 1 polish */
+.tgroups { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; background: var(--paper-2); border-radius: 18px; padding: 4px; }
+.tgroup { appearance: none; border: 0; cursor: pointer; background: transparent; border-radius: 14px; min-height: 58px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: 700 10.5px/1 var(--font); color: var(--ink-2); padding: 4px 0; }
+.tgroup img { width: 28px; height: 28px; }
+.tgroup.on { background: #fff; color: var(--blue); box-shadow: 0 0 0 3px var(--blue) inset; }
+.floatbar .fb.lab { flex-direction: column; gap: 1px; padding: 0 8px; min-width: 60px; }
+.floatbar .fb.lab svg { width: 26px; height: 26px; }
+.floatbar .fb small { font-size: 11px; font-weight: 700; line-height: 1; }
+.style-panel { height: 330px; }
+.style-panel .optrow { flex: 1; overflow-y: auto; align-content: flex-start; }
+.style-panel .tabs { background: #e9eef8; padding: 5px; border-radius: 24px; gap: 4px; flex: none; }
+.style-panel .stab { background: transparent; height: 66px; }
+.style-panel .stab.on { background: var(--blue); color: #fff; box-shadow: 0 3px 8px rgba(47,111,228,.35); }
+.next-btn.wait { background: var(--paper); color: var(--blue); box-shadow: 0 0 0 3px var(--blue) inset; }
+.mission-tile.next { box-shadow: 0 0 0 4px var(--mc), var(--shadow-lg); }
+.mission-tile .ribbon { position: absolute; top: -14px; right: 14px; background: var(--go); color: #fff; font-weight: 800; font-size: 17px; padding: 6px 14px 6px 10px; border-radius: 999px; display: flex; align-items: center; gap: 4px; box-shadow: 0 4px 0 rgba(0,0,0,.16); animation: pulse 1.6s infinite; }
+.mission-tile .ribbon svg { width: 20px; height: 20px; }
+.studio-card { min-height: 230px; }
+.brief-item { cursor: pointer; padding: 8px 12px; }
+.brief-item .tick.say { border: 0; background: var(--paper); color: var(--ink-3); }
+.brief-item .tick.say svg { width: 20px; height: 20px; }
+.choice .cpic { width: 96px; height: 96px; display: grid; place-items: center; flex: none; }
+.choice .cpic svg { width: 96px; height: 96px; }
+.choice .cpic.crop { width: 150px; height: 104px; border-radius: 16px; background: url('../assets/site/map.jpg') no-repeat; background-size: 520% auto; box-shadow: inset 0 0 0 3px rgba(255,255,255,.7); }
+.choice img.cemo { width: 84px; height: 84px; }
+.ctile .foot { position: absolute; right: 4px; top: 4px; width: 20px; height: 20px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.3)); }
+.ctile .blk svg { width: 50px; height: 50px; }
+.ctile.small .blk svg { width: 40px; height: 40px; }
+.ctray.rows { flex-direction: column; gap: 6px; overflow: visible; }
+.ctray .trow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ctray .tlabel { display: flex; align-items: center; gap: 6px; font-size: 15px; min-width: 92px; color: var(--ink-2); }
+.ctray .tlabel img { width: 28px; height: 28px; }
+.ctray.rows .grp { flex-wrap: wrap; }
+.btn.gobtn { min-width: 150px; }
+.walk-pad { bottom: 86px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.0) 54%, rgba(255,255,255,.55) 55%, rgba(255,255,255,.55) 62%, rgba(255,255,255,0) 63%); }
+.walk-pad::before { content: ''; position: absolute; inset: -18px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='%232f6fe4' opacity='.8'%3E%3Cpath d='M50 2l7 9H43zM50 98l7-9H43zM2 50l9-7v14zM98 50l-9-7v14z'/%3E%3C/g%3E%3C/svg%3E") center/100% no-repeat; pointer-events: none; }
+.walk-dest { flex-wrap: wrap; max-height: 190px; overflow-y: auto; }
+
+.day { gap: 8px; padding: 10px 16px 12px; }
+.daybar { flex-wrap: wrap; row-gap: 6px; }
+.daybar .dtabs, .daybar .pslot { display: flex; gap: 6px; }
+.daybar .pslot .pupils { padding: 0; }
+.day .strip { min-height: 88px; padding: 6px 8px; }
+.day .strip .ctile { width: 76px; height: 76px; }
+.day .strip .ctile img { width: 40px; height: 40px; }
+.ctile.small { width: 56px; height: 56px; font-size: 10px; border-radius: 14px; }
+.ctile.small img { width: 30px; height: 30px; }
+.ctile.small .foot { width: 16px; height: 16px; right: 2px; top: 2px; }
+.ctray .tlabel { min-width: 72px; font-size: 14px; }
+.ctray .trow, .ctray.rows .grp { gap: 4px; }
+.ctray.rows .grp { padding-right: 6px; margin-right: 2px; }
+.day .btn.gobtn { min-height: 60px; font-size: 22px; }

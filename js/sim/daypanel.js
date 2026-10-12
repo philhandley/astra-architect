@@ -2,6 +2,7 @@
 import { store } from '../core/store.js';
 import { ROOMS, ACTIVITIES, ACTIVITY_ORDER } from '../core/catalogue.js';
 import { roomGroups } from '../core/design.js';
+import { formIcon } from '../ui/formicons.js';
 import { Day, report, PERIOD, BELLS, TILE } from './sim.js';
 import { PupilsView } from './pupils3d.js';
 import { emo } from '../core/emoji.js';
@@ -9,6 +10,7 @@ import { icon } from '../core/icons.js';
 import { h, esc, say, sayAuto, sfx, toast, hush } from '../ui/dom.js';
 
 const MAX_TILES = 8;
+const SHORT = { pool: 'Pool', track: 'Track', yoga: 'Chill-out', lunch: 'Lunch', classroom: 'Classroom', climbing: 'Climbing', changing: 'Changing', toilets: 'Toilets' };
 
 export async function openDayPanel(api, world, root, opts = {}) {
   const S = store.state;
@@ -25,10 +27,13 @@ export async function openDayPanel(api, world, root, opts = {}) {
 
   const el = h(`<div class="day">
     <div class="daybar">
-      <h3>${emo('🔔')} School day</h3>
+      <h3>${emo(opts.codeOnly ? '🧩' : '🔔')} ${opts.codeOnly ? 'Code' : 'School day'}</h3>
+      <div class="dtabs"></div>
       <div class="bells"></div>
       <div class="clock"></div>
+      <div class="pslot"></div>
       <div style="flex:1"></div>
+      <span class="codeact" style="display:flex;gap:8px"></span>
       <span class="ctl" style="display:flex;gap:8px"></span>
       <button class="btn ghost round small close" type="button" aria-label="Close">${icon('close')}</button>
     </div>
@@ -39,14 +44,22 @@ export async function openDayPanel(api, world, root, opts = {}) {
   requestAnimationFrame(shift);
   const ro = new ResizeObserver(shift);
   ro.observe(el);
+  // Keep the rails clear of the panel, then frame the school in the space above it.
+  const lrail = root.querySelector('.rail.left'), rrail = root.querySelector('.rail.right'), tright = root.querySelector('.topright');
+  const oldL = lrail.style.display, oldR = rrail.style.display, oldT = tright ? tright.style.display : '';
+  lrail.style.display = 'none';
+  rrail.style.display = 'none';
+  if (tright) tright.style.display = 'none';
+  shift();
   api.frameModel(false, false, true);
   api.setCutaway(true);
-  // Keep the rails clear of the panel.
-  const lrail = root.querySelector('.rail.left'), rrail = root.querySelector('.rail.right');
-  const oldL = lrail.style.display;
-  lrail.style.display = 'none';
-  rrail.style.bottom = '';
+  // If the school changes while the panel is open, the pupils use the new one.
+  const offChange = api.on('change', () => {
+    if (running) stopRun();
+    else { day = new Day(api.idx, pupils(), S.bells, {}); view.ensure(day.pupils); drawBody(); }
+  });
   const bellsEl = el.querySelector('.bells'), clock = el.querySelector('.clock'), ctl = el.querySelector('.ctl'), body = el.querySelector('.body');
+  const dtabs = el.querySelector('.dtabs'), pslot = el.querySelector('.pslot'), codeact = el.querySelector('.codeact');
   el.querySelector('.close').addEventListener('click', close);
 
   function drawBells() {
@@ -63,6 +76,7 @@ export async function openDayPanel(api, world, root, opts = {}) {
   function drawCtl() {
     ctl.innerHTML = '';
     if (!running) {
+      if (opts.codeOnly) return;
       const run = h(`<button class="btn go" type="button">${icon('play')} Run the day</button>`);
       run.addEventListener('click', () => startRun('day'));
       ctl.append(run);
@@ -80,12 +94,10 @@ export async function openDayPanel(api, world, root, opts = {}) {
 
   // ---------- Body: code, timetable or report ----------
   function drawBody() {
-    body.innerHTML = '';
+    body.innerHTML = ''; dtabs.innerHTML = ''; pslot.innerHTML = ''; codeact.innerHTML = '';
     if (tab === 'report') return drawReport();
-    const tabs = h(`<div class="row" style="gap:8px"></div>`);
     const tb = (id, ic, label) => { const b = h(`<button class="btn small ${tab === id ? '' : 'ghost'}" type="button">${emo(ic)} ${label}</button>`); b.addEventListener('click', () => { tab = id; drawBody(); }); return b; };
-    if (!opts.codeOnly) tabs.append(tb('code', '🧩', 'Code a pupil'), tb('bells', '🔔', 'Bell timetable'));
-    body.append(tabs);
+    if (!opts.codeOnly) dtabs.append(tb('code', '🧩', 'Code'), tb('bells', '🔔', 'Timetable'));
     if (tab === 'bells') return drawTimetable();
     drawCode();
   }
@@ -94,7 +106,8 @@ export async function openDayPanel(api, world, root, opts = {}) {
     const { kind, arg } = TILE.parse(t);
     if (kind === 'go') {
       const R = ROOMS[arg];
-      return `<button class="ctile go ${cls}" type="button" data-i="${i}">${icon('next', 'arrow')}${emo(arg === 'gate' ? '🚪' : R?.emoji || '❓')}<span>${esc(arg === 'gate' ? 'Gate' : R?.name.split(' ')[0] || arg)}</span></button>`;
+      const pic = arg === 'gate' || !R ? emo('🚪') : `<span class="blk">${formIcon(R.form, 'iso', R.colour)}</span>`;
+      return `<button class="ctile go ${cls}" type="button" data-i="${i}">${emo('👣', 'foot')}${pic}<span>${esc(arg === 'gate' ? 'Gate' : SHORT[arg] || R?.name.split(' ')[0] || arg)}</span></button>`;
     }
     if (kind === 'do') return `<button class="ctile do ${cls}" type="button" data-i="${i}">${emo(ACTIVITIES[arg]?.emoji || '❓')}<span>${esc(ACTIVITIES[arg]?.name || arg)}</span></button>`;
     if (kind === 'wait') return `<button class="ctile wait ${cls}" type="button" data-i="${i}">${emo(arg === 'bell' ? '🔔' : '⏳')}<span>${arg === 'bell' ? 'Wait for bell' : 'Wait'}</span></button>`;
@@ -113,7 +126,8 @@ export async function openDayPanel(api, world, root, opts = {}) {
   function drawCode() {
     const P = pupils();
     const chips = h(`<div class="pupils"></div>`);
-    P.forEach((p, i) => {
+    if (sel >= 6) sel = 0;
+    P.slice(0, 6).forEach((p, i) => {
       const b = h(`<button class="pupil-chip ${i === sel ? 'on' : ''}" type="button"><span class="av" style="background:${p.colour}">${esc(p.name[0])}</span>${esc(p.name)}${p.strip.length ? emo('🧩', 'coded') : ''}</button>`);
       b.addEventListener('click', () => { sel = i; drawBody(); sfx.tap(); });
       chips.append(b);
@@ -128,17 +142,16 @@ export async function openDayPanel(api, world, root, opts = {}) {
       st.splice(i, 1); store.save(); sfx.thud(); drawBody(); api.emit('codeChange', { pupil: sel, strip: [...st] });
     }));
     const actions = h(`<div class="row" style="gap:8px"></div>`);
-    actions.append(chips);
     const right = h(`<div style="display:flex;gap:8px;margin-left:auto"></div>`);
-    const tryBtn = h(`<button class="btn go" type="button" ${st.length ? '' : 'disabled'}>${icon('play')} Try ${esc(P[sel].name)}'s code</button>`);
+    const tryBtn = h(`<button class="btn go big gobtn" type="button" ${st.length ? '' : 'disabled'} aria-label="Go: try ${esc(P[sel].name)}'s code">${icon('play')} Go!</button>`);
     tryBtn.addEventListener('click', () => askPredict());
     const clr = h(`<button class="btn ghost small" type="button" ${st.length ? '' : 'disabled'}>${icon('trash')} Clear</button>`);
     clr.addEventListener('click', () => { st.length = 0; store.save(); drawBody(); api.emit('codeChange', { pupil: sel, strip: [] }); });
-    right.append(clr, tryBtn);
-    actions.append(right);
-    body.append(actions, strip);
-    // Tray of tiles.
-    const tray = h(`<div class="ctray"></div>`);
+    // With one pupil everything fits on the top bar; with a class, the pupils get their own row.
+    if (opts.codeOnly || P.length < 2) { pslot.append(chips); if (!running) codeact.append(clr, tryBtn); body.append(strip); }
+    else { right.append(clr, tryBtn); if (running) right.innerHTML = ''; actions.append(chips, right); body.append(actions, strip); }
+    // Tiles, in two labelled rows: places to go, and things to do.
+    const tray = h(`<div class="ctray rows"></div>`);
     const rooms = [...new Set(roomGroups(api.idx).map(g => g.room))].filter(r => !['stairs', 'bridge', 'slide'].includes(r));
     const groups = [
       ['go', ['go:gate', ...rooms.map(r => `go:${r}`)]],
@@ -146,8 +159,12 @@ export async function openDayPanel(api, world, root, opts = {}) {
       ['wait', ['wait:bell', 'wait:short']],
       ['again', ['again:2', 'again:3', 'again:forever']],
     ];
-    for (const [, list] of groups) {
+    const rowGo = h(`<div class="trow"><span class="tlabel">${emo('🚶')}<b>Go to</b></span></div>`);
+    const rowDo = h(`<div class="trow"><span class="tlabel">${emo('🤸')}<b>Do</b></span></div>`);
+    tray.append(rowGo, rowDo);
+    for (const [kind, list] of groups) {
       const g = h(`<div class="grp"></div>`);
+      (kind === 'go' ? rowGo : rowDo).append(g);
       for (const t of list) {
         const b = h(tileHTML(t, -1, 'small'));
         b.addEventListener('click', () => {
@@ -158,7 +175,6 @@ export async function openDayPanel(api, world, root, opts = {}) {
         });
         g.append(b);
       }
-      tray.append(g);
     }
     body.append(tray);
     // Drag to reorder (SortableJS), if it loads.
@@ -303,16 +319,20 @@ export async function openDayPanel(api, world, root, opts = {}) {
 
   function close() {
     ro.disconnect();
+    offChange();
     world.setViewShift(0);
     api.setCutaway(false);
     world.updaters.delete(tick);
     view.clear();
     el.remove();
     lrail.style.display = oldL;
+    rrail.style.display = oldR;
+    if (tright) tright.style.display = oldT;
     hush();
     opts.onClose && opts.onClose();
   }
 
+  if (opts.codeOnly) bellsEl.style.display = 'none';
   drawBells(); drawCtl(); drawBody();
   clock.textContent = '';
   if (opts.autoplay) startRun('day');

@@ -4,14 +4,20 @@
 // by the 3D builder and the plan drawing, so both always agree.
 import * as THREE from 'three';
 import { ROOMS, LEVEL_H } from './catalogue.js';
-import { key } from './design.js';
+import { key, roomGroups } from './design.js';
+
+// Materials kept across rebuilds (everything cached). Anything else is freed when the school is rebuilt.
+const keepSet = new WeakSet();
+export const KEEP = { has: m => keepSet.has(m), keep: m => { keepSet.add(m); return m; } };
 
 export const ROOFS = ['flat', 'pitch', 'pyramid', 'cone', 'barrel', 'saw', 'mono', 'dome'];
-export const WINDOWS = ['big', 'round', 'slot', 'strip', 'grid', 'none'];
+export const WINDOWS = ['big', 'round', 'face', 'slot', 'strip', 'grid', 'none'];
 export const WALLS = ['straight', 'round', 'curvy', 'wave'];
 export const SIDES = ['s', 'e', 'n', 'w'];
 export const ROOF_NAMES = { flat: 'Flat', pitch: 'Pointy', pyramid: 'Pyramid', cone: 'Witch hat', barrel: 'Round', saw: 'Zigzag', mono: 'Slope', dome: 'Dome' };
-export const WINDOW_NAMES = { big: 'Big glass', round: 'Portholes', slot: 'Slits', strip: 'Strip', grid: 'Grid', none: 'None' };
+export const WINDOW_NAMES = { big: 'Big glass', round: 'Portholes', face: 'A face', slot: 'Slits', strip: 'Strip', grid: 'Grid', none: 'None' };
+// Every room has a character name, read aloud in the Style workshop (an idea from John Hejduk's drawings).
+export const CHARACTER_NAMES = { classroom: 'the Thinking House', hall: 'the Big Jump Hall', library: 'the Story Tower', lunch: 'the Munch House', art: 'the Paint Pot', music: 'the Drum House', toilets: 'the Splash Room', changing: 'the Wiggle Room', yoga: 'the Calm Shell', aquarium: 'the Fish Palace', lookout: 'the Seagull Tower', climbing: 'the Monkey Tower', stairs: 'the Up and Down' };
 export const WALL_NAMES = { straight: 'Straight', round: 'Soft corners', curvy: 'Curvy', wave: 'Wavy' };
 
 // Every kind of room starts with its own character, so a new school already looks like a little village.
@@ -40,7 +46,43 @@ export function styleOf(cells) {
 }
 
 export const LIFT = 0.28;                 // how high legs raise a room
-export const liftOf = c => (c && c.style && c.style.legs && c.level === 0 ? LIFT : 0);
+// A room stands on legs only on the ground and with nothing on top. The whole room shares one answer.
+export function liftOf(c, idx) {
+  if (!c || c.level !== 0) return 0;
+  if (!idx) return c.style && c.style.legs ? LIFT : 0;
+  if (!idx._lifted) idx._lifted = liftedCells(idx);
+  return idx._lifted.has(c.id) ? LIFT : 0;
+}
+function liftedCells(idx) {
+  const out = new Set();
+  for (const g of roomGroups(idx)) {
+    if (g.level !== 0) continue;
+    const dc = [...g.forms].map(id => idx.byId.get(id)).filter(Boolean);
+    if (!styleOf(dc).legs) continue;
+    if (g.cells.some(p => idx.occ.has(key(p.x, p.z, 1)))) continue;
+    for (const c of dc) out.add(c.id);
+  }
+  return out;
+}
+// Split cells into pieces that touch side by side (a curved block can cut a room in two).
+export function splitParts(cells) {
+  const left = new Map(cells.map(c => [`${c.x},${c.z}`, c]));
+  const parts = [];
+  while (left.size) {
+    const [k0, c0] = left.entries().next().value;
+    left.delete(k0);
+    const part = [c0], todo = [c0];
+    while (todo.length) {
+      const c = todo.pop();
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const k = `${c.x + dx},${c.z + dz}`;
+        if (left.has(k)) { const n = left.get(k); left.delete(k); part.push(n); todo.push(n); }
+      }
+    }
+    parts.push(part);
+  }
+  return parts;
+}
 
 const SIDE_VEC = { s: [0, 1], n: [0, -1], e: [1, 0], w: [-1, 0] };
 
@@ -63,13 +105,22 @@ export function traceLoops(cells) {
     const [startK] = edges.keys();
     let [cx, cz] = startK.split(',').map(Number);
     const loop = [[cx, cz]];
-    let guard = 0;
+    let guard = 0, px = null, pz = null;
     while (guard++ < 10000) {
       const k = `${cx},${cz}`;
       const outs = edges.get(k);
       if (!outs || !outs.length) { edges.delete(k); break; }
-      const [nx, nz] = outs.shift();
+      // Where two corners touch, always keep to the outside (the sharper left turn), so a courtyard stays
+      // a closed courtyard whatever order the blocks were built in.
+      let pick = 0;
+      if (outs.length > 1 && px !== null) {
+        const ix = cx - px, iz = cz - pz;
+        const turn = o => ix * (o[1] - cz) - iz * (o[0] - cx);
+        pick = outs.reduce((bi, o, i) => (turn(o) < turn(outs[bi]) ? i : bi), 0);
+      }
+      const [nx, nz] = outs.splice(pick, 1)[0];
       if (!outs.length) edges.delete(k);
+      px = cx; pz = cz;
       cx = nx; cz = nz;
       if (cx === loop[0][0] && cz === loop[0][1]) break;
       loop.push([cx, cz]);
@@ -164,7 +215,7 @@ export function layoutGroup(group, idx, doors, style, { cut = false } = {}) {
   const bbox = { x0: Math.min(...xs), z0: Math.min(...zs), x1: Math.max(...xs) + 1, z1: Math.max(...zs) + 1 };
   const rect = cells.length === (bbox.x1 - bbox.x0) * (bbox.z1 - bbox.z0) && !holes.length;
   const covered = cells.some(c => idx.occ.has(key(c.x, c.z, group.level + 1)));
-  const lift = style.legs && group.level === 0 ? LIFT : 0;
+  const lift = style.legs && group.level === 0 && !covered ? LIFT : 0;
   const tall = covered || cut ? 0 : (style.tall || 0);
   const height = cut ? 0.26 : LEVEL_H * (1 + 0.45 * tall);
   // Wall segments (outer and courtyards), with outward normals.
@@ -177,13 +228,23 @@ export function layoutGroup(group, idx, doors, style, { cut = false } = {}) {
     const k = `${x},${z},${group.level},${dx},${dz}`;
     const n = idx.occ.get(key(x + dx, z + dz, group.level));
     if (n && n.room === group.room) continue;
-    if (!doors.has(k) && !(n && isRoomish(n))) continue;
+    if (!doors.has(k)) continue;
     const p = nearestOn(segs, x + 0.5 + dx * 0.5, z + 0.5 + dz * 0.5);
     if (p) doorPts.push({ ...p, outside: !n, dx, dz });
   }
   // Windows evenly along the walls, keeping clear of corners and doors.
   const windows = [];
-  if (!cut && style.win !== 'none') {
+  if (!cut && style.win === 'face') {
+    // Two round eyes and a wide smile on the sunniest long wall.
+    const front = segs.filter(s => s.len > 0.6).sort((p, q) => (q.n[0] * 0.6 + q.n[1] * 0.8) - (p.n[0] * 0.6 + p.n[1] * 0.8))[0];
+    if (front) {
+      const at = t => [front.a[0] + (front.b[0] - front.a[0]) * t, front.a[1] + (front.b[1] - front.a[1]) * t];
+      const e = Math.min(0.3, 0.32 / front.len);
+      for (const t of [0.5 - e, 0.5 + e]) { const [x, z] = at(t); windows.push({ x, z, nx: front.n[0], nz: front.n[1], w: 0.2, type: 'eye' }); }
+      if (!doorPts.some(d => Math.hypot(d.x - at(0.5)[0], d.z - at(0.5)[1]) < 0.3)) { const [x, z] = at(0.5); windows.push({ x, z, nx: front.n[0], nz: front.n[1], w: Math.min(0.5, front.len * 0.4), type: 'smile' }); }
+    }
+  }
+  if (!cut && style.win !== 'none' && style.win !== 'face') {
     const spacing = { big: 0.5, round: 0.34, slot: 0.26, strip: 0.2, grid: 0.5 }[style.win] || 0.5;
     for (const s of segs) {
       if (style.win === 'strip') {
@@ -226,7 +287,7 @@ const isRoomish = n => n && !['pad', 'slab', 'wedge', 'roof'].includes(n.form);
 
 // ---------- 3D ----------
 const mats = new Map();
-const M = (k, make) => { if (!mats.has(k)) mats.set(k, make()); return mats.get(k); };
+const M = (k, make) => { if (!mats.has(k)) mats.set(k, KEEP.keep(make())); return mats.get(k); };
 let CLIPS = [];
 export function setClip(arr) { CLIPS = arr; }
 const lam = (hex, extra = {}) => M(hex + JSON.stringify(extra), () => new THREE.MeshLambertMaterial({ color: hex, clippingPlanes: CLIPS, ...extra }));
@@ -350,7 +411,7 @@ export function roofObject(type, x0, z0, x1, z1, y, colour, roomColour) {
   return g;
 }
 let _glass = null;
-export function glassMat() { return _glass || (_glass = new THREE.MeshLambertMaterial({ color: '#cdeaf5', emissive: '#6fb1d1', emissiveIntensity: 0.22, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide, clippingPlanes: CLIPS })); }
+export function glassMat() { return _glass || (_glass = KEEP.keep(new THREE.MeshLambertMaterial({ color: '#cdeaf5', emissive: '#6fb1d1', emissiveIntensity: 0.22, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide, clippingPlanes: CLIPS }))); }
 
 // A flat roof that follows any outline, a little bigger all round.
 export function slabFollowing(L, y, colour) {

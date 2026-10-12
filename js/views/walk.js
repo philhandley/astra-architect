@@ -15,7 +15,7 @@ export function startWalk(api, world, root) {
   const idx = api.idx;
   const graph = buildGraph(idx, computeDoors(idx));
   const cam = world.cam;
-  const saved = { pos: cam.position.clone(), target: world.controls.target.clone(), fov: cam.fov, near: cam.near };
+  const saved = { pos: cam.position.clone(), target: world.controls.target.clone(), fov: world.baseFov, near: cam.near };
   world.controls.enabled = false;
   world.baseFov = 70; cam.near = 0.02; world.applyShift();
   world.scene.fog = new THREE.Fog('#dfeaf0', 5, 34);
@@ -49,7 +49,7 @@ export function startWalk(api, world, root) {
   let nipple = null;
   import('nipplejs').then(m => {
     const lib = m.default || m;
-    nipple = lib.create({ zone: pad, mode: 'static', position: { left: '50%', top: '50%' }, color: '#2f6fe4', size: 150, restOpacity: 0.85 });
+    nipple = lib.create({ zone: pad, mode: 'static', position: { left: '50%', top: '50%' }, color: '#2f6fe4', size: 150, restOpacity: 0.95 });
     nipple.on('move', (e, d) => { if (d && d.vector) joy = { x: d.vector.x * Math.min(1, d.force), y: d.vector.y * Math.min(1, d.force) }; auto = null; });
     nipple.on('end', () => { joy = { x: 0, y: 0 }; });
   }).catch(() => { pad.innerHTML = '<div class="pill">Drag to look, tap a room below to walk there</div>'; });
@@ -93,6 +93,7 @@ export function startWalk(api, world, root) {
     const p = findPath(graph, here, goals);
     if (!p) { sfx.no(); say(`I can't find a way to the ${label.toLowerCase()}. Is there a door, or stairs?`); api.emit('walkStuck'); return; }
     sfx.tap();
+    if (p.path.length < 2) { say(`Here we are: the ${label.toLowerCase()}.`); api.emit('walkArrive', { label }); return; }
     auto = { path: p.path, kinds: p.kinds, i: 0, t: 0, label };
     api.emit('walkTo', { label });
   }

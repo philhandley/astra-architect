@@ -14,7 +14,7 @@ const SIDES = [
 ];
 
 export function startSection(api, world, root) {
-  if (api.S.mode === 'blocks') api.setMode('building');
+  if (api.S.mode === 'blocks') api.setMode('building', { quiet: true });
   const ui = h(`<div class="section-ui"></div>`);
   const sidebar = h(`<div class="pill" style="position:absolute;top:84px;left:50%;transform:translateX(-50%);z-index:6;gap:6px;padding:6px"></div>`);
   const slider = h(`<div class="section-slider pill" style="padding:8px 18px">${emo('🏫')}<input type="range" min="0" max="1000" value="1000" aria-label="Cut through the school"><b class="cutlbl" style="min-width:150px">Outside view</b></div>`);
@@ -49,7 +49,7 @@ export function startSection(api, world, root) {
   let pan = 0, drag = null;
   const onDown = e => { drag = { x: e.clientX, pan }; };
   const onMove = e => { if (!drag) return; const v = world.orthoView; const perPx = (2 * v.halfH * (world.w / world.h)) / world.w; pan = drag.pan - (e.clientX - drag.x) * perPx; frame(); };
-  const onUp = () => { drag = null; };
+  const onUp = e => { const d = drag; drag = null; if (d && e.target === world.canvas && Math.abs(e.clientX - d.x) < 8) api.handleTap(e.clientX, e.clientY); };
   world.canvas.addEventListener('pointerdown', onDown);
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);

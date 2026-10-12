@@ -16,9 +16,12 @@ import { emo, emojiFile } from './core/emoji.js';
 import { icon } from './core/icons.js';
 import { formIcon } from './ui/formicons.js';
 import { roofIcon, windowIcon, wallIcon, moreIcon } from './ui/styleicons.js';
-import { styleOf, ROOFS, WINDOWS, WALLS, SIDES, ROOF_NAMES, WINDOW_NAMES, WALL_NAMES } from './core/character.js';
+import { styleOf, ROOFS, WINDOWS, WALLS, SIDES, ROOF_NAMES, WINDOW_NAMES, WALL_NAMES, CHARACTER_NAMES, splitParts } from './core/character.js';
 import { BOX } from './core/arch.js';
-import { h, esc, say, sayAuto, hush, toast, sfx, clamp } from './ui/dom.js';
+import { h, esc, say, sayAuto, hush, toast, sfx, clamp, speakButton } from './ui/dom.js';
+
+const GROUP_PIC = { Learn: ['✏️', 'Learn'], Play: ['⚽', 'Play'], 'Up and down': ['🪜', 'Climb'], 'Eat and rest': ['🍎', 'Eat, rest'], Outside: ['🌳', 'Outside'] };
+const BUILD_HOW = 'Put your finger where it should go. Lift your finger to build it.';
 
 const NEEDS_TURN = new Set(['long', 'slab', 'arch', 'curve', 'wedge', 'steps', 'roof']);
 
@@ -106,12 +109,48 @@ export async function mountStudio(host, opts = {}) {
     snapshot();
     const cell = { id: S.design.nextId++, form: c.form, room: c.room, x: c.x, z: c.z, level: c.level, rot: c.rot || 0, material: c.material || 'colour', colour: c.colour || null };
     S.design.cells.push(cell);
+    const idx2 = indexDesign(S.design);
+    const grp = roomGroups(idx2).find(gr => gr.forms.has(cell.id));
+    const mate = grp && [...grp.forms].map(id => idx2.byId.get(id)).filter(o => o && o.id !== cell.id);
+    if (mate && mate.length) {
+      const st = mate.find(o => o.style);
+      if (st && BOX.has(cell.form) && !c.style) cell.style = { ...st.style };
+      if (!c.colour && mate[0].colour) cell.colour = mate[0].colour;
+      if (!c.material && mate[0].material && mate[0].material !== 'colour') cell.material = mate[0].material;
+    }
     refresh();
-    sfx.pop();
+    sfx.build(cell.level);
+    dv.bounce(cell.id);
+    puff(cell);
     emit('build', { cell });
     const seenKey = 'seen:' + cell.room;
     if (!store.modLoad('studio', seenKey)) { store.modSave('studio', seenKey, 1); sayAuto(ROOMS[cell.room].card); }
     return cell;
+  }
+
+  // A puff of sand round a new block.
+  const puffTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 2, 32, 32, 30); gr.addColorStop(0, 'rgba(250,238,214,0.95)'); gr.addColorStop(1, 'rgba(250,238,214,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+  function puff(cell) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const ps = footprint(cell).filter(p => p.level === cell.level);
+    const cx = ps.reduce((a, p) => a + p.x + 0.5, 0) / ps.length, cz = ps.reduce((a, p) => a + p.z + 0.5, 0) / ps.length;
+    const y = cell.level * LEVEL_H + (cell.level === 0 ? cellGround(cell.x, cell.z) : 0) + 0.05;
+    const parts = [];
+    for (let i = 0; i < 9; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, depthWrite: false }));
+      const a = (i / 9) * Math.PI * 2;
+      sp.userData = { vx: Math.cos(a) * (0.9 + Math.random() * 0.5), vz: Math.sin(a) * (0.9 + Math.random() * 0.5), vy: 0.35 + Math.random() * 0.3 };
+      sp.position.set(cx + Math.cos(a) * 0.4, y, cz + Math.sin(a) * 0.4);
+      sp.scale.setScalar(0.3);
+      world.groups.fx.add(sp); parts.push(sp);
+    }
+    let t = 0;
+    const fn = dt => {
+      t += dt;
+      for (const sp of parts) { sp.position.x += sp.userData.vx * dt; sp.position.z += sp.userData.vz * dt; sp.position.y += sp.userData.vy * dt; sp.userData.vx *= 0.9; sp.userData.vz *= 0.9; sp.scale.setScalar(0.3 + t * 0.9); sp.material.opacity = Math.max(0, 1 - t / 0.55); }
+      if (t > 0.55) { for (const sp of parts) { world.groups.fx.remove(sp); sp.material.dispose(); } world.updaters.delete(fn); }
+    };
+    world.updaters.add(fn);
   }
 
   function removeCell(id) {
@@ -148,19 +187,29 @@ export async function mountStudio(host, opts = {}) {
     const bin = h(`<button class="tile-btn tool bin ${S.tool === 'bin' ? 'on' : ''}" type="button">${icon('trash')}<span>Bin</span></button>`);
     bin.addEventListener('click', () => setTool(S.tool === 'bin' ? null : 'bin'));
     tray.append(hand, bin);
-    const groups = allowedRooms.length > 6 ? GROUPS : [{ name: 'Rooms', rooms: allowedRooms }];
-    for (const grp of groups) {
-      const rooms = grp.rooms.filter(r => allowedRooms.includes(r));
-      if (!rooms.length) continue;
-      if (groups.length > 1) tray.append(h(`<div class="tt">${esc(grp.name)}</div>`));
-      for (const id of rooms) {
-        const R = ROOMS[id];
-        const b = h(`<button class="tile-btn ${S.tool === id ? 'on' : ''}" type="button" data-room="${id}"><span class="blk">${formIcon(R.form, 'iso', R.colour)}${emo(R.emoji, 'stk')}</span><span class="lbl">${esc(R.name)}</span></button>`);
-        b.addEventListener('click', () => setTool(S.tool === id ? null : id));
-        tray.append(b);
-      }
+    let rooms = allowedRooms;
+    if (allowedRooms.length > 6) {
+      const groups = GROUPS.map(g => ({ ...g, rooms: g.rooms.filter(r => allowedRooms.includes(r)) })).filter(g => g.rooms.length);
+      if (S.tool && ROOMS[S.tool]) { const gi = groups.findIndex(g => g.rooms.includes(S.tool)); if (gi >= 0) trayGroup = gi; }
+      trayGroup = clamp(trayGroup, 0, groups.length - 1);
+      const tabs = h(`<div class="tgroups"></div>`);
+      groups.forEach((g, i) => {
+        const [pic, short] = GROUP_PIC[g.name] || ['⭐', g.name];
+        const b = h(`<button class="tgroup ${i === trayGroup ? 'on' : ''}" type="button" aria-label="${esc(g.name)}">${emo(pic)}<span>${esc(short)}</span></button>`);
+        b.addEventListener('click', () => { trayGroup = i; store.modSave('studio', 'trayGroup', i); sfx.tap(); say(`${g.name}: ${g.rooms.map(r => ROOMS[r].name.toLowerCase()).join(', ')}.`); drawTray(); emit('trayGroup', { group: g.name }); });
+        tabs.append(b);
+      });
+      tray.append(tabs);
+      rooms = groups[trayGroup].rooms;
+    }
+    for (const id of rooms) {
+      const R = ROOMS[id];
+      const b = h(`<button class="tile-btn ${S.tool === id ? 'on' : ''}" type="button" data-room="${id}"><span class="blk">${formIcon(R.form, 'iso', R.colour)}${emo(R.emoji, 'stk')}</span><span class="lbl">${esc(R.name)}</span></button>`);
+      b.addEventListener('click', () => setTool(S.tool === id ? null : id));
+      tray.append(b);
     }
   }
+  let trayGroup = +store.modLoad('studio', 'trayGroup') || 0;
   function setTool(id) {
     S.tool = id;
     S.moving = null;
@@ -170,7 +219,7 @@ export async function mountStudio(host, opts = {}) {
     select(null);
     drawTray();
     drawShapeStrip();
-    if (id) { sfx.tap(); say(id === 'bin' ? 'Tap a block to take it away.' : `${ROOMS[id].name}. Tap where it should go.`); }
+    if (id) { sfx.tap(); say(id === 'bin' ? 'Tap a block to take it away.' : `${ROOMS[id].name}. ${BUILD_HOW}`); }
     emit('tool', { tool: id });
   }
 
@@ -430,6 +479,7 @@ export async function mountStudio(host, opts = {}) {
     world.groups.lab.add(flashObj);
     flashTimer = setTimeout(() => { dropLabel(flashObj); flashObj = null; }, 2600);
     if (m && m.face === 'sad') sayAuto(`${txt} Tap it and move it if you like.`);
+    if (m && m.face === 'happy') { sfx.sparkle(); el.querySelector('.ghost-tag').classList.add('happy'); }
   }
   function turnGhost() {
     if (!S.ghost) return;
@@ -453,12 +503,13 @@ export async function mountStudio(host, opts = {}) {
         fb(`${icon('plus')} Bigger`, 'go', () => growRoom(c), 'Bigger');
         if (groupOf(c)?.forms.size > 1) fb(`${icon('minus')} Smaller`, '', () => shrinkRoom(c), 'Smaller');
       }
-      if (NEEDS_TURN.has(c.form) || c.form === 'curve') fb(icon('rotate'), '', () => turnSelected(), 'Turn');
-      if (R.forms.length > 1) fb(icon('shape'), '', () => openPanel('shape'), 'Change shape');
-      fb(icon('paint'), '', () => openPanel('colour'), 'Colour');
-      fb(icon('move'), '', () => startMove(), 'Move');
-      fb(icon('trash'), 'no', () => removeCell(S.selected), 'Bin');
-      fb(icon('close'), '', () => select(null), 'Done');
+      const lab = (ic, word) => `${icon(ic)}<small>${word}</small>`;
+      if (NEEDS_TURN.has(c.form) || c.form === 'curve') fb(lab('rotate', 'Turn'), 'lab', () => turnSelected(), 'Turn');
+      if (R.forms.length > 1) fb(lab('shape', 'Shape'), 'lab', () => openPanel('shape'), 'Change shape');
+      fb(lab('paint', 'Colour'), 'lab', () => openPanel('colour'), 'Colour');
+      fb(lab('move', 'Move'), 'lab', () => startMove(), 'Move');
+      fb(lab('trash', 'Bin'), 'no lab', () => removeCell(S.selected), 'Bin');
+      fb(lab('close', 'Done'), 'lab', () => select(null), 'Done');
     }
     viewport.appendChild(floatbar);
     positionFloatbar();
@@ -518,8 +569,14 @@ export async function mountStudio(host, opts = {}) {
     if (S.view === 'plan') drawPlanView();
     emit('select', { cell: c });
   }
+  function hasOnTop(c) {
+    const top = c.level + FORMS[c.form].levels;
+    return footprint(c).some(p => { const o = S.idx.occ.get(key(p.x, p.z, top)); return o && o.id !== c.id; });
+  }
+  function onTopNo() { sfx.no(); say('Something is sitting on top of this block. Move the top one first.'); }
   function turnSelected() {
     const c = S.idx.byId.get(S.selected);
+    if (hasOnTop(c)) { onTopNo(); return; }
     for (let k = 1; k <= 3; k++) {
       const cand = { ...c, rot: (c.rot + k) & 3 };
       if (placeCheck(S.idx, cand, c.id).ok) { snapshot(); c.rot = cand.rot; refresh(); select(c.id); sfx.pop(); emit('turn'); return; }
@@ -552,13 +609,18 @@ export async function mountStudio(host, opts = {}) {
   function shrinkRoom(c) {
     const g = groupOf(c);
     if (!g || g.forms.size < 2) { sfx.no(); say('That is as small as it goes. Use the bin to take it away.'); return; }
-    const ids = [...g.forms].filter(id => id !== c.id).sort((a, b) => b - a);
-    removeCell(ids[0]);
+    const all = [...g.forms].map(id => S.idx.byId.get(id)).filter(Boolean);
+    const flat = list => list.flatMap(o => footprint(o).filter(p => p.level === g.level));
+    const cands = all.filter(o => o.id !== c.id && !hasOnTop(o)).sort((a, b) => (Math.abs(b.x - c.x) + Math.abs(b.z - c.z)) - (Math.abs(a.x - c.x) + Math.abs(a.z - c.z)) || b.id - a.id);
+    const pick = cands.find(o => splitParts(flat(all.filter(x => x.id !== o.id))).length === 1) || cands[0];
+    if (!pick) { sfx.no(); say('That is as small as it goes here.'); return; }
+    removeCell(pick.id);
     if (S.idx.byId.has(c.id)) select(c.id);
     emit('shrink', { cell: c });
   }
   function startMove() {
     const c = S.idx.byId.get(S.selected);
+    if (hasOnTop(c)) { onTopNo(); return; }
     S.moving = c.id;
     S.tool = null;
     S.rot = c.rot;
@@ -569,7 +631,9 @@ export async function mountStudio(host, opts = {}) {
 
   // ---------- Panels: shape and paint ----------
   let panel = null;
-  function closePanel() { if (panel) { panel.remove(); panel = null; } }
+  let panelShift = false;
+  function closePanel() { if (panel) { panel.remove(); panel = null; } if (panelShift) { panelShift = false; world.setViewShift(0); } }
+  function closeAndBack() { closePanel(); if (S.selected) showFloatbar('select'); }
   // Zoom in on a room for the workshop (only the first time the panel opens for it).
   let focused = null;
   function focusOn(c) {
@@ -577,22 +641,39 @@ export async function mountStudio(host, opts = {}) {
     focused = c.id;
     const ps = footprint(c);
     const cx = ps.reduce((a, p) => a + p.x + 0.5, 0) / ps.length, cz = ps.reduce((a, p) => a + p.z + 0.5, 0) / ps.length;
-    const target = new THREE.Vector3(cx, 0.5 + c.level * LEVEL_H, cz + 0.6);
-    if (world.iso) animateCam(target, null, 0.6, clamp(Math.max(world.ortho.zoom, 3.2), 0.3, 7));
+    const target = new THREE.Vector3(cx, 0.5 + c.level * LEVEL_H, cz);
+    if (world.iso) {
+      const zoom = clamp(Math.max(world.ortho.zoom, 3.2), 0.3, 7);
+      const lrail = root.querySelector('.rail.left');
+      const trayW = lrail && lrail.style.display !== 'none' ? 326 : 0;
+      const right = new THREE.Vector3().setFromMatrixColumn(world.ortho.matrixWorld, 0).setY(0).normalize();
+      target.addScaledVector(right, -((trayW - 100) / 2) / (zoom * (viewport.clientHeight || 800) / 24));
+      animateCam(target, null, 0.6, zoom);
+    }
     else animateCam(target, target.clone().add(new THREE.Vector3(2.4, 3, 4)), 0.6);
   }
   function openPanel(kind) {
     closePanel();
     const c = S.idx.byId.get(S.selected);
     if (!c) return;
-    if (kind === 'style') { drawStylePanel(c); focusOn(c); emit('stylePanel', { cell: c }); return; }
+    hideFloatbar();
+    if (kind === 'style') {
+      const first = focused !== c.id;
+      drawStylePanel(c);
+      if (!day && S.view === 'model') { world.setViewShift(Math.round(panel.offsetHeight / 2)); panelShift = true; }
+      focusOn(c);
+      if (first) say(`This is ${CHARACTER_NAMES[c.room] || 'your room'}! Make it your own.`);
+      emit('stylePanel', { cell: c });
+      return;
+    }
     const R = ROOMS[c.room];
     const title = kind === 'shape' ? `Shape for the ${R.name.toLowerCase()}` : `Colour for the ${R.name.toLowerCase()}`;
     panel = h(`<div class="sheet-panel"><div class="head"><h3>${esc(title)}</h3></div><div class="optrow"></div></div>`);
     const close = h(`<button class="btn ghost round small" type="button" aria-label="Close">${icon('close')}</button>`);
-    close.addEventListener('click', closePanel);
+    close.addEventListener('click', closeAndBack);
     panel.querySelector('.head').append(close);
     const row = panel.querySelector('.optrow');
+    const roomCells = (() => { const g = groupOf(c); return g ? [...g.forms].map(id => S.idx.byId.get(id)).filter(Boolean) : [c]; })();
     const apply = (fn, ev) => { snapshot(); fn(); refresh(); select(c.id); openPanel(kind); sfx.pop(); emit(ev, { cell: c }); };
     if (kind === 'shape') {
       for (const f of R.forms) {
@@ -600,6 +681,7 @@ export async function mountStudio(host, opts = {}) {
         b.addEventListener('click', () => {
           say(FORMS[f].good);
           if (f === c.form) return;
+          if (hasOnTop(c)) { onTopNo(); return; }
           for (let r = 0; r < 4; r++) {
             const cand = { ...c, form: f, rot: (c.rot + r) & 3 };
             if (placeCheck(S.idx, cand, c.id).ok) { apply(() => { c.form = f; c.rot = cand.rot; }, 'shape'); return; }
@@ -610,11 +692,11 @@ export async function mountStudio(host, opts = {}) {
       }
     } else {
       const def = h(`<button class="opt ${!c.colour ? 'on' : ''}" type="button"><span class="sw" style="background:${R.colour}"></span><span>Room colour</span></button>`);
-      def.addEventListener('click', () => apply(() => { c.colour = null; }, 'paint'));
+      def.addEventListener('click', () => apply(() => { for (const o of roomCells) o.colour = null; }, 'paint'));
       row.append(def);
       for (const pc of PAINT) {
         const b = h(`<button class="opt ${c.colour === pc.hex ? 'on' : ''}" type="button"><span class="sw" style="background:${pc.hex}"></span><span>${esc(pc.name)}</span></button>`);
-        b.addEventListener('click', () => apply(() => { c.colour = pc.hex; }, 'paint'));
+        b.addEventListener('click', () => apply(() => { for (const o of roomCells) o.colour = pc.hex; }, 'paint'));
         row.append(b);
       }
       const mrow = h(`<div class="optrow"></div>`);
@@ -623,7 +705,7 @@ export async function mountStudio(host, opts = {}) {
         if (m === 'colour') continue;
         const M = MATERIALS[m];
         const b = h(`<button class="opt ${(c.material || 'colour') === m ? 'on' : ''}" type="button">${emo(M.emoji)}<span>${esc(M.name)}</span></button>`);
-        b.addEventListener('click', () => { apply(() => { c.material = c.material === m ? 'colour' : m; }, 'paint'); say(M.card); if (S.mode === 'blocks') toast('Switch to Building to see the materials', '🏠'); });
+        b.addEventListener('click', () => { const nm = (c.material || 'colour') === m ? 'colour' : m; apply(() => { for (const o of roomCells) o.material = nm; }, 'paint'); say(M.card); if (S.mode === 'blocks') toast('Switch to Building to see the materials', '🏠'); });
         mrow.append(b);
       }
     }
@@ -634,7 +716,7 @@ export async function mountStudio(host, opts = {}) {
   // ---------- The Style workshop: push, pull and play with a room's character ----------
   const SAY = {
     roof: { flat: 'A flat roof. You could put a garden or a running track on it.', pitch: 'A pointy roof lets the rain run off.', pyramid: 'A pyramid roof, like a little mountain.', cone: 'A witch hat roof! Tall and round, like a castle tower.', barrel: 'A round roof, like a tunnel. Halls love them.', saw: 'A zigzag roof lets soft light in from the sky. Great for classrooms and art rooms.', mono: 'A sloping roof, high on one side.', dome: 'A dome, round like a bubble.' },
-    win: { big: 'Big glass windows, for lots of light.', round: 'Round windows, like a ship!', slot: 'Tall thin windows, like a castle.', strip: 'A long strip of window, all the way along.', grid: 'Windows in a grid, like a bar of chocolate.', none: 'No windows at all. It will be dark inside!' },
+    win: { face: 'Two round eyes and a big smile. Your building has a face!', big: 'Big glass windows, for lots of light.', round: 'Round windows, like a ship!', slot: 'Tall thin windows, like a castle.', strip: 'A long strip of window, all the way along.', grid: 'Windows in a grid, like a bar of chocolate.', none: 'No windows at all. It will be dark inside!' },
     walls: { straight: 'Straight walls.', round: 'Soft round corners.', curvy: 'A curvy wall that bulges out.', wave: 'A wavy wall, like the sea!' },
   };
   let styleTab = 'roof';
@@ -662,10 +744,11 @@ export async function mountStudio(host, opts = {}) {
     const col = c.colour || R.colour;
     const cells = groupCellsOf(c);
     const st = styleOf(cells);
-    const covered = cells.some(o => S.idx.occ.has(key(o.x, o.z, o.level + FORMS[o.form].levels)));
-    panel = h(`<div class="sheet-panel style-panel"><div class="head"><h3>${emo(R.emoji)} Make the ${esc(R.name.toLowerCase())} your own</h3></div><div class="tabs"></div><div class="optrow"></div></div>`);
+    const covered = cells.some(o => S.idx.occ.has(key(o.x, o.z, o.level + 1)));
+    const cname = CHARACTER_NAMES[c.room] || `the ${R.name.toLowerCase()}`;
+    panel = h(`<div class="sheet-panel style-panel"><div class="head"><h3>${emo(R.emoji)} ${esc(cname.replace(/^the /, 'The '))}</h3><span class="muted" style="font-size:16px">Make it your own</span></div><div class="tabs"></div><div class="optrow"></div></div>`);
     const close = h(`<button class="btn ghost round small" type="button" aria-label="Close">${icon('close')}</button>`);
-    close.addEventListener('click', () => { closePanel(); });
+    close.addEventListener('click', closeAndBack);
     panel.querySelector('.head').append(close);
     const tabs = panel.querySelector('.tabs');
     for (const [id, label, pic] of [['roof', 'Roof', roofIcon(st.roof, col)], ['win', 'Windows', windowIcon(st.win, col)], ['walls', 'Walls', wallIcon(st.walls, col)], ['push', 'Push and pull', moreIcon('taller', col)], ['extras', 'Extras', moreIcon('flag', col)]]) {
@@ -680,7 +763,7 @@ export async function mountStudio(host, opts = {}) {
       row.append(b);
     };
     if (styleTab === 'roof') {
-      if (covered) row.append(h(`<p class="muted" style="margin:0;font-size:17px">Something is built on top of this room, so it keeps a flat roof.</p>`));
+      if (covered) row.append(h(`<p class="muted" style="margin:0;font-size:17px">Something is built on top of this room (or it is a tall tower), so it keeps a flat roof.</p>`));
       else for (const r of ROOFS) opt(roofIcon(r, col), ROOF_NAMES[r], st.roof === r, () => setStyle(c, { roof: r }), SAY.roof[r]);
       if (!covered) for (const [hex, nm] of [[null, 'Auto'], ['#3d405b', 'Charcoal'], ['#e76f51', 'Coral'], ['#ffd166', 'Yellow'], ['#2a9d8f', 'Teal'], ['#9b7ede', 'Lavender'], ['#f7f4ee', 'White']]) {
         opt(`<span class="sw" style="background:${hex || 'conic-gradient(#3d405b 0 25%, #dfe5e8 0 50%, #f7f4ee 0 75%, ' + col + ' 0)'}"></span>`, nm, st.roofColour === hex, () => setStyle(c, { roofColour: hex }), hex ? `${nm} roof.` : 'The usual roof colour.');
@@ -700,6 +783,7 @@ export async function mountStudio(host, opts = {}) {
       opt(moreIcon('bay', col), st.bay ? 'Bay: on' : 'Bay window', st.bay, () => setStyle(c, { bay: !st.bay }, 'push'), st.bay ? 'The bay window goes back in.' : 'Pull a window out from the wall, a bay window to sit in!');
       if (st.bay) opt(moreIcon('turn', col), 'Move the bay', false, () => setStyle(c, { side: SIDES[(SIDES.indexOf(st.side) + 1) % 4] }, 'push'), 'The bay moves round to another side.');
     } else {
+      opt(moreIcon('creature', col), 'Creature!', st.legs && st.beak && st.flag, () => setStyle(c, { legs: c.level === 0 && !covered, beak: true, flag: true, win: 'face', roof: st.roof === 'flat' ? 'cone' : st.roof }), 'Legs, a beak, a flag and a face. It is a creature!');
       opt(moreIcon('chimney', col), st.chimney ? 'Chimney: on' : 'Chimney', st.chimney, () => setStyle(c, { chimney: !st.chimney }), 'A chimney!');
       opt(moreIcon('flag', col), st.flag ? 'Flag: on' : 'Flag', st.flag, () => setStyle(c, { flag: !st.flag }), 'A flag on the top!');
       opt(moreIcon('beak', col), st.beak ? 'Beak: on' : 'Beak', st.beak, () => setStyle(c, { beak: !st.beak }), 'A beak over the door, like the architect John Hejduk liked to draw.');
@@ -711,11 +795,19 @@ export async function mountStudio(host, opts = {}) {
   // ---------- Picking ----------
   const ray = new THREE.Raycaster();
   function targetFromRay(rc) {
-    const objs = [...dv.pickables(), terrain.ground];
+    const objs = [...dv.pickables(), ...dv.group.children.filter(o => o.userData.cells), terrain.ground];
     const hits = rc.intersectObjects(objs, true);
     for (const hit of hits) {
-      const id = hit.object.userData.cellId ?? findCellId(hit.object);
       const p = hit.point;
+      let id = hit.object.userData.cellId ?? findCellId(hit.object);
+      if (id === undefined) {
+        const ids = findCells(hit.object);
+        if (ids) {
+          const n0 = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : new THREE.Vector3();
+          const hx = Math.floor(p.x - n0.x * 0.05), hz = Math.floor(p.z - n0.z * 0.05);
+          id = ids.find(i => { const c = S.idx.byId.get(i); return c && footprint(c).some(q => q.x === hx && q.z === hz); }) ?? ids[0];
+        }
+      }
       if (id !== undefined && id !== null && S.idx.byId.has(id)) {
         if (S.moving === id) continue;
         const n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : new THREE.Vector3(0, 1, 0);
@@ -736,13 +828,32 @@ export async function mountStudio(host, opts = {}) {
     return null;
   }
   function findCellId(o) { while (o) { if (o.userData && o.userData.cellId !== undefined) return o.userData.cellId; o = o.parent; } return undefined; }
+  function findCells(o) { while (o) { if (o.userData && o.userData.cells) return o.userData.cells; o = o.parent; } return null; }
+  // The room whose blocks are nearest the finger on screen (within about a fingertip).
+  function nearestRoom(clientX, clientY, maxPx = 46) {
+    const r = viewport.getBoundingClientRect();
+    const v = new THREE.Vector3();
+    let best = null, bd = maxPx;
+    for (const c of S.design.cells) for (const p of footprint(c)) {
+      if (p.level !== c.level) continue;
+      v.set(p.x + 0.5, (c.level + 0.5) * LEVEL_H + (c.level === 0 ? Math.max(0, cellGround(p.x, p.z)) : 0), p.z + 0.5);
+      const sp = world.toScreen(v);
+      const d = Math.hypot(sp.x + r.left - clientX, sp.y + r.top - clientY);
+      if (d < bd) { bd = d; best = c.id; }
+    }
+    return best;
+  }
 
   function handleTap(clientX, clientY) {
     if (S.view === 'section' || S.view === 'walk') {
       if (S.view === 'section') { const t = targetFromRay(world.rayFrom(clientX, clientY)); if (t && t.hitId) select(t.hitId); }
       return;
     }
-    const t = targetFromRay(world.rayFrom(clientX, clientY));
+    let t = targetFromRay(world.rayFrom(clientX, clientY));
+    if (!S.moving && (!S.tool || S.tool === 'bin') && (!t || !t.hitId)) {
+      const id = nearestRoom(clientX, clientY);
+      if (id) t = { ...(t || { x: 0, z: 0, level: 0 }), hitId: id };
+    }
     tapAt(t);
   }
   function tapAt(t, phase = 'up') {
@@ -802,7 +913,8 @@ export async function mountStudio(host, opts = {}) {
   world.canvas.addEventListener('pointerdown', onDown);
   world.canvas.addEventListener('pointermove', onMove);
   world.canvas.addEventListener('pointerup', onUp);
-  world.canvas.addEventListener('pointercancel', () => { down = null; clearGhost(); });
+  const onCancel = () => { down = null; clearGhost(); };
+  world.canvas.addEventListener('pointercancel', onCancel);
 
   // ---------- Views ----------
   let section = null, walk = null;
@@ -822,11 +934,12 @@ export async function mountStudio(host, opts = {}) {
     world.camera = world.cam;
     world.controls.enabled = true;
     world.setIso(v === 'model' && S.iso);
+    world.hold = v === 'plan';
     if (v === 'plan') {
       world.stop();
       // Fit the school into the clear area between the tray and the right-hand buttons.
       const W = viewport.clientWidth, H = viewport.clientHeight;
-      planView = fitView(S.design, Math.max(200, W - 440), Math.max(200, H - 140));
+      planView = fitView(S.design, Math.max(200, W - 440), Math.max(200, H - 140), 1.5);
       planView.x0 -= 326 / planView.s; planView.z0 -= 76 / planView.s;
       drawPlanView();
       say('This is the plan. It shows the school from above, like a map, with the walls, doors and windows.');
@@ -845,11 +958,12 @@ export async function mountStudio(host, opts = {}) {
     if (S.ghost && v !== 'plan' && v !== 'model') clearGhost();
     emit('view', { view: v });
   }
-  function setMode(m) {
+  function setMode(m, { quiet = false } = {}) {
     S.mode = m;
-    store.modSave('studio', 'mode', m);
+    if (!quiet) store.modSave('studio', 'mode', m);
     if (modeBtn) { modeBtn.querySelector('span').textContent = m === 'blocks' ? 'Blocks' : 'Building'; modeBtn.querySelector('svg').outerHTML = icon(m === 'blocks' ? 'blocks' : 'building'); }
     refresh({ silent: true });
+    if (quiet) { emit('mode', { mode: m }); return; }
     sfx.whoosh();
     say(m === 'building' ? 'Building mode. The blocks become a real building, with walls, doors, windows and roofs.' : 'Blocks mode. Just the shapes, like a model on the table.');
     emit('mode', { mode: m });
@@ -886,10 +1000,22 @@ export async function mountStudio(host, opts = {}) {
       b = { ...b, x0: Math.min(b.x0, gx), x1: Math.max(b.x1, gx + 1), z0: Math.min(b.z0, gz), z1: Math.max(b.z1, gz + 1) };
       b.cx = (b.x0 + b.x1) / 2; b.cz = (b.z0 + b.z1) / 2;
     }
-    const target = b ? new THREE.Vector3(b.cx, 0.4, b.cz) : new THREE.Vector3(24, 0, 24);
+    const m = meadow();
+    const target = b ? new THREE.Vector3(b.cx, 0.4, b.cz) : new THREE.Vector3(m.cx, 0, m.cz);
     const size = b ? Math.max(8, Math.max(b.x1 - b.x0, b.z1 - b.z0) * 1.25 + 3) : 40;
     if (world.iso) {
-      const zoom = clamp(12 / Math.max(5, size * (close ? 0.42 : 0.56)), 0.3, 7);
+      const lrail = root.querySelector('.rail.left');
+      const trayW = lrail && lrail.style.display !== 'none' ? 326 : 0;
+      const W = viewport.clientWidth || 1280, H = viewport.clientHeight || 800;
+      const freeW = Math.max(320, W - trayW - 110), freeH = Math.max(200, H - 2 * (world.viewShift || 0) - 150);
+      const span = b ? (b.x1 - b.x0 + b.z1 - b.z0) * 0.7071 + 2.5 : 22;
+      let ppu = Math.min(freeW / span, freeH / (span * 0.62));
+      if (close) ppu *= 1.4;
+      const zoom = clamp(ppu * 24 / H, 0.3, 3.4);
+      if (instant) { world.placeIso(target); world.ortho.updateMatrixWorld(); }
+      // Slide the picture so the school sits in the middle of the clear space, not under the tray.
+      const right = new THREE.Vector3().setFromMatrixColumn(world.ortho.matrixWorld, 0).setY(0).normalize();
+      target.addScaledVector(right, -((trayW - 100) / 2) / (zoom * H / 24));
       if (instant) { world.controls.target.copy(target); world.placeIso(target); world.ortho.zoom = zoom; world.ortho.updateProjectionMatrix(); world.controls.update(); }
       else animateCam(target, null, 0.7, zoom);
       return;
@@ -898,6 +1024,15 @@ export async function mountStudio(host, opts = {}) {
     const pos = target.clone().add(new THREE.Vector3(0.45, 0.62, 0.95).normalize().multiplyScalar(dist));
     if (instant) { world.controls.target.copy(target); world.cam.position.copy(pos); world.controls.update(); }
     else animateCam(target, pos);
+  }
+  let meadowC = null;
+  function meadow() {
+    if (meadowC) return meadowC;
+    const S2 = site();
+    let sx = 0, sz = 0, n = 0;
+    for (let z = 0; z < S2.d; z++) for (let x = 0; x < S2.w; x++) if (zone(x, z) === 'm') { sx += x + 0.5; sz += z + 0.5; n++; }
+    meadowC = n ? { cx: sx / n + 3, cz: sz / n - 1 } : { cx: 24, cz: 26 };
+    return meadowC;
   }
   let camAnim = null;
   function animateCam(target, pos, dur = 0.7, zoom = null) {
@@ -969,20 +1104,20 @@ export async function mountStudio(host, opts = {}) {
     S.tasks = list.map(t => ({ ...t, done: false }));
     tasksDone = false;
     if (tasksEl) tasksEl.remove();
-    tasksEl = h(`<div class="tasks"><div class="tt" role="button" tabindex="0">Your jobs <span class="fold">${icon('down')}</span></div></div>`);
-    tasksEl.querySelector('.tt').addEventListener('click', () => { tasksEl.classList.toggle('folded'); sfx.tap(); });
-    root.appendChild(tasksEl);
+    tasksEl = h(`<div class="tasks" role="button" tabindex="0"><span class="sp"></span><div class="tnow"></div><div class="tdots"></div></div>`);
+    const jobText = () => { const t = S.tasks.find(x => !x.done); return t ? (t.say || t.text) : 'All jobs done! Tap Next.'; };
+    tasksEl.querySelector('.sp').replaceWith(speakButton(jobText, 'Read the job'));
+    tasksEl.addEventListener('click', () => { sfx.tap(); say(jobText()); });
+    top.prepend(tasksEl);
     drawTasks();
   }
   function drawTasks() {
     if (!tasksEl) return;
-    tasksEl.querySelectorAll('.task').forEach(n => n.remove());
-    const firstOpen = S.tasks.findIndex(t => !t.done);
-    S.tasks.forEach((t, i) => {
-      const el = h(`<div class="task ${t.done ? 'done' : ''} ${i === firstOpen ? 'now' : ''}"><div class="box">${t.done ? icon('check') : ''}</div>${t.emoji ? emo(t.emoji) : ''}<span>${esc(t.text)}</span></div>`);
-      el.addEventListener('click', () => say(t.say || t.text));
-      tasksEl.append(el);
-    });
+    const i = S.tasks.findIndex(t => !t.done);
+    const t = S.tasks[i];
+    tasksEl.classList.toggle('alldone', !t);
+    tasksEl.querySelector('.tnow').innerHTML = t ? `${t.emoji ? emo(t.emoji) : ''}<span>${esc(t.text)}</span>` : `${emo('🎉')}<span>All jobs done! Tap Next.</span>`;
+    tasksEl.querySelector('.tdots').innerHTML = S.tasks.map((x, k) => `<i class="${x.done ? 'done' : ''} ${k === i ? 'now' : ''}"></i>`).join('');
   }
   function checkTasks(ev, data) {
     if (!S.tasks || tasksDone) return;
@@ -996,7 +1131,7 @@ export async function mountStudio(host, opts = {}) {
     if (changed) {
       drawTasks();
       const next = S.tasks.find(t => !t.done);
-      if (!next) { tasksDone = true; sfx.tada(); toast('All jobs done!', '🎉'); ctx.complete && ctx.complete(); emit('tasksDone'); setTimeout(() => tasksEl && tasksEl.classList.add('folded'), 3500); }
+      if (!next) { tasksDone = true; sfx.tada(); toast('All jobs done!', '🎉'); ctx.complete && ctx.complete(); emit('tasksDone'); setTimeout(() => { if (!S.destroyed) sayAuto('All jobs done! Tap Next when you are ready.'); }, 2400); }
       else setTimeout(() => sayAuto(next.say || next.text), 1800);
     }
   }
@@ -1021,7 +1156,7 @@ export async function mountStudio(host, opts = {}) {
     get root() { return root; },
     get viewport() { return viewport; },
     world, ctx, preset,
-    addCell, removeCell, drawPlanView, say,
+    addCell, removeCell, drawPlanView, say, handleTap,
     setBubbles(on) { S.bubbles = on; drawPlanView(); },
     setCutaway(on) { S.cutaway = on; dv.sync(S.idx, on ? 'cutaway' : S.mode); },
     setTraffic(t) { S.traffic = t; },
@@ -1046,6 +1181,8 @@ export async function mountStudio(host, opts = {}) {
       world.canvas.removeEventListener('pointerdown', onDown);
       world.canvas.removeEventListener('pointermove', onMove);
       world.canvas.removeEventListener('pointerup', onUp);
+      world.canvas.removeEventListener('pointercancel', onCancel);
+      world.hold = false;
       for (const o of [...world.groups.lab.children]) dropLabel(o);
       world.detach();
       store.flush();
@@ -1062,7 +1199,7 @@ export async function mountStudio(host, opts = {}) {
   if (preset.setup) await preset.setup(api);
   if (preset.tasks) setTasks(preset.tasks);
   emit('ready');
-  if (preset.full && !S.design.cells.length) setTimeout(() => sayAuto('Welcome to your site! Choose a room on the left, then tap the meadow to see where it goes. Tap again to build it.'), 900);
+  if (preset.full && !S.design.cells.length) setTimeout(() => sayAuto(`Welcome to your site! Choose a room on the left. ${BUILD_HOW}`), 900);
   window.__studio = api;   // testing aid
   return api;
 }

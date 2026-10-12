@@ -31,12 +31,16 @@ export async function openIdeas() {
       <div class="num">${emo('🔢')} ${esc(it.number?.text || '')}</div>
       <div class="mindrow" style="justify-content:flex-start">
         <button class="btn go small try" type="button">${icon('plus')} Try it in my school</button>
-        <a class="btn ghost small" href="${esc(it.link)}" target="_blank" rel="noopener">${icon('ext')} Real photos</a>
+        <button class="btn ghost small grown" type="button">${icon('ext')} Real photos (grown-up)</button>
         ${it.number?.source ? `<a class="source-link" href="${esc(it.number.source)}" target="_blank" rel="noopener">Where the number comes from</a>` : ''}
       </div></div>`);
     card.querySelector('.sp').replaceWith(speakButton(() => `${it.name}. ${it.idea}. ${it.text} ${it.number?.text || ''}`));
     const cv = card.querySelector('canvas');
     drawIdea(cv, it);
+    // Real photos open a web page outside the app, so ask a grown-up first.
+    card.querySelector('.grown').addEventListener('click', () => {
+      if (confirm(`This opens real photos of ${it.name} on another website. Grown-up, is that OK?`)) window.open(it.link, '_blank', 'noopener');
+    });
     card.querySelector('.try').addEventListener('click', () => {
       const ok = tryIdea(it);
       if (ok) { sfx.tada(); toast(`${it.name}'s idea is in your school. Undo takes it away.`, it.emoji); close && close(); location.hash = '#/studio'; }

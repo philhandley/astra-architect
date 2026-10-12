@@ -92,6 +92,7 @@ export class Day {
   startPath(p, goals, then) {
     const r = findPath(this.graph, p.node, goals);
     if (!r) return false;
+    if (r.path.length < 2) { p.path = null; p.state = 'arrived'; then ? then() : this.next(p); return true; }
     p.path = r.path; p.kinds = r.kinds; p.seg = 0; p.segT = 0;
     p.state = 'walk'; p.after = then;
     p.walked += r.path.length;

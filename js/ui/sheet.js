@@ -50,7 +50,7 @@ async function renderViews(idx) {
   if (!world.designView) world.designView = new DesignView(world);
   const dv = world.designView;
   const prevMode = dv.mode;
-  const saved = { pos: world.cam.position.clone(), target: world.controls.target.clone(), camera: world.camera, shift: world.viewShift || 0, fog: world.scene.fog };
+  const saved = { pos: world.cam.position.clone(), target: world.controls.target.clone(), camera: world.camera, shift: world.viewShift || 0, fog: world.scene.fog, bg: world.scene.background, sky: world.sky.visible };
   world.setViewShift(0);
   world.scene.fog = null;
   dv.sync(idx, 'building');
@@ -98,8 +98,8 @@ async function renderViews(idx) {
   trees.forEach(t => { t.visible = true; });
   // Restore everything.
   CLIP.length = 0;
-  world.scene.background = null;
-  world.sky.visible = true;
+  world.scene.background = saved.bg;
+  world.sky.visible = saved.sky;
   world.scene.fog = saved.fog;
   world.camera = saved.camera;
   world.cam.position.copy(saved.pos); world.controls.target.copy(saved.target);

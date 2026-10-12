@@ -4,7 +4,7 @@ import { FORMS, ROOMS, mix } from './catalogue.js';
 import { key, roomGroups, DIRS, footprint, mood } from './design.js';
 import { BOX, isRoomCell, archOpenSide, wedgeDir } from './arch.js';
 import { emojiImage } from './emoji.js';
-import { styleOf, layoutGroup } from './character.js';
+import { styleOf, layoutGroup, splitParts } from './character.js';
 
 let mapImg = null;
 export function loadMapImage() {
@@ -92,8 +92,8 @@ export function drawPlan(g, W, H, idx, doors, view, opts = {}) {
   const wall = Math.max(2, s * 0.09);
   for (const gr of roomGroups(idx)) {
     if (gr.level !== L) continue;
-    const box = gr.cells.filter(p => { const o = idx.occ.get(key(p.x, p.z, L)); return o && BOX.has(o.form); });
-    if (!box.length) continue;
+    const allBox = gr.cells.filter(p => { const o = idx.occ.get(key(p.x, p.z, L)); return o && BOX.has(o.form); });
+    for (const box of splitParts(allBox)) {
     const dc = [...new Set(box.map(p => idx.occ.get(key(p.x, p.z, L))))];
     const lay = layoutGroup({ room: gr.room, level: L, cells: box }, idx, doors, styleOf(dc));
     if (!lay) continue;
@@ -117,6 +117,7 @@ export function drawPlan(g, W, H, idx, doors, view, opts = {}) {
       const tx = -d.nz, tz = d.nx, hw = 0.19;
       g.strokeStyle = mix(col, '#ffffff', 0.55); g.lineWidth = wall * 1.3;
       g.beginPath(); g.moveTo(X(d.x - tx * hw), Z(d.z - tz * hw)); g.lineTo(X(d.x + tx * hw), Z(d.z + tz * hw)); g.stroke();
+      if (!d.outside && (d.dx < 0 || d.dz < 0)) continue;   // a door between two rooms: one swing is enough
       const hx = X(d.x - tx * hw), hy = Z(d.z - tz * hw), len = 0.38 * s;
       const a0 = Math.atan2(tz, tx), a1 = Math.atan2(-d.nz, -d.nx);
       let da = a1 - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
@@ -125,6 +126,7 @@ export function drawPlan(g, W, H, idx, doors, view, opts = {}) {
       g.moveTo(hx + Math.cos(a0) * len, hy + Math.sin(a0) * len); g.arc(hx, hy, len, a0, a1, da < 0); g.stroke();
     }
     if (lay.bay) { g.fillStyle = '#cdeaf5'; g.strokeStyle = INK; g.lineWidth = Math.max(1, wall * 0.4); const tx = -lay.bay.nz, tz = lay.bay.nx; g.beginPath(); const P2 = (u, o) => [X(lay.bay.x + tx * u + lay.bay.nx * o), Z(lay.bay.z + tz * u + lay.bay.nz * o)]; g.moveTo(...P2(-0.25, 0)); g.lineTo(...P2(-0.25, 0.28)); g.lineTo(...P2(0.25, 0.28)); g.lineTo(...P2(0.25, 0)); g.closePath(); g.fill(); g.stroke(); }
+    }
   }
   for (const { x, z, c } of cellsAt) {
     if (BOX.has(c.form)) { if (c.form === 'steps' || c.room === 'stairs') stairsSymbol(g, x, z, c, X, Z, s); continue; }
@@ -135,7 +137,7 @@ export function drawPlan(g, W, H, idx, doors, view, opts = {}) {
         if (!(c.form === 'arch' && n.form === 'arch' && !archOpenSide(c, dx, dz))) continue;
       }
       const internal = n && isRoomCell(n);
-      const door = doors.has(`${x},${z},${L},${dx},${dz}`) || (internal && n.room !== c.room);
+      const door = doors.has(`${x},${z},${L},${dx},${dz}`);
       if (internal && n.room !== c.room && (dx < 0 || dz < 0) && BOX.has(n.form)) continue; // draw shared walls once
       if (c.form === 'arch' && archOpenSide(c, dx, dz) && !internal) continue;          // open tunnel ends
       edge(g, x, z, dx, dz, X, Z, s, wall, door, !internal && !door && c.material !== 'glass');

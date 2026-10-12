@@ -75,6 +75,8 @@ function tone(freq, t0, dur, type = 'sine', vol = 0.18, slide = 0) {
 }
 export const sfx = {
   pop() { if (!store.state.sound) return; tone(520, 0, 0.09, 'triangle', 0.2, 260); tone(780, 0.05, 0.08, 'sine', 0.12); },
+  build(level = 0) { if (!store.state.sound) return; const f = 440 * Math.pow(2, level * 4 / 12); tone(f * 0.6, 0, 0.05, 'triangle', 0.22, -60); tone(f, 0.04, 0.1, 'triangle', 0.18, 240); tone(f * 1.5, 0.09, 0.12, 'sine', 0.1); },
+  sparkle() { if (!store.state.sound) return; [1318, 1568, 2093].forEach((f, i) => tone(f, i * 0.06, 0.25, 'sine', 0.08)); },
   thud() { if (!store.state.sound) return; tone(140, 0, 0.16, 'sine', 0.3, -60); },
   tap() { if (!store.state.sound) return; tone(900, 0, 0.04, 'sine', 0.08); },
   no() { if (!store.state.sound) return; tone(220, 0, 0.12, 'square', 0.06); tone(180, 0.1, 0.16, 'square', 0.06); },

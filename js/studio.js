@@ -15,6 +15,9 @@ import { checkBrief, HINTS } from './core/brief.js';
 import { emo, emojiFile } from './core/emoji.js';
 import { icon } from './core/icons.js';
 import { formIcon } from './ui/formicons.js';
+import { roofIcon, windowIcon, wallIcon, moreIcon } from './ui/styleicons.js';
+import { styleOf, ROOFS, WINDOWS, WALLS, SIDES, ROOF_NAMES, WINDOW_NAMES, WALL_NAMES } from './core/character.js';
+import { BOX } from './core/arch.js';
 import { h, esc, say, sayAuto, hush, toast, sfx, clamp } from './ui/dom.js';
 
 const NEEDS_TURN = new Set(['long', 'slab', 'arch', 'curve', 'wedge', 'steps', 'roof']);
@@ -43,7 +46,7 @@ export async function mountStudio(host, opts = {}) {
     design: store.state.design,
     idx: null,
     doors: null,
-    mode: preset.mode || store.modLoad('studio', 'mode') || 'blocks',
+    mode: preset.mode || store.modLoad('studio', 'mode') || 'building',
     view: 'model',
     tool: null,          // room id, or null for the hand
     rot: 0,
@@ -445,6 +448,7 @@ export async function mountStudio(host, opts = {}) {
       const c = S.idx.byId.get(S.selected);
       const R = ROOMS[c.room];
       fb(emo(R.emoji), '', () => say(`${R.name}. ${R.card}`), 'About this room');
+      if (BOX.has(c.form) && c.room !== 'stairs') fb(`${icon('bulb')} Style`, 'go style', () => openPanel('style'), 'Style');
       if (!['stairs', 'slide', 'climbing', 'lookout'].includes(c.room) && c.form !== 'curve') {
         fb(`${icon('plus')} Bigger`, 'go', () => growRoom(c), 'Bigger');
         if (groupOf(c)?.forms.size > 1) fb(`${icon('minus')} Smaller`, '', () => shrinkRoom(c), 'Smaller');
@@ -499,6 +503,7 @@ export async function mountStudio(host, opts = {}) {
   // ---------- Selection ----------
   let selMesh = null;
   function select(id) {
+    if (id !== S.selected) focused = null;
     S.selected = id;
     closePanel();
     if (selMesh) { ghostGroup.remove(selMesh); selMesh = null; }
@@ -565,10 +570,22 @@ export async function mountStudio(host, opts = {}) {
   // ---------- Panels: shape and paint ----------
   let panel = null;
   function closePanel() { if (panel) { panel.remove(); panel = null; } }
+  // Zoom in on a room for the workshop (only the first time the panel opens for it).
+  let focused = null;
+  function focusOn(c) {
+    if (focused === c.id || S.view !== 'model') return;
+    focused = c.id;
+    const ps = footprint(c);
+    const cx = ps.reduce((a, p) => a + p.x + 0.5, 0) / ps.length, cz = ps.reduce((a, p) => a + p.z + 0.5, 0) / ps.length;
+    const target = new THREE.Vector3(cx, 0.5 + c.level * LEVEL_H, cz + 0.6);
+    if (world.iso) animateCam(target, null, 0.6, clamp(Math.max(world.ortho.zoom, 3.2), 0.3, 7));
+    else animateCam(target, target.clone().add(new THREE.Vector3(2.4, 3, 4)), 0.6);
+  }
   function openPanel(kind) {
     closePanel();
     const c = S.idx.byId.get(S.selected);
     if (!c) return;
+    if (kind === 'style') { drawStylePanel(c); focusOn(c); return; }
     const R = ROOMS[c.room];
     const title = kind === 'shape' ? `Shape for the ${R.name.toLowerCase()}` : `Colour for the ${R.name.toLowerCase()}`;
     panel = h(`<div class="sheet-panel"><div class="head"><h3>${esc(title)}</h3></div><div class="optrow"></div></div>`);
@@ -609,6 +626,84 @@ export async function mountStudio(host, opts = {}) {
         b.addEventListener('click', () => { apply(() => { c.material = c.material === m ? 'colour' : m; }, 'paint'); say(M.card); if (S.mode === 'blocks') toast('Switch to Building to see the materials', '🏠'); });
         mrow.append(b);
       }
+    }
+    root.appendChild(panel);
+  }
+
+
+  // ---------- The Style workshop: push, pull and play with a room's character ----------
+  const SAY = {
+    roof: { flat: 'A flat roof. You could put a garden or a running track on it.', pitch: 'A pointy roof lets the rain run off.', pyramid: 'A pyramid roof, like a little mountain.', cone: 'A witch hat roof! Tall and round, like a castle tower.', barrel: 'A round roof, like a tunnel. Halls love them.', saw: 'A zigzag roof lets soft light in from the sky. Great for classrooms and art rooms.', mono: 'A sloping roof, high on one side.', dome: 'A dome, round like a bubble.' },
+    win: { big: 'Big glass windows, for lots of light.', round: 'Round windows, like a ship!', slot: 'Tall thin windows, like a castle.', strip: 'A long strip of window, all the way along.', grid: 'Windows in a grid, like a bar of chocolate.', none: 'No windows at all. It will be dark inside!' },
+    walls: { straight: 'Straight walls.', round: 'Soft round corners.', curvy: 'A curvy wall that bulges out.', wave: 'A wavy wall, like the sea!' },
+  };
+  let styleTab = 'roof';
+  function groupCellsOf(c) {
+    const g = roomGroups(S.idx).find(gr => gr.forms.has(c.id));
+    if (!g) return [c];
+    return [...g.forms].map(id => S.idx.byId.get(id)).filter(o => o && BOX.has(o.form));
+  }
+  function setStyle(c, patch, ev = 'style') {
+    snapshot();
+    const cells = groupCellsOf(c);
+    if (patch === null) { for (const o of cells) delete o.style; }
+    else {
+      const next = { ...styleOf(cells), ...patch };
+      const own = {};
+      for (const k of ['roof', 'win', 'walls', 'side', 'tall', 'bay', 'legs', 'chimney', 'flag', 'beak', 'roofColour']) if (next[k] !== undefined) own[k] = next[k];
+      for (const o of cells) o.style = { ...own };
+    }
+    if (S.mode !== 'building') setMode('building');
+    refresh(); select(c.id); openPanel('style'); sfx.pop();
+    emit(ev, { cell: c, patch });
+  }
+  function drawStylePanel(c) {
+    const R = ROOMS[c.room];
+    const col = c.colour || R.colour;
+    const cells = groupCellsOf(c);
+    const st = styleOf(cells);
+    const covered = cells.some(o => S.idx.occ.has(key(o.x, o.z, o.level + FORMS[o.form].levels)));
+    panel = h(`<div class="sheet-panel style-panel"><div class="head"><h3>${emo(R.emoji)} Make the ${esc(R.name.toLowerCase())} your own</h3></div><div class="tabs"></div><div class="optrow"></div></div>`);
+    const close = h(`<button class="btn ghost round small" type="button" aria-label="Close">${icon('close')}</button>`);
+    close.addEventListener('click', () => { closePanel(); });
+    panel.querySelector('.head').append(close);
+    const tabs = panel.querySelector('.tabs');
+    for (const [id, label, pic] of [['roof', 'Roof', roofIcon(st.roof, col)], ['win', 'Windows', windowIcon(st.win, col)], ['walls', 'Walls', wallIcon(st.walls, col)], ['push', 'Push and pull', moreIcon('taller', col)], ['extras', 'Extras', moreIcon('flag', col)]]) {
+      const b = h(`<button class="stab ${styleTab === id ? 'on' : ''}" type="button">${pic}<span>${esc(label)}</span></button>`);
+      b.addEventListener('click', () => { styleTab = id; sfx.tap(); openPanel('style'); });
+      tabs.append(b);
+    }
+    const row = panel.querySelector('.optrow');
+    const opt = (pic, label, on, fn, sayText) => {
+      const b = h(`<button class="opt sopt ${on ? 'on' : ''}" type="button">${pic}<span>${esc(label)}</span></button>`);
+      b.addEventListener('click', () => { if (sayText) say(sayText); fn(); });
+      row.append(b);
+    };
+    if (styleTab === 'roof') {
+      if (covered) row.append(h(`<p class="muted" style="margin:0;font-size:17px">Something is built on top of this room, so it keeps a flat roof.</p>`));
+      else for (const r of ROOFS) opt(roofIcon(r, col), ROOF_NAMES[r], st.roof === r, () => setStyle(c, { roof: r }), SAY.roof[r]);
+      if (!covered) for (const [hex, nm] of [[null, 'Auto'], ['#3d405b', 'Charcoal'], ['#e76f51', 'Coral'], ['#ffd166', 'Yellow'], ['#2a9d8f', 'Teal'], ['#9b7ede', 'Lavender'], ['#f7f4ee', 'White']]) {
+        opt(`<span class="sw" style="background:${hex || 'conic-gradient(#3d405b 0 25%, #dfe5e8 0 50%, #f7f4ee 0 75%, ' + col + ' 0)'}"></span>`, nm, st.roofColour === hex, () => setStyle(c, { roofColour: hex }), hex ? `${nm} roof.` : 'The usual roof colour.');
+      }
+    } else if (styleTab === 'win') {
+      for (const w of WINDOWS) opt(windowIcon(w, col), WINDOW_NAMES[w], st.win === w, () => setStyle(c, { win: w }), SAY.win[w]);
+    } else if (styleTab === 'walls') {
+      for (const w of WALLS) opt(wallIcon(w, col), WALL_NAMES[w], st.walls === w, () => setStyle(c, { walls: w }), SAY.walls[w]);
+      if (st.walls === 'curvy' || st.walls === 'wave') opt(moreIcon('turn', col), 'Turn the curve', false, () => setStyle(c, { side: SIDES[(SIDES.indexOf(st.side) + 1) % 4] }), 'The curve moves round to another side.');
+    } else if (styleTab === 'push') {
+      if (covered) row.append(h(`<p class="muted" style="margin:0;font-size:17px">Something is built on top, so this room cannot grow taller or stand on legs.</p>`));
+      else {
+        opt(moreIcon('taller', col), 'Taller', st.tall >= 2, () => setStyle(c, { tall: Math.min(2, st.tall + 1) }, 'push'), st.tall >= 2 ? 'That is as tall as it goes!' : 'Pull it up! A taller room with tall windows.');
+        opt(moreIcon('lower', col), 'Lower', false, () => setStyle(c, { tall: Math.max(0, st.tall - 1) }, 'push'), 'Push it down a bit.');
+        if (c.level === 0) opt(moreIcon('legs', col), st.legs ? 'Legs: on' : 'Legs', st.legs, () => setStyle(c, { legs: !st.legs }, 'push'), st.legs ? 'Back down on the ground.' : 'Up on legs, like a building on stilts!');
+      }
+      opt(moreIcon('bay', col), st.bay ? 'Bay: on' : 'Bay window', st.bay, () => setStyle(c, { bay: !st.bay }, 'push'), st.bay ? 'The bay window goes back in.' : 'Pull a window out from the wall, a bay window to sit in!');
+      if (st.bay) opt(moreIcon('turn', col), 'Move the bay', false, () => setStyle(c, { side: SIDES[(SIDES.indexOf(st.side) + 1) % 4] }, 'push'), 'The bay moves round to another side.');
+    } else {
+      opt(moreIcon('chimney', col), st.chimney ? 'Chimney: on' : 'Chimney', st.chimney, () => setStyle(c, { chimney: !st.chimney }), 'A chimney!');
+      opt(moreIcon('flag', col), st.flag ? 'Flag: on' : 'Flag', st.flag, () => setStyle(c, { flag: !st.flag }), 'A flag on the top!');
+      opt(moreIcon('beak', col), st.beak ? 'Beak: on' : 'Beak', st.beak, () => setStyle(c, { beak: !st.beak }), 'A beak over the door, like the architect John Hejduk liked to draw.');
+      opt(`<span class="sw" style="background:#fff;display:grid;place-items:center">${icon('refresh')}</span>`, 'Start again', false, () => setStyle(c, null), 'Back to how it started.');
     }
     root.appendChild(panel);
   }

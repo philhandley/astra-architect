@@ -9,9 +9,49 @@ import { formGeometry, placeObject, materialFor, wallMaterial, interiorMaterial,
 import { emojiImage } from './emoji.js';
 import { CLIP } from './scene.js';
 import { staticParts } from './models.js';
+import { styleOf, layoutGroup, bodyGeometry, roofObject, slabFollowing, glassMat, setClip, shade, DOOR_ACCENT, liftOf, LIFT } from './character.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 let PATH_GEO = null;
+
+const LINE_MAT = new THREE.LineBasicMaterial({ color: '#3d405b', transparent: true, opacity: 0.42, clippingPlanes: CLIP });
+const lamCache = new Map();
+const lam = hex => { if (!lamCache.has(hex)) lamCache.set(hex, new THREE.MeshLambertMaterial({ color: hex, clippingPlanes: CLIP })); return lamCache.get(hex); };
+const once = (make) => { let g = null; return () => { if (!g) { g = make(); g.userData.cached = true; } return g; }; };
+const BOX1 = once(() => new THREE.BoxGeometry(1, 1, 1));
+const DOORFRAME = once(() => mergeBoxes([new THREE.BoxGeometry(0.04, 0.54, 0.045).translate(-0.17, 0.27, 0), new THREE.BoxGeometry(0.04, 0.54, 0.045).translate(0.17, 0.27, 0), new THREE.BoxGeometry(0.38, 0.05, 0.045).translate(0, 0.54, 0)]));
+const DISC = once(() => new THREE.CylinderGeometry(0.1, 0.1, 0.03, 20).rotateX(Math.PI / 2));
+const RING = once(() => new THREE.TorusGeometry(0.1, 0.02, 6, 24));
+const LEG = once(() => new THREE.CylinderGeometry(0.032, 0.032, LIFT, 8).translate(0, LIFT / 2, 0));
+const BEAK = once(() => { const g = new THREE.ConeGeometry(0.17, 0.42, 4); g.rotateY(Math.PI / 4); g.rotateX(Math.PI / 2); g.scale(1, 0.55, 1); return g; });
+const CHIMNEY = once(() => new THREE.CylinderGeometry(0.06, 0.07, 0.48, 12));
+const CHIMNEY_TOP = once(() => new THREE.CylinderGeometry(0.075, 0.075, 0.06, 12));
+const POLE = once(() => new THREE.CylinderGeometry(0.012, 0.012, 0.72, 6));
+const FLAG = once(() => { const s = new THREE.Shape(); s.moveTo(0, 0.1); s.lineTo(0.3, 0); s.lineTo(0, -0.1); s.lineTo(0, 0.1); return new THREE.ShapeGeometry(s); });
+const SIGN_GEO = once(() => new THREE.CircleGeometry(0.13, 24));
+
+// Points round an outline, every `step`, pulled in a little (for legs).
+function perimeterPoints(loop, step, inset) {
+  const pts = [];
+  let cx = 0, cz = 0; for (const p of loop) { cx += p[0]; cz += p[1]; } cx /= loop.length; cz /= loop.length;
+  let carry = 0;
+  for (let i = 0; i < loop.length; i++) {
+    const a = loop[i], b = loop[(i + 1) % loop.length];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    for (let t = carry; t < len; t += step) {
+      const x = a[0] + (b[0] - a[0]) * t / len, z = a[1] + (b[1] - a[1]) * t / len;
+      const dx = cx - x, dz = cz - z, d = Math.hypot(dx, dz) || 1;
+      pts.push([x + dx / d * inset, z + dz / d * inset]);
+    }
+    carry = ((carry - len) % step + step) % step;
+  }
+  return pts;
+}
+// How far a roof rises above the walls (for flags).
+function roofHeight(type, b, rect) {
+  const W = b.x1 - b.x0, D = b.z1 - b.z0, short = rect ? Math.min(W, D) : 1;
+  return { flat: 0.05, pitch: Math.min(0.55, 0.32 * short + 0.18), pyramid: Math.min(0.9, 0.42 * short + 0.3), cone: Math.min(1.1, (short / 2 + 0.08) * 1.9 + 0.2), barrel: short * 0.31, saw: 0.24, mono: Math.min(0.4, 0.2 * short + 0.12), dome: Math.min(0.7, short * 0.5) }[type] || 0.05;
+}
 
 // ---------- Emoji stickers ----------
 const stickerTex = new Map();
@@ -68,6 +108,7 @@ export class DesignView {
     this.group = world.groups.design;
     this.mode = 'blocks';
     this.fish = [];
+    this.flags = [];
     this.byId = new Map();          // design id -> Object3D (for picking and highlighting)
     world.updaters.add((dt, t) => this.animate(dt, t));
   }
@@ -76,10 +117,11 @@ export class DesignView {
     for (const o of [...this.group.children]) {
       this.group.remove(o);
       // Free every geometry made for this build; shared, cached shapes are kept.
-      o.traverse(m => { if (m.isMesh && m.geometry && !m.geometry.userData.cached) m.geometry.dispose(); });
+      o.traverse(m => { if ((m.isMesh || m.isLineSegments) && m.geometry && !m.geometry.userData.cached) m.geometry.dispose(); });
     }
     this.byId.clear();
     this.fish = [];
+    this.flags = [];
   }
 
   sync(idx, mode = this.mode) {
@@ -138,88 +180,152 @@ export class DesignView {
   }
 
   // ---------- Building mode ----------
+  // Each room group becomes a character: its outline (maybe curved) pushed up into walls, a roof with
+  // personality, its own kind of windows, a bright door, and any extras Finn has added.
   buildBuilding(idx, cut = false) {
     this.cut = cut;
-    const acc = new Map();      // material key -> { mat, pos, nor, uv }
-    const quadsFor = (mat, k) => { if (!acc.has(k)) acc.set(k, { mat, pos: [], nor: [], uv: [] }); return acc.get(k); };
-    const windows = [], doorFrames = [], parapets = [], holds = [];
-    const doors = this.doors;
-
-    // Merged walls for box-shaped rooms.
-    for (const [k, c] of idx.occ) {
-      if (!BOX.has(c.form)) continue;
-      const [x, z, l] = k.split(',').map(Number);
-      const g0 = l === 0 ? cellGround(x, z) : 0;
-      const y0 = l * LEVEL_H + g0, y1 = (l + 1) * LEVEL_H + g0;
-      const ext = quadsFor(wallMaterial(c.room, c.material, c.colour), `w${c.colour || c.room}:${c.material || 'colour'}`);
-      const int = quadsFor(interiorMaterial(c.room), `i${c.room}`);
-      const glassWall = c.material === 'glass';
-      for (const [dx, dz] of DIRS) {
-        const n = idx.occ.get(key(x + dx, z + dz, l));
-        if (n && BOX.has(n.form) && n.room === c.room) continue;
-        const internal = n && BOX.has(n.form);
-        const door = doors.has(`${x},${z},${l},${dx},${dz}`) || (n && isRoomCell(n) && n.room !== c.room);
-        const hole = door ? { u0: 0.31, u1: 0.69, y: y0 + 0.5 } : null;
-        const yw = cut ? y0 + 0.26 : y1;
-        const holeC = hole && cut ? null : hole;
-        wallQuads(int, x, z, dx, dz, 0.035, y0, yw, cut ? (door ? { u0: 0.31, u1: 0.69, y: yw } : null) : holeC, true);
-        if (!internal) {
-          wallQuads(ext, x, z, dx, dz, 0, y0, yw, cut ? (door ? { u0: 0.31, u1: 0.69, y: yw } : null) : holeC, false);
-          if (door) doorFrames.push({ x, z, dx, dz, y: y0, room: c.room, colour: c.colour || ROOMS[c.room].colour });
-          else if (!glassWall) windows.push({ x, z, dx, dz, y: y0 + 0.43, wide: c.room === 'classroom' || c.room === 'art' });
-          if (c.room === 'climbing') holds.push({ x, z, dx, dz, y0 });
+    setClip(CLIP);
+    const P = { glass: [], frames: [], rings: [], discs: [], doors: [], doorFrames: [], steps: [], legs: [] };
+    this.layouts = [];
+    for (const g of roomGroups(idx)) {
+      const box = g.cells.filter(c => { const o = idx.occ.get(key(c.x, c.z, g.level)); return o && BOX.has(o.form); });
+      if (!box.length) continue;
+      const dcells = [...new Set(box.map(c => idx.occ.get(key(c.x, c.z, g.level))))];
+      const style = styleOf(dcells);
+      const L = layoutGroup({ room: g.room, level: g.level, cells: box }, idx, this.doors, style, { cut });
+      if (!L) continue;
+      this.layouts.push(L);
+      const c0 = dcells[0];
+      const colour = c0.colour || ROOMS[g.room].colour;
+      const y0 = g.level * LEVEL_H + (g.level === 0 ? cellGround(box[0].x, box[0].z) : 0) + 0.004;
+      const yb = y0 + L.lift;                 // where the room's floor is
+      const yTop = yb + L.height;
+      // Body
+      const geo = bodyGeometry(L, y0);
+      const capMat = cut && g.level > 0 ? seeThrough(floorMaterial(g.room)) : floorMaterial(g.room, true);
+      const body = new THREE.Mesh(geo, [capMat, wallMaterial(g.room, c0.material, c0.colour, true)]);
+      body.castShadow = !cut; body.receiveShadow = true;
+      this.group.add(body);
+      if (!cut) this.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), LINE_MAT));
+      if (cut) continue;
+      // Roof
+      if (!L.covered) {
+        if (style.roof === 'flat') this.group.add(slabFollowing(L, yTop, style.roofColour));
+        else if (L.rect) this.group.add(roofObject(style.roof, L.bbox.x0, L.bbox.z0, L.bbox.x1, L.bbox.z1, yTop, style.roofColour, colour));
+        else for (const c of box) this.group.add(roofObject(style.roof, c.x, c.z, c.x + 1, c.z + 1, yTop, style.roofColour, colour));
+      } else {
+        for (const c of box) if (!idx.occ.has(key(c.x, c.z, g.level + 1))) this.group.add(roofObject('flat', c.x, c.z, c.x + 1, c.z + 1, yTop, style.roofColour, colour));
+      }
+      // Windows (scaled to the wall height)
+      const f = L.height / LEVEL_H;
+      for (const w of L.windows) {
+        const a = Math.atan2(w.nx, w.nz);
+        const at = (u, y, out = 0) => ({ x: w.x + Math.cos(a) * u * 1 + w.nx * out, y, z: w.z - Math.sin(a) * u + w.nz * out, a });
+        if (w.type === 'big') {
+          const h = 0.42 * f, cy = yb + 0.12 * f + h / 2;
+          P.glass.push({ ...at(0, cy), sx: w.w, sy: h, sz: 0.03 });
+          P.frames.push({ ...at(0, cy + h / 2), sx: w.w + 0.04, sy: 0.03, sz: 0.045 }, { ...at(0, cy - h / 2), sx: w.w + 0.06, sy: 0.03, sz: 0.07 }, { ...at(0, cy), sx: 0.022, sy: h, sz: 0.04 });
+        } else if (w.type === 'round') {
+          const cy = yb + 0.44 * f;
+          P.discs.push({ ...at(0, cy), r: 0.1 }); P.rings.push({ ...at(0, cy), r: 0.1 });
+        } else if (w.type === 'slot') {
+          const h = 0.52 * f, cy = yb + 0.1 * f + h / 2;
+          P.glass.push({ ...at(0, cy), sx: 0.075, sy: h, sz: 0.03 });
+          P.frames.push({ ...at(0, cy + h / 2), sx: 0.11, sy: 0.025, sz: 0.045 }, { ...at(0, cy - h / 2), sx: 0.11, sy: 0.025, sz: 0.045 });
+        } else if (w.type === 'strip') {
+          const cy = yb + 0.55 * f;
+          P.glass.push({ ...at(0, cy), sx: w.w, sy: 0.17, sz: 0.03 });
+          P.frames.push({ ...at(0, cy - 0.1), sx: w.w, sy: 0.025, sz: 0.06 });
+        } else if (w.type === 'grid') {
+          const cy = yb + 0.42 * f, s2 = 0.13;
+          for (const [gx, gy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) P.glass.push({ ...at(gx * (s2 / 2 + 0.012), cy + gy * (s2 / 2 + 0.012)), sx: s2, sy: s2, sz: 0.03 });
+          P.frames.push({ ...at(0, cy), sx: 0.024, sy: s2 * 2 + 0.07, sz: 0.04 }, { ...at(0, cy), sx: s2 * 2 + 0.07, sy: 0.024, sz: 0.04 });
         }
       }
-      const up = idx.occ.get(key(x, z, l + 1));
-      const upBox = up && BOX.has(up.form);
-      // Ceiling (inside) and roof (outside).
-      if (!cut) flatQuad(int, x, z, y1 - 0.012, -1);
-      if (!upBox && !cut) {
-        const roofMat = c.material === 'grass' ? wallMaterial(c.room, 'grass') : shared.roof;
-        flatQuad(quadsFor(roofMat, c.material === 'grass' ? 'roofgrass' : 'roof'), x, z, y1, 1);
-        if (!up) for (const [dx, dz] of DIRS) {
-          const n = idx.occ.get(key(x + dx, z + dz, l));
-          if (!(n && BOX.has(n.form))) parapets.push({ x, z, dx, dz, y: y1 });
+      // Doors, with steps if the room stands on legs, and a beak if Finn added one.
+      for (const d of L.doorPts) {
+        const a = Math.atan2(d.nx, d.nz);
+        if (!d.outside) continue;
+        P.doors.push({ x: d.x + d.nx * 0.004, y: yb + 0.25, z: d.z + d.nz * 0.004, a, colour: DOOR_ACCENT(colour) });
+        P.doorFrames.push({ x: d.x, y: yb + 0.27, z: d.z, a });
+        if (L.lift) for (let k = 0; k < 2; k++) P.steps.push({ x: d.x + d.nx * (0.08 + k * 0.1), y: yb - 0.07 - k * 0.1, z: d.z + d.nz * (0.08 + k * 0.1), a, w: 0.34 });
+        if (style.beak) {
+          const bk = new THREE.Mesh(BEAK(), new THREE.MeshLambertMaterial({ color: shade(colour, 0.65), clippingPlanes: CLIP }));
+          bk.position.set(d.x + d.nx * 0.16, yb + 0.6, d.z + d.nz * 0.16);
+          bk.rotation.y = a;
+          bk.castShadow = true;
+          this.group.add(bk);
         }
       }
-      // Floor (inside), and an underside where it hangs out over nothing.
-      if (cut && l > 0) flatQuad(quadsFor(seeThrough(floorMaterial(c.room)), `ft${c.room}`), x, z, y0 + 0.012, 1);
-      else flatQuad(quadsFor(floorMaterial(c.room), `f${c.room}`), x, z, y0 + 0.012, 1);
-      if (l > 0) {
-        const below = idx.occ.get(key(x, z, l - 1));
-        if (!(below && BOX.has(below.form))) flatQuad(ext, x, z, y0, -1);
+      // Legs, like a building on stilts.
+      if (L.lift) {
+        const per = perimeterPoints(L.outer, 0.62, 0.1);
+        for (const q of per) P.legs.push({ x: q[0], y: y0, z: q[1] });
       }
-      if (c.form === 'steps' || c.room === 'stairs') {
-        const st = new THREE.Mesh(formGeometry('steps', 'building'), shared.stair);
-        st.scale.set(0.7, 1, 0.7);
-        st.position.set(x + 0.5, y0, z + 0.5);
-        st.rotation.y = -(c.rot & 3) * Math.PI / 2;
-        st.castShadow = true;
-        this.group.add(st);
+      // A bay window pulled out from the wall.
+      if (L.bay) {
+        const a = Math.atan2(L.bay.nx, L.bay.nz);
+        const bay = new THREE.Group();
+        const glassBox = new THREE.Mesh(BOX1(), glassMat()); glassBox.scale.set(0.5, 0.5 * f, 0.28); glassBox.position.set(0, 0.32 * f, 0.14);
+        const top = new THREE.Mesh(BOX1(), shared.frame); top.scale.set(0.58, 0.05, 0.34); top.position.set(0, 0.32 * f + 0.27 * f, 0.15);
+        const bot = new THREE.Mesh(BOX1(), lam(colour)); bot.scale.set(0.58, 0.07, 0.34); bot.position.set(0, 0.32 * f - 0.28 * f, 0.15);
+        bay.add(glassBox, top, bot);
+        bay.position.set(L.bay.x, yb, L.bay.z); bay.rotation.y = a;
+        bay.traverse(m => { if (m.isMesh) m.castShadow = true; });
+        this.group.add(bay);
+      }
+      // Extras on the roof.
+      const roofH = L.covered ? 0.05 : roofHeight(style.roof, L.bbox, L.rect);
+      if (style.chimney && !L.covered) {
+        const ch = new THREE.Group();
+        const tube = new THREE.Mesh(CHIMNEY(), lam('#4a4e69')); tube.position.y = 0.24;
+        const band = new THREE.Mesh(CHIMNEY_TOP(), lam(colour)); band.position.y = 0.46;
+        ch.add(tube, band);
+        ch.position.set(L.bbox.x0 + 0.24, yTop, L.bbox.z0 + 0.24);
+        ch.traverse(m => { if (m.isMesh) m.castShadow = true; });
+        this.group.add(ch);
+      }
+      if (style.flag && !L.covered) {
+        const fl = new THREE.Group();
+        const pole = new THREE.Mesh(POLE(), shared.frame); pole.position.y = 0.36;
+        const cloth = new THREE.Mesh(FLAG(), new THREE.MeshLambertMaterial({ color: shade(colour, 0.8), side: THREE.DoubleSide, clippingPlanes: CLIP }));
+        cloth.position.set(0, 0.62, 0);
+        fl.add(pole, cloth);
+        fl.position.set((L.bbox.x0 + L.bbox.x1) / 2, yTop + roofH - 0.02, (L.bbox.z0 + L.bbox.z1) / 2);
+        fl.traverse(m => { if (m.isMesh) m.castShadow = true; });
+        this.group.add(fl);
+        this.flags.push(cloth);
+      }
+      // A round sign with the room's picture high on the sunny side.
+      if (g.room !== 'stairs') {
+        const seg = L.segs.filter(sg => sg.len > 0.35).sort((p2, q2) => (q2.n[0] * 0.6 + q2.n[1] * 0.8) - (p2.n[0] * 0.6 + p2.n[1] * 0.8))[0];
+        if (seg) {
+          const sx = (seg.a[0] + seg.b[0]) / 2, sz = (seg.a[1] + seg.b[1]) / 2;
+          const sign = new THREE.Mesh(SIGN_GEO(), stickerMat(ROOMS[g.room].emoji));
+          sign.position.set(sx + seg.n[0] * 0.02, yTop - 0.14, sz + seg.n[1] * 0.02);
+          sign.rotation.y = Math.atan2(seg.n[0], seg.n[1]);
+          this.group.add(sign);
+        }
       }
     }
-    for (const { mat, pos, nor, uv } of acc.values()) {
-      if (!pos.length) continue;
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-      const m = new THREE.Mesh(geo, mat);
-      m.castShadow = true; m.receiveShadow = true;
-      m.userData.ownGeo = true;
-      this.group.add(m);
-    }
-    this.instanced(windows, doorFrames, parapets, holds);
+    this.instanced(P);
 
     // Pickable proxies for box forms (invisible), so tapping still selects the right form.
     const proxyMat = new THREE.MeshBasicMaterial({ visible: false });
     for (const c of idx.design.cells) {
       if (BOX.has(c.form)) {
         const p = new THREE.Mesh(formGeometry(c.form, 'building'), proxyMat);
-        placeObject(p, c, c.level === 0 ? cellGround(c.x, c.z) : 0);
+        placeObject(p, c, (c.level === 0 ? cellGround(c.x, c.z) : 0) + liftOf(c));
         p.userData.cellId = c.id;
         this.group.add(p);
         this.byId.set(c.id, p);
+        if (c.form === 'steps' && !cut) {
+          const st = new THREE.Mesh(formGeometry('steps', 'building'), shared.stair);
+          st.scale.set(0.7, 1, 0.7);
+          placeObject(st, c, (c.level === 0 ? cellGround(c.x, c.z) : 0));
+          st.castShadow = true;
+          this.group.add(st);
+        }
       } else {
         const o = this.special(c, idx);
         placeObject(o, c, c.level === 0 ? cellGround(c.x, c.z) : 0);
@@ -233,50 +339,24 @@ export class DesignView {
     this.furnish(idx);
   }
 
-  instanced(windows, doorFrames, parapets, holds) { // eslint-disable-line
+  instanced(P) {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
-    const face = (it, out) => { const a = Math.atan2(it.dx, it.dz); q.setFromAxisAngle(UP, a); p.set(it.x + 0.5 + it.dx * (0.5 + out), it.y, it.z + 0.5 + it.dz * (0.5 + out)); };
-    if (this.cut) { windows = []; doorFrames = []; parapets = []; }
-    if (windows.length) {
-      const glass = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 0.07), shared.glass, windows.length);
-      const sill = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.04, 0.1), shared.frame, windows.length);
-      windows.forEach((w, i) => {
-        face(w, -0.017);
-        const ww = w.wide ? 0.74 : 0.5;
-        m4.compose(p, q, s.set(ww, 0.34, 1)); glass.setMatrixAt(i, m4);
-        p.y -= 0.19; m4.compose(p, q, s.set(ww + 0.06, 1, 1)); sill.setMatrixAt(i, m4);
-      });
-      this.group.add(glass, sill);
-    }
-    if (doorFrames.length) {
-      const fg = new THREE.BufferGeometry();
-      const parts = [new THREE.BoxGeometry(0.05, 0.54, 0.09).translate(-0.215, 0.27, 0), new THREE.BoxGeometry(0.05, 0.54, 0.09).translate(0.215, 0.27, 0), new THREE.BoxGeometry(0.48, 0.06, 0.09).translate(0, 0.53, 0)];
-      const merged = mergeBoxes(parts);
-      fg.copy(merged);
-      const frames = new THREE.InstancedMesh(fg, new THREE.MeshLambertMaterial({ color: '#ffffff', clippingPlanes: CLIP }), doorFrames.length);
-      doorFrames.forEach((d, i) => { face(d, 0); m4.compose(p, q, s.set(1, 1, 1)); frames.setMatrixAt(i, m4); frames.setColorAt(i, new THREE.Color(d.colour)); });
-      frames.castShadow = true;
-      this.group.add(frames);
-    }
-    if (parapets.length) {
-      const par = new THREE.InstancedMesh(new THREE.BoxGeometry(1.0, 0.07, 0.06), shared.parapet, parapets.length);
-      parapets.forEach((r, i) => { const a = Math.atan2(r.dx, r.dz); q.setFromAxisAngle(UP, a); p.set(r.x + 0.5 + r.dx * 0.47, r.y + 0.035, r.z + 0.5 + r.dz * 0.47); m4.compose(p, q, s.set(1, 1, 1)); par.setMatrixAt(i, m4); });
-      par.castShadow = true;
-      this.group.add(par);
-    }
-    if (holds.length) {
-      const n = holds.length * 9;
-      const hm = new THREE.InstancedMesh(new THREE.SphereGeometry(0.035, 6, 4), new THREE.MeshLambertMaterial({ clippingPlanes: CLIP }), n);
-      const cols = ['#e63946', '#2a9d8f', '#f4a261', '#457b9d', '#8ac926'];
-      let i = 0;
-      for (const h of holds) for (let k = 0; k < 9; k++) {
-        const u = ((k * 37) % 9) / 9 - 0.42, v = (k / 9) * 0.7 + 0.06;
-        const t = [-h.dz, h.dx];
-        p.set(h.x + 0.5 + h.dx * 0.51 + t[0] * u, h.y0 + v, h.z + 0.5 + h.dz * 0.51 + t[1] * u);
-        m4.compose(p, q.identity(), s.set(1, 1, 1)); hm.setMatrixAt(i, m4); hm.setColorAt(i, new THREE.Color(cols[(k + i) % cols.length])); i++;
-      }
-      this.group.add(hm);
-    }
+    const make = (geo, mat, list, place, colourOf) => {
+      if (!list.length) return;
+      const im = new THREE.InstancedMesh(geo, mat, list.length);
+      list.forEach((it, i) => { s.set(1, 1, 1); place(it); m4.compose(p, q, s); im.setMatrixAt(i, m4); if (colourOf) im.setColorAt(i, new THREE.Color(colourOf(it))); });
+      im.castShadow = true; im.receiveShadow = true;
+      this.group.add(im);
+    };
+    const faced = it => { q.setFromAxisAngle(UP, it.a); p.set(it.x, it.y, it.z); };
+    make(BOX1(), glassMat(), P.glass, it => { faced(it); s.set(it.sx, it.sy, it.sz); });
+    make(BOX1(), shared.frame, P.frames, it => { faced(it); s.set(it.sx, it.sy, it.sz); });
+    make(DISC(), glassMat(), P.discs, it => { faced(it); s.set(it.r / 0.1, it.r / 0.1, 1); });
+    make(RING(), shared.frame, P.rings, it => { faced(it); s.set(it.r / 0.1, it.r / 0.1, 1); });
+    make(BOX1(), new THREE.MeshLambertMaterial({ color: '#ffffff', clippingPlanes: CLIP }), P.doors, it => { faced(it); s.set(0.3, 0.5, 0.035); }, it => it.colour);
+    make(DOORFRAME(), shared.frame, P.doorFrames, it => { faced(it); p.y -= 0.27; });
+    make(BOX1(), shared.frame, P.steps, it => { faced(it); s.set(it.w, 0.05, 0.12); });
+    make(LEG(), shared.dark, P.legs, it => { q.identity(); p.set(it.x, it.y, it.z); });
   }
 
   // Forms that keep their own shape in Building mode, with details for the room.
@@ -333,7 +413,7 @@ export class DesignView {
     } else if (c.form === 'cylinder') {
       const band = add(new THREE.CylinderGeometry(0.475, 0.475, 0.3, 32, 1, true), shared.glass, false);
       band.position.y = 0.43;
-      const cap = add(new THREE.CylinderGeometry(0.49, 0.49, 0.05, 32), shared.parapet);
+      const cap = add(new THREE.CylinderGeometry(0.58, 0.58, 0.05, 32), shared.frame);
       cap.position.y = LEVEL_H;
     } else if (c.form === 'dome') {
       const ring = add(new THREE.TorusGeometry(0.97, 0.04, 6, 40), shared.parapet, false);
@@ -399,7 +479,7 @@ export class DesignView {
       if (!plan || !isRoomCell(c) || c.form === 'dome' && false) continue;
       const [x, z, l] = k.split(',').map(Number);
       if (FORMS[c.form].levels > 1 && l > c.level) continue;
-      const y = l * LEVEL_H + (l === 0 ? cellGround(x, z) : 0) + 0.014;
+      const y = l * LEVEL_H + (l === 0 ? cellGround(x, z) : 0) + 0.014 + liftOf(c);
       for (const [model, hgt, u, v, turn] of plan) {
         if (!want.has(model)) want.set(model, []);
         height[model] = hgt;
@@ -425,6 +505,7 @@ export class DesignView {
   }
 
   animate(dt, t) {
+    for (const [i, fl] of this.flags.entries()) { fl.rotation.y = Math.sin(t * 3 + i) * 0.35; fl.scale.x = 1 + Math.sin(t * 5 + i) * 0.06; }
     for (const f of this.fish) {
       const c = f.c;
       const odd = (c.rot & 1) === 1;
@@ -447,17 +528,28 @@ export class DesignView {
   }
 }
 
-// One wall face of a cell, optionally with a door-shaped hole. inset moves it into the cell.
+// One wall face of a cell, optionally with an opening { u0, u1, ya, yb } (a door when ya is the floor).
 function wallQuads(acc, x, z, dx, dz, inset, y0, y1, hole, inward) {
   const cx = x + 0.5 + dx * (0.5 - inset), cz = z + 0.5 + dz * (0.5 - inset);
   const tx = -dz, tz = dx;
   const P = (u, y) => [cx + tx * (u - 0.5), y, cz + tz * (u - 0.5)];
   const n = inward ? [-dx, 0, -dz] : [dx, 0, dz];
-  const rect = (u0, u1, ya, yb) => quad(acc, P(u0, ya), P(u1, ya), P(u1, yb), P(u0, yb), n, [u0, (ya - y0) / LEVEL_H, u1, (yb - y0) / LEVEL_H]);
+  const rect = (u0, u1, ya, yb) => { if (yb - ya > 0.001 && u1 - u0 > 0.001) quad(acc, P(u0, ya), P(u1, ya), P(u1, yb), P(u0, yb), n, [u0, (ya - y0) / LEVEL_H, u1, (yb - y0) / LEVEL_H]); };
   if (!hole) { rect(0, 1, y0, y1); return; }
+  const yb = Math.min(hole.yb, y1);
   rect(0, hole.u0, y0, y1);
   rect(hole.u1, 1, y0, y1);
-  rect(hole.u0, hole.u1, hole.y, y1);
+  rect(hole.u0, hole.u1, y0, hole.ya);
+  rect(hole.u0, hole.u1, yb, y1);
+}
+// The thickness of the wall inside an opening, so it looks solid rather than paper thin.
+function reveals(acc, x, z, dx, dz, hole, depth) {
+  const tx = -dz, tz = dx;
+  const at = (u, y, inset) => [x + 0.5 + dx * (0.5 - inset) + tx * (u - 0.5), y, z + 0.5 + dz * (0.5 - inset) + tz * (u - 0.5)];
+  const side = (u, sgn) => quad(acc, at(u, hole.ya, 0), at(u, hole.ya, depth), at(u, hole.yb, depth), at(u, hole.yb, 0), [tx * sgn, 0, tz * sgn], [0, 0, 1, 1]);
+  side(hole.u0, 1); side(hole.u1, -1);
+  quad(acc, at(hole.u0, hole.yb, 0), at(hole.u1, hole.yb, 0), at(hole.u1, hole.yb, depth), at(hole.u0, hole.yb, depth), [0, -1, 0], [0, 0, 1, 1]);
+  if (hole.ya > 0.0001 && Math.abs(hole.ya % LEVEL_H) > 0.001) quad(acc, at(hole.u0, hole.ya, 0), at(hole.u1, hole.ya, 0), at(hole.u1, hole.ya, depth), at(hole.u0, hole.ya, depth), [0, 1, 0], [0, 0, 1, 1]);
 }
 
 function flatQuad(acc, x, z, y, dir) {

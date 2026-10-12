@@ -4,6 +4,7 @@ import { FORMS, ROOMS, mix } from './catalogue.js';
 import { key, roomGroups, DIRS, footprint, mood } from './design.js';
 import { BOX, isRoomCell, archOpenSide, wedgeDir } from './arch.js';
 import { emojiImage } from './emoji.js';
+import { styleOf, layoutGroup } from './character.js';
 
 let mapImg = null;
 export function loadMapImage() {
@@ -72,7 +73,7 @@ export function drawPlan(g, W, H, idx, doors, view, opts = {}) {
   for (const { x, z, c } of cellsAt) {
     const R = { ...ROOMS[c.room], colour: c.colour || ROOMS[c.room].colour };
     const f = c.form;
-    if (BOX.has(f) || f === 'arch') {
+    if (f === 'arch') {
       g.fillStyle = mix(R.colour, '#ffffff', 0.55);
       g.fillRect(X(x), Z(z), s + 0.5, s + 0.5);
     }
@@ -87,10 +88,47 @@ export function drawPlan(g, W, H, idx, doors, view, opts = {}) {
     else if (f === 'roof') { g.fillStyle = '#c96a4f'; g.fillRect(X(c.x) + s * 0.05, Z(c.z) + s * 0.05, s * 0.9, s * 0.9); g.strokeStyle = INK; g.lineWidth = 1; g.beginPath(); g.moveTo(X(c.x) + s * 0.05, Z(c.z + 0.5)); g.lineTo(X(c.x + 0.95), Z(c.z + 0.5)); g.stroke(); }
   }
 
-  // Walls, doors and windows of box rooms and arches.
+  // Box rooms: each room group drawn from its character outline (curves and all), with windows and doors.
   const wall = Math.max(2, s * 0.09);
+  for (const gr of roomGroups(idx)) {
+    if (gr.level !== L) continue;
+    const box = gr.cells.filter(p => { const o = idx.occ.get(key(p.x, p.z, L)); return o && BOX.has(o.form); });
+    if (!box.length) continue;
+    const dc = [...new Set(box.map(p => idx.occ.get(key(p.x, p.z, L))))];
+    const lay = layoutGroup({ room: gr.room, level: L, cells: box }, idx, doors, styleOf(dc));
+    if (!lay) continue;
+    const col = dc[0].colour || ROOMS[gr.room].colour;
+    const path = () => {
+      g.beginPath();
+      for (const loop of [lay.outer, ...lay.holes]) { loop.forEach((p, i) => (i ? g.lineTo(X(p[0]), Z(p[1])) : g.moveTo(X(p[0]), Z(p[1])))); g.closePath(); }
+    };
+    path(); g.fillStyle = mix(col, '#ffffff', 0.55); g.fill('evenodd');
+    path(); g.strokeStyle = INK; g.lineWidth = wall; g.lineJoin = 'round'; g.stroke();
+    // Windows: a light double line along the wall.
+    for (const w of lay.windows) {
+      const tx = -w.nz, tz = w.nx, hw = (w.type === 'round' ? 0.1 : w.type === 'slot' ? 0.05 : w.w / 2);
+      g.strokeStyle = '#ffffff'; g.lineWidth = wall * 0.6;
+      g.beginPath(); g.moveTo(X(w.x - tx * hw), Z(w.z - tz * hw)); g.lineTo(X(w.x + tx * hw), Z(w.z + tz * hw)); g.stroke();
+      g.strokeStyle = '#4ea8de'; g.lineWidth = Math.max(1, wall * 0.25);
+      g.beginPath(); g.moveTo(X(w.x - tx * hw), Z(w.z - tz * hw)); g.lineTo(X(w.x + tx * hw), Z(w.z + tz * hw)); g.stroke();
+    }
+    // Doors: a gap in the wall and a swing.
+    for (const d of lay.doorPts) {
+      const tx = -d.nz, tz = d.nx, hw = 0.19;
+      g.strokeStyle = mix(col, '#ffffff', 0.55); g.lineWidth = wall * 1.3;
+      g.beginPath(); g.moveTo(X(d.x - tx * hw), Z(d.z - tz * hw)); g.lineTo(X(d.x + tx * hw), Z(d.z + tz * hw)); g.stroke();
+      const hx = X(d.x - tx * hw), hy = Z(d.z - tz * hw), len = 0.38 * s;
+      const a0 = Math.atan2(tz, tx), a1 = Math.atan2(-d.nz, -d.nx);
+      let da = a1 - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+      g.strokeStyle = 'rgba(35,38,45,0.75)'; g.lineWidth = Math.max(1, wall * 0.35);
+      g.beginPath(); g.moveTo(hx, hy); g.lineTo(hx - d.nx * len, hy - d.nz * len);
+      g.moveTo(hx + Math.cos(a0) * len, hy + Math.sin(a0) * len); g.arc(hx, hy, len, a0, a1, da < 0); g.stroke();
+    }
+    if (lay.bay) { g.fillStyle = '#cdeaf5'; g.strokeStyle = INK; g.lineWidth = Math.max(1, wall * 0.4); const tx = -lay.bay.nz, tz = lay.bay.nx; g.beginPath(); const P2 = (u, o) => [X(lay.bay.x + tx * u + lay.bay.nx * o), Z(lay.bay.z + tz * u + lay.bay.nz * o)]; g.moveTo(...P2(-0.25, 0)); g.lineTo(...P2(-0.25, 0.28)); g.lineTo(...P2(0.25, 0.28)); g.lineTo(...P2(0.25, 0)); g.closePath(); g.fill(); g.stroke(); }
+  }
   for (const { x, z, c } of cellsAt) {
-    if (!(BOX.has(c.form) || c.form === 'arch')) continue;
+    if (BOX.has(c.form)) { if (c.form === 'steps' || c.room === 'stairs') stairsSymbol(g, x, z, c, X, Z, s); continue; }
+    if (c.form !== 'arch') continue;
     for (const [dx, dz] of DIRS) {
       const n = idx.occ.get(key(x + dx, z + dz, L));
       if (n && n.room === c.room && (BOX.has(n.form) || n.form === 'arch')) {

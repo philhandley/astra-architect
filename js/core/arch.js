@@ -3,6 +3,7 @@
 import { FORMS, ROOMS, LEVEL_H } from './catalogue.js';
 import { key, roomGroups, DIRS } from './design.js';
 import { zone, isWalkGround, isWater, site, cellGround, groundAt } from './site.js';
+import { liftOf } from './character.js';
 
 export const BOX = new Set(['cube', 'long', 'tower', 'steps']);          // drawn as merged walls in Building mode
 export const OPEN_ROOM = new Set(['cylinder', 'dome', 'curve', 'arch']); // rooms with their own shape
@@ -90,7 +91,7 @@ export function buildGraph(idx, doors, paths = computePaths(idx, doors)) {
       const c = idx.occ.get(key(x, z, l));
       const k = key(x, z, l);
       if (c) {
-        if (isRoomCell(c)) add(k, { x, z, l, y: l * LEVEL_H + cellGround(x, z) * (l === 0 ? 1 : 0) + 0.01, kind: 'room', room: c.room, cell: c });
+        if (isRoomCell(c)) add(k, { x, z, l, y: l * LEVEL_H + cellGround(x, z) * (l === 0 ? 1 : 0) + 0.01 + (BOX.has(c.form) ? liftOf(c) : 0), kind: 'room', room: c.room, cell: c });
         else if (FORMS[c.form].flat) add(k, { x, z, l, y: l * LEVEL_H + (l === 0 ? cellGround(x, z) : 0) + 0.07, kind: 'pad', room: c.room, cell: c });
         else if (c.form === 'slab') add(k, { x, z, l, y: l * LEVEL_H + 0.22, kind: c.room === 'pool' ? 'pool' : 'deck', room: c.room, cell: c });
         else if (c.form === 'wedge') add(k, { x, z, l, y: l * LEVEL_H + 0.02, kind: 'slide', room: 'slide', cell: c });

@@ -187,12 +187,14 @@ export function blockMaterial(roomId, colour = null) {
 }
 
 // Outside walls in Building mode: the chosen material, or a soft version of the room colour.
-export function wallMaterial(roomId, matId, colour = null) {
+export function wallMaterial(roomId, matId, colour = null, double = false) {
   const base = colour || ROOMS[roomId]?.colour || '#cccccc';
-  return cached(`w${base}:${matId}`, () => {
-    if (!matId || matId === 'colour') return new THREE.MeshLambertMaterial({ color: mix(base, '#ffffff', 0.18), map: materialTexture('render'), clippingPlanes: CLIP });
-    if (matId === 'glass') return new THREE.MeshLambertMaterial({ color: '#ffffff', map: materialTexture('glass'), transparent: true, opacity: 0.8, clippingPlanes: CLIP });
-    return new THREE.MeshLambertMaterial({ color: '#ffffff', map: materialTexture(matId), clippingPlanes: CLIP });
+  const side = double ? THREE.DoubleSide : THREE.FrontSide;
+  return cached(`w${base}:${matId}:${double}`, () => {
+    if (!matId || matId === 'colour') return new THREE.MeshLambertMaterial({ color: mix(base, '#ffffff', 0.1), side, clippingPlanes: CLIP });
+    if (matId === 'glass') return new THREE.MeshLambertMaterial({ color: '#ffffff', map: materialTexture('glass'), transparent: true, opacity: 0.8, side, depthWrite: false, clippingPlanes: CLIP });
+    const tx = materialTexture(matId);
+    return new THREE.MeshLambertMaterial({ color: '#ffffff', map: tx, side, clippingPlanes: CLIP });
   });
 }
 
@@ -201,15 +203,16 @@ export function interiorMaterial(roomId) {
   const col = mix(ROOMS[roomId]?.colour || '#dddddd', '#ffffff', 0.72);
   return cached('i' + roomId, () => new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.32, clippingPlanes: CLIP, side: THREE.FrontSide }));
 }
-export function floorMaterial(roomId) {
-  return cached('f' + roomId, () => new THREE.MeshLambertMaterial({ color: mix(ROOMS[roomId]?.colour || '#dddddd', '#ffffff', 0.45), clippingPlanes: CLIP }));
+export function floorMaterial(roomId, double = false) {
+  return cached('f' + roomId + double, () => new THREE.MeshLambertMaterial({ color: mix(ROOMS[roomId]?.colour || '#dddddd', '#ffffff', 0.45), side: double ? THREE.DoubleSide : THREE.FrontSide, clippingPlanes: CLIP }));
 }
 export const shared = {
-  get roof() { return cached('roof', () => new THREE.MeshLambertMaterial({ color: '#d8d4cb', clippingPlanes: CLIP })); },
+  get roof() { return cached('roof', () => new THREE.MeshLambertMaterial({ color: '#e4e0d8', clippingPlanes: CLIP })); },
   get parapet() { return cached('parapet', () => new THREE.MeshLambertMaterial({ color: '#f3f0ea', clippingPlanes: CLIP })); },
-  get glass() { return cached('glass', () => new THREE.MeshLambertMaterial({ color: '#8fcbe8', emissive: '#1b4e6b', emissiveIntensity: 0.25, transparent: true, opacity: 0.85, clippingPlanes: CLIP })); },
+  get glass() { return cached('glass', () => new THREE.MeshLambertMaterial({ color: '#cdeaf5', emissive: '#6fb1d1', emissiveIntensity: 0.22, transparent: true, opacity: 0.42, depthWrite: false, clippingPlanes: CLIP })); },
+  get vault() { return cached('vault', () => new THREE.MeshLambertMaterial({ color: '#dfe5e8', side: THREE.DoubleSide, clippingPlanes: CLIP })); },
   get frame() { return cached('frame', () => new THREE.MeshLambertMaterial({ color: '#fbfaf7', clippingPlanes: CLIP })); },
-  get dark() { return cached('dark', () => new THREE.MeshLambertMaterial({ color: '#3b3f47', clippingPlanes: CLIP })); },
+  get dark() { return cached('dark', () => new THREE.MeshLambertMaterial({ color: '#4a4e69', clippingPlanes: CLIP })); },
   get rail() { return cached('rail', () => new THREE.MeshLambertMaterial({ color: '#e7e3da', clippingPlanes: CLIP })); },
   get water() { return cached('water', () => new THREE.MeshLambertMaterial({ color: '#4fb3e8', emissive: '#0b5a86', emissiveIntensity: 0.35, transparent: true, opacity: 0.88, clippingPlanes: CLIP })); },
   get timber() { return cached('timberDeck', () => new THREE.MeshLambertMaterial({ color: '#ffffff', map: materialTexture('timber'), clippingPlanes: CLIP })); },

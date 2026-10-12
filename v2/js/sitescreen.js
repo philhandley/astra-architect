@@ -184,7 +184,11 @@ export function mountSite(root, world, model, siteView, thumbs) {
   function select(id, { quiet = false } = {}) {
     S.selected = id;
     const b = id ? model.byId.get(id) : null;
-    if (!b) { handles.visible = false; selbar.hidden = true; return; }
+    if (!b) {
+      handles.visible = false; selbar.hidden = true;
+      setHint(S.tool ? `${emo(PROGRAMMES[S.tool].emoji)} Tap a square to build a ${esc(PROGRAMMES[S.tool].name.toLowerCase())}. Tap on top of a room to stack it.` : model.boxes.length ? 'Tap a room to change it, or choose a room on the left to build.' : 'Choose a room on the left, then tap the grid.');
+      return;
+    }
     placeHandles();
     drawSelbar(b);
     if (!quiet) { sfx.tap(); say(PROGRAMMES[b.type].name); }

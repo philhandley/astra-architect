@@ -170,7 +170,23 @@ class World {
     }
     if (this.camera === this.cam && this.controls.enabled) this.controls.update();
     this.render();
+    this.watchSpeed(dt);
     requestAnimationFrame(this._loop);
+  }
+
+  // If the tablet struggles, step quality down: first fewer pixels, then smaller shadows.
+  watchSpeed(dt) {
+    const q = this.quality || (this.quality = { level: 0, sum: 0, n: 0 });
+    if (q.level >= 2 || dt <= 0 || dt > 0.25) return;
+    q.sum += dt; q.n++;
+    if (q.sum < 4) return;
+    const avg = q.sum / q.n;
+    q.sum = 0; q.n = 0;
+    if (avg < 1 / 28) return;
+    q.level++;
+    if (q.level === 1 && this.renderer.getPixelRatio() > 1) { this.renderer.setPixelRatio(1); this.resize(); }
+    else { this.sun.shadow.mapSize.set(1024, 1024); if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; } q.level = 2; }
+    console.info('Astra Architect: lowered quality to level', q.level);
   }
 
   render() {

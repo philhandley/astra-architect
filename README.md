@@ -32,4 +32,5 @@ GitHub Pages redeploys in about two minutes. The service worker caches everythin
 - `tools/make_icons.py` draws the app icons.
 - `tools/fetch_emoji.py` downloads any Twemoji pictures the code or content uses.
 - `tools/shot.sh` takes a headless Chrome screenshot of the local server.
-- `dev/test-sw.html` checks the offline cache (use headless Edge; headless Chrome fails cache writes on this PC).
+- Offline check: start `python tools/slowserve.py 8401`, then run `bash tools/swtest.sh` (headless Edge loads `dev/test-sw.html` and lists what the service worker cached).
+- `?reset` in the address wipes the saved state (testing only).

@@ -1,5 +1,19 @@
 # Astra Architect: Finn's Dream School (plan v2)
 
+## Build status (12 Oct 2026)
+
+Built and live at https://philhandley.github.io/astra-architect/ :
+
+- The site from the homework map on a wooden plinth, with water, the waterfall, a flat clearing by the falls, and Kenney trees that clear away round buildings.
+- Twelve forms and eighteen rooms, tap-then-tap building with a ghost preview and mood faces, turn, change shape, paint materials, move, bin, undo.
+- Blocks and Building modes (walls, doors, windows, parapets, pool water, slide rails, track lanes, fish, furniture), and a doll's-house cutaway during the school day.
+- Views: Model, Plan (a 2D architect's drawing with door swings, windows and a bubble diagram), Section (slide the cut, four sides, solid earth) and Walk (joystick or tap a room).
+- The Brief with live wish detectors, the school day simulation (bells, capacity, routes, stairs, slides, roof laps, report card) and a ScratchJr-style tile strip with predict-then-go.
+- All seven missions with their play steps, the sorting game and the shape lab with the arch test, the Ideas book with Try it, the drawing sheet, patches, Crew Log and the grown-up's corner.
+- Installable PWA that works offline after one visit (tested with headless Edge).
+
+Not built yet (later phases): rule tiles (If, When), teachers, sound beyond simple effects, share links, mission cover pictures. Changed from the plan: Water2 was replaced by a light custom water shader (Water2 renders the scene three times, too heavy for a tablet), and the Co-pilot role was removed (the app is Finn's own).
+
 A tablet app where Finn (the Architect) and a grown-up (the Client) design a school on the
 painted site from his homework: mountains, a waterfall, a meadow, a beach and the sea. He
 builds with simple forms, gives each form a job, sees the school as an architect does (plan,

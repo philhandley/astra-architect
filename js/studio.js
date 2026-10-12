@@ -832,6 +832,7 @@ export async function mountStudio(host, opts = {}) {
   if (preset.setup) await preset.setup(api);
   if (preset.tasks) setTasks(preset.tasks);
   emit('ready');
+  if (preset.full && !S.design.cells.length) setTimeout(() => sayAuto('Welcome to your site! Choose a room on the left, then tap the meadow to see where it goes. Tap again to build it.'), 900);
   window.__studio = api;   // testing aid
   return api;
 }

@@ -189,11 +189,18 @@ export async function mountStudio(host, opts = {}) {
     floorGroup.append(rb('up', 'Up', () => setFloor(S.floor + 1)), h(`<div class="rbtn floor-n" style="min-height:40px;font-size:15px">Ground</div>`), rb('down', 'Down', () => setFloor(S.floor - 1)));
     rail.append(floorGroup);
     rail.append(h(`<div class="rspacer"></div>`));
+    if (preset.full) {
+      rail.append(rb('bubbles', 'Bubbles', () => { const on = !S.bubbles; if (on && S.view !== 'plan') setView('plan'); api.setBubbles(on); if (on) say('A bubble diagram: every room is a bubble. Green lines join rooms that like each other, red lines join rooms that do not.'); emit('bubbles', { on }); }));
+    }
     if (tools.includes('day')) rail.append(rb('bell', 'Day', () => openDay(), 'day-btn'));
     // Undo and zoom sit in a row at the top right, so the rail fits on a tablet.
     topRight.innerHTML = '';
     if (tools.includes('undo')) topRight.append(rb('undo', 'Undo', undo));
     if (tools.includes('zoom')) topRight.append(rb('zoomIn', 'Closer', () => zoom(0.75)), rb('zoomOut', 'Further', () => zoom(1.33)));
+    if (preset.full) {
+      topRight.append(rb('ideas', 'Ideas', () => import('./ui/ideas.js').then(m => m.openIdeas())));
+      topRight.append(rb('image', 'Sheet', () => import('./ui/sheet.js').then(m => m.openSheet({ onMade: () => emit('sheet') }))));
+    }
   }
   const topRight = h(`<div class="topright"></div>`);
   root.appendChild(topRight);
@@ -421,7 +428,7 @@ export async function mountStudio(host, opts = {}) {
     }
     const W = viewport.clientWidth, H = viewport.clientHeight;
     const fw = floatbar.offsetWidth || 300;
-    x = clamp(x, fw / 2 + 210, W - fw / 2 - 96);
+    x = clamp(x, fw / 2 + 280, W - fw / 2 - 96);
     y = clamp(y, 150, H - 20);
     floatbar.style.left = x + 'px';
     floatbar.style.top = y + 'px';
@@ -593,6 +600,7 @@ export async function mountStudio(host, opts = {}) {
     for (const [k, b] of Object.entries(viewBtns)) b.classList.toggle('on', k === v);
     root.classList.toggle('plan', v === 'plan');
     floorGroup.style.display = v === 'plan' ? '' : 'none';
+    if (sunBtn) sunBtn.style.display = v === 'plan' ? 'none' : '';
     if (prev === 'section' && section) { section.destroy(); section = null; }
     if (prev === 'walk' && walk) { walk.destroy(); walk = null; }
     world.sky.visible = true;

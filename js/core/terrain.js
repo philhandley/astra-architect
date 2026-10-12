@@ -235,7 +235,7 @@ async function plantTrees(world) {
     const zn = zone(x, z);
     if (zn === 'f') {
       const hgt = groundAt(x + 0.5, z + 0.5);
-      const n = rnd() < 0.62 ? 1 : 0;
+      const n = rnd() < 0.5 ? 1 : 0;
       for (let k = 0; k < n; k++) {
         const high = hgt > 0.7;
         const options = kinds.map((kd, i) => i).filter(i => (kinds[i].where === 'high') === high || rnd() < 0.25);

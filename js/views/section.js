@@ -1,7 +1,7 @@
 // Section and elevation: look at the school from one side, and slide a cut through it like a doll's house.
 import * as THREE from 'three';
 import { CLIP, clipPlane } from '../core/scene.js';
-import { bounds } from '../core/design.js';
+import { bounds, roomGroups } from '../core/design.js';
 import { LEVEL_H } from '../core/catalogue.js';
 import { h, esc, say, sfx } from '../ui/dom.js';
 import { emo } from '../core/emoji.js';
@@ -26,7 +26,7 @@ export function startSection(api, world, root) {
   let zoomF = 1;
   const btns = SIDES.map(s => {
     const b = h(`<button class="opt ${s === side ? 'on' : ''}" type="button" style="min-width:86px;min-height:70px">${emo(s.emoji)}<span>${esc(s.label)}</span></button>`);
-    b.addEventListener('click', () => { side = s; btns.forEach(x => x.classList.toggle('on', x === b)); frame(); sfx.tap(); api.emit('sectionSide', { side: s.id }); });
+    b.addEventListener('click', () => { side = s; btns.forEach(x => x.classList.toggle('on', x === b)); aim(); sfx.tap(); api.emit('sectionSide', { side: s.id }); });
     sidebar.append(b);
     return b;
   });
@@ -89,7 +89,28 @@ export function startSection(api, world, root) {
     lbl.textContent = t > 0.98 ? 'Outside view' : 'Cut through';
   }
   input.addEventListener('input', () => { applyCut(); api.emit('section', { t: input.value / 1000 }); });
+  // Start with the cut through the middle of the biggest building, centred on it.
+  function aim() {
+    const g = roomGroups(api.idx).sort((p, q) => q.cells.length - p.cells.length)[0];
+    const b = bounds(api.design);
+    if (!g || !b) return;
+    const [dx, dz] = side.d;
+    const along = c => (c.x + 0.5) * dx + (c.z + 0.5) * dz;
+    const perp = c => (dz !== 0 ? (c.x + 0.5) * (dz > 0 ? 1 : -1) : (c.z + 0.5) * (dx > 0 ? -1 : 1));
+    const mid = g.cells.reduce((a, c) => a + along(c), 0) / g.cells.length;
+    const bc = { x: b.cx - 0.5, z: b.cz - 0.5 };
+    pan = g.cells.reduce((a, c) => a + perp(c), 0) / g.cells.length - perp(bc);
+    const ps = g.cells.map(perp);
+    const groupW = Math.max(...ps) - Math.min(...ps) + 1;
+    const schoolW = dz !== 0 ? b.x1 - b.x0 : b.z1 - b.z0;
+    zoomF = Math.max(0.35, Math.min(1, (groupW + 7) / (schoolW + 3)));
+    frame();
+    const t = (mid + 0.05 - range.min) / (range.max - range.min + 0.6);
+    input.value = Math.round(Math.max(0, Math.min(1, t)) * 1000);
+    applyCut();
+  }
   frame();
+  aim();
   say('This is a section. Slide the bar to cut through the school and see inside, like a doll\'s house.');
 
   return {

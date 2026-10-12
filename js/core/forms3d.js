@@ -19,6 +19,7 @@ export function formGeometry(form, mode = 'blocks') {
   const k = form + mode;
   if (geoCache.has(k)) return geoCache.get(k);
   const g = makeGeometry(form, mode);
+  g.userData.cached = true;
   geoCache.set(k, g);
   return g;
 }

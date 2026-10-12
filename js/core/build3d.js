@@ -8,6 +8,7 @@ import { cellGround } from './site.js';
 import { formGeometry, placeObject, materialFor, wallMaterial, interiorMaterial, floorMaterial, shared, formBox, blockMaterial } from './forms3d.js';
 import { emojiImage } from './emoji.js';
 import { CLIP } from './scene.js';
+import { staticParts } from './models.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -27,6 +28,7 @@ function emojiTexture(ch, plain = false) {
   return t;
 }
 const stickerGeo = new THREE.CircleGeometry(0.26, 24).rotateX(-Math.PI / 2);
+stickerGeo.userData.cached = true;
 const stickerMats = new Map();
 function stickerMat(ch) {
   if (!stickerMats.has(ch)) stickerMats.set(ch, new THREE.MeshBasicMaterial({ map: emojiTexture(ch), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, clippingPlanes: CLIP }));
@@ -60,7 +62,8 @@ export class DesignView {
   clear() {
     for (const o of [...this.group.children]) {
       this.group.remove(o);
-      o.traverse(m => { if (m.isMesh && m.userData.ownGeo) m.geometry.dispose(); });
+      // Free every geometry made for this build; shared, cached shapes are kept.
+      o.traverse(m => { if (m.isMesh && m.geometry && !m.geometry.userData.cached) m.geometry.dispose(); });
     }
     this.byId.clear();
     this.fish = [];
@@ -68,6 +71,7 @@ export class DesignView {
 
   sync(idx, mode = this.mode) {
     this.mode = mode;
+    this.gen = (this.gen || 0) + 1;
     this.clear();
     this.idx = idx;
     this.doors = computeDoors(idx);
@@ -197,6 +201,7 @@ export class DesignView {
       }
     }
     this.trackLanes(idx);
+    this.furnish(idx);
   }
 
   instanced(windows, doorFrames, parapets, holds) { // eslint-disable-line
@@ -340,6 +345,54 @@ export class DesignView {
       }
     }
     this.group.add(im);
+  }
+
+  // Furniture inside rooms (Kenney Furniture Kit, CC0), instanced. Loaded lazily the first time.
+  async furnish(idx) {
+    const gen = this.gen;
+    const F = 'assets/models/furniture/';
+    // [model, height, u, v, turn] per cell, in cell coordinates (0..1), turn in quarter turns.
+    const PLAN = {
+      classroom: [['desk', 0.24, 0.3, 0.42, 2], ['desk', 0.24, 0.7, 0.42, 2], ['chair', 0.28, 0.3, 0.66, 2], ['chair', 0.28, 0.7, 0.66, 2]],
+      library: [['bookcaseOpen', 0.46, 0.5, 0.14, 0], ['rugRound', 0.012, 0.5, 0.6, 0], ['books', 0.06, 0.55, 0.6, 1]],
+      lunch: [['table', 0.22, 0.5, 0.5, 0], ['bench', 0.13, 0.5, 0.24, 0], ['bench', 0.13, 0.5, 0.76, 0]],
+      yoga: [['rugRound', 0.012, 0.5, 0.5, 0], ['plantSmall1', 0.2, 0.18, 0.18, 0]],
+      hall: [['bench', 0.13, 0.5, 0.15, 0]],
+      toilets: [['toilet', 0.24, 0.3, 0.2, 0], ['toilet', 0.24, 0.7, 0.2, 0]],
+      art: [['tableRound', 0.22, 0.5, 0.5, 0], ['chair', 0.28, 0.25, 0.5, 1], ['chair', 0.28, 0.75, 0.5, 3]],
+      music: [['loungeSofa', 0.22, 0.5, 0.2, 0], ['pottedPlant', 0.24, 0.82, 0.8, 0]],
+      changing: [['bench', 0.13, 0.5, 0.2, 0]],
+    };
+    const want = new Map();     // model -> [{ x, y, z, turn }]
+    const height = {};
+    for (const [k, c] of idx.occ) {
+      const plan = PLAN[c.room];
+      if (!plan || !isRoomCell(c) || c.form === 'dome' && false) continue;
+      const [x, z, l] = k.split(',').map(Number);
+      if (FORMS[c.form].levels > 1 && l > c.level) continue;
+      const y = l * LEVEL_H + (l === 0 ? cellGround(x, z) : 0) + 0.014;
+      for (const [model, hgt, u, v, turn] of plan) {
+        if (!want.has(model)) want.set(model, []);
+        height[model] = hgt;
+        want.get(model).push({ x: x + u, y, z: z + v, turn });
+      }
+    }
+    if (!want.size) return;
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3();
+    for (const [model, list] of want) {
+      let parts;
+      try { parts = await staticParts(F + model + '.glb', height[model], { clippingPlanes: CLIP }); } catch (e) { continue; }
+      if (gen !== this.gen) return;      // the design changed while loading
+      for (const part of parts) {
+        const im = new THREE.InstancedMesh(part.geometry, part.material, list.length);
+        list.forEach((it, i) => { q.setFromAxisAngle(UP, -it.turn * Math.PI / 2); pos.set(it.x, it.y, it.z); m4.compose(pos, q, sc); im.setMatrixAt(i, m4); });
+        im.instanceMatrix.needsUpdate = true;
+        im.computeBoundingSphere();
+        im.castShadow = false;
+        im.receiveShadow = true;
+        this.group.add(im);
+      }
+    }
   }
 
   animate(dt, t) {

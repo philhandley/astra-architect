@@ -34,7 +34,13 @@ export function litMaterial(m, extra = {}) {
 
 // Flatten a static model into one geometry per material, normalised so its base sits at y = 0
 // and its height is `height` units. Returns [{ geometry, material }].
-export async function staticParts(url, height = 1, extra = {}) {
+const partsCache = new Map();
+export function staticParts(url, height = 1, extra = {}) {
+  const k = url + '|' + height + '|' + (extra.tint || '');
+  if (!partsCache.has(k)) partsCache.set(k, makeParts(url, height, extra));
+  return partsCache.get(k);
+}
+async function makeParts(url, height, extra) {
   const gltf = await loadGLB(url);
   const root = gltf.scene;
   root.updateMatrixWorld(true);
@@ -78,6 +84,7 @@ export async function staticParts(url, height = 1, extra = {}) {
     });
     const merged = clean.length > 1 ? mergeGeometries(clean, false) : clean[0];
     if (!merged.attributes.normal) merged.computeVertexNormals();
+    merged.userData.cached = true;
     parts.push({ geometry: merged, material: litMaterial(mat, extra) });
   }
   return parts;

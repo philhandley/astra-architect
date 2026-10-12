@@ -31,8 +31,9 @@ export const SHAPES = {
   drum: { name: 'Round', flat: true },
   tower: { name: 'Witch hats' },
   ring: { name: 'Ring', flat: true, ring: true },
-  ringhouse: { name: 'Ring of roofs', ring: true },
+  ringhouse: { name: 'Ring of classrooms', ring: true },
   arc: { name: 'Curve' },
+  spiral: { name: 'Spiral stairs', cap: true },
   arch: { name: 'Arch', flat: true },
   steps: { name: 'Big steps' },
   stairs: { name: 'Stairs', cap: true },
@@ -42,11 +43,18 @@ export const SHAPES = {
   garden: { name: 'Garden', cap: true },
   tree: { name: 'Tree', cap: true },
   turbine: { name: 'Wind turbine', cap: true },
+  rocket: { name: 'Rocket', cap: true },
+  observatory: { name: 'Star dome', cap: true },
+  greenhouse: { name: 'Glass house', cap: true },
+  treehouse: { name: 'Treehouse', cap: true },
+  stage: { name: 'Stage', cap: true },
+  circle: { name: 'Talking circle', cap: true },
+  weather: { name: 'Weather station', cap: true },
 };
 
 // Programmes: what each piece is for. size = [width, depth, storeys].
 export const PROGRAMMES = {
-  classroom: { name: 'Classroom', emoji: '✏️', size: [1, 1, 1], shapes: ['house', 'box', 'saw', 'drum', 'tower', 'vault'], colour: 'yellow',
+  classroom: { name: 'Classroom', emoji: '✏️', size: [1, 1, 1], shapes: ['house', 'box', 'arc', 'drum', 'saw', 'tower', 'vault', 'ringhouse'], colour: 'yellow',
     holds: '30 children', say: 'A classroom for thirty children. It is one block, like in your model.' },
   hall: { name: 'Hall', emoji: '🤸', size: [3, 2, 2], shapes: ['vault', 'box', 'saw', 'house', 'drum', 'arch'], colour: 'magenta',
     holds: 'the whole school', say: 'The hall is big and tall, for PE and for the whole school to meet.' },
@@ -64,14 +72,14 @@ export const PROGRAMMES = {
     holds: '20 artists', say: 'An art room. A zigzag roof lets in soft light for painting.' },
   music: { name: 'Music room', emoji: '🎵', size: [1, 1, 1], shapes: ['drum', 'box', 'house', 'tower'], colour: 'red',
     holds: '15 musicians', say: 'A music room for drums and singing.' },
-  ringhouse: { name: 'Ring of houses', emoji: '🏘️', size: [3, 3, 1], shapes: ['ringhouse', 'ring'], colour: 'yellow',
+  ringhouse: { name: 'Ring of classrooms', emoji: '🏘️', size: [3, 3, 1], shapes: ['ringhouse', 'ring'], colour: 'yellow',
     holds: '8 classrooms', say: 'A ring of classrooms with pointy roofs, round a garden in the middle.' },
   steps: { name: 'Big steps', emoji: '🪑', size: [2, 2, 1], shapes: ['steps'], colour: 'blue',
     holds: '60 children sitting', say: 'Big steps to sit on, like a theatre outside.' },
-  stairs: { name: 'Stairs', emoji: '🪜', size: [1, 2, 2], shapes: ['stairs'], colour: 'teal',
-    holds: '', say: 'Stairs, to climb up to the rooms on top.' },
-  slide: { name: 'Slide', emoji: '🛝', size: [1, 2, 2], shapes: ['slide'], colour: 'yellow',
-    holds: '', say: 'A slide! A quick way down from the top.' },
+  stairs: { name: 'Stairs', emoji: '🪜', size: [1, 1, 2], shapes: ['stairs', 'spiral'], colour: 'teal',
+    holds: '', say: 'Stairs, to climb up to the first and second floors. Put them next to a building.' },
+  slide: { name: 'Helter-skelter', emoji: '🛝', size: [1, 2, 3], shapes: ['slide'], colour: 'yellow',
+    holds: '', say: 'A helter-skelter slide! Climb up the tower and whizz round and round to the bottom.' },
   archway: { name: 'Archway', emoji: '🌈', size: [2, 1, 1], shapes: ['arch'], colour: 'navy',
     holds: '', say: 'An archway to walk under. You can build on top of it.' },
   track: { name: 'Running track', emoji: '🏃', size: [3, 2, 1], shapes: ['track'], colour: 'red',
@@ -83,4 +91,21 @@ export const PROGRAMMES = {
   turbine: { name: 'Wind turbine', emoji: '🌬️', size: [1, 1, 1], shapes: ['turbine'], colour: 'white',
     holds: '', say: 'A wind turbine makes electricity from the wind.' },
 };
-export const TRAY = ['classroom', 'hall', 'pool', 'aquarium', 'library', 'yoga', 'lunch', 'art', 'music', 'ringhouse', 'steps', 'stairs', 'slide', 'archway', 'track', 'garden', 'tree', 'turbine'];
+// Surfaces Finn can put on the walls.
+export const SURFACES = [
+  { id: 'plain', name: 'Plain' }, { id: 'climb', name: 'Climbing wall' }, { id: 'green', name: 'Green wall' },
+  { id: 'tiles', name: 'Tiles' }, { id: 'pixel', name: 'Pixels' }, { id: 'brick', name: 'Bricks' },
+  { id: 'wood', name: 'Wood' }, { id: 'glass', name: 'Glass' }, { id: 'chalk', name: 'Chalkboard' },
+];
+export const NO_SURFACE = new Set(['pool', 'track', 'garden', 'tree', 'turbine', 'slide', 'rocket', 'greenhouse', 'treehouse', 'circle', 'weather', 'observatory']);
+
+PROGRAMMES.rocket = { name: 'Rocket launch pad', emoji: '🚀', size: [2, 2, 1], shapes: ['rocket'], colour: 'red', holds: '', say: 'A rocket on its launch pad! Tap Launch to send it up.' };
+PROGRAMMES.observatory = { name: 'Observatory', emoji: '🔭', size: [1, 1, 1], shapes: ['observatory'], colour: 'navy', holds: '10 star-gazers', say: 'An observatory with a big telescope, to look at the stars and planets.' };
+PROGRAMMES.greenhouse = { name: 'Greenhouse', emoji: '🌱', size: [2, 1, 1], shapes: ['greenhouse'], colour: 'lime', holds: 'lots of plants', say: 'A glass greenhouse, to grow plants and do science experiments.' };
+PROGRAMMES.treehouse = { name: 'Treehouse classroom', emoji: '🌳', size: [1, 1, 2], shapes: ['treehouse'], colour: 'orange', holds: '12 children', say: 'A classroom up in a tree! Climb the ladder to get in.' };
+PROGRAMMES.stage = { name: 'Stage', emoji: '🎭', size: [2, 1, 1], shapes: ['stage'], colour: 'purple', holds: 'a show', say: 'A stage for shows, plays and talks.' };
+PROGRAMMES.maker = { name: 'Maker workshop', emoji: '🛠️', size: [2, 1, 1], shapes: ['saw', 'box', 'vault'], colour: 'orange', holds: '20 makers', say: 'A workshop to build and test inventions, like real engineers.' };
+PROGRAMMES.circle = { name: 'Conundrum circle', emoji: '💬', size: [2, 2, 1], shapes: ['circle'], colour: 'blue', holds: '16 thinkers', say: 'A circle to sit in and talk about big questions. There is no right answer!' };
+PROGRAMMES.weather = { name: 'Weather station', emoji: '🌦️', size: [1, 1, 1], shapes: ['weather'], colour: 'white', holds: '', say: 'A weather station measures the wind and the rain.' };
+
+export const TRAY = ['classroom', 'hall', 'pool', 'aquarium', 'library', 'yoga', 'lunch', 'art', 'music', 'ringhouse', 'maker', 'greenhouse', 'observatory', 'treehouse', 'stage', 'circle', 'rocket', 'steps', 'stairs', 'slide', 'archway', 'track', 'garden', 'tree', 'turbine', 'weather'];

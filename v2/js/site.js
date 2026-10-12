@@ -96,8 +96,10 @@ export function buildSite(world) {
   // The model's base: off-white sides down to a board, like an architect's site model.
   group.add(plinth(W, D));
 
-  // The waterfall: a white ribbon down the cliff and a little foam.
-  group.add(waterfall());
+  // The waterfall: water running down the cliff, foam and ripples.
+  const falls = waterfall();
+  group.add(falls);
+  world.updaters.add(dt => falls.userData.update(dt));
 
   // Round trees on the forest, each a ball on a stick.
   const trees = forestTrees();
@@ -193,11 +195,28 @@ function waterfall() {
   let top = 0, tz = fz;
   for (let d = 0; d < 1.6; d += 0.05) { const h = groundAt(fx, fz - d); if (h > top) { top = h; tz = fz - d; } }
   const hgt = Math.max(0.2, top - S.sea);
-  const fall = new THREE.Mesh(new THREE.PlaneGeometry(0.42, hgt), new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#cfeffa', emissiveIntensity: 0.4, transparent: true, opacity: 0.88, side: THREE.DoubleSide }));
-  fall.position.set(fx, S.sea + hgt / 2, (tz + fz) / 2);
-  fall.rotation.x = -Math.atan2(fz - tz, hgt) * 0.6;
+  // Falling water: white and pale blue streaks that run down the cliff.
+  const c = document.createElement('canvas'); c.width = 64; c.height = 256;
+  const x = c.getContext('2d');
+  x.fillStyle = '#bfe6f3'; x.fillRect(0, 0, 64, 256);
+  for (let i = 0; i < 70; i++) { x.fillStyle = i % 3 ? 'rgba(255,255,255,0.85)' : 'rgba(160,214,234,0.9)'; const w = 2 + Math.random() * 5, px = Math.random() * 64, py = Math.random() * 256, len = 30 + Math.random() * 80; x.fillRect(px, py, w, len); if (py + len > 256) x.fillRect(px, py - 256, w, len); }
+  const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(1, 1.5); tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.MeshLambertMaterial({ map: tex, emissive: '#d9f3fb', emissiveIntensity: 0.35, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
+  const fall = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, hgt, 16, 1, true, -Math.PI * 0.55, Math.PI * 1.1), mat);
+  fall.position.set(fx, S.sea + hgt / 2, (tz + fz) / 2 + 0.05);
   g.add(fall);
-  const foam = new THREE.MeshLambertMaterial({ color: '#ffffff' });
-  for (let i = 0; i < 6; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.06 + (i % 3) * 0.02, 8, 6), foam); b.position.set(fx + (i - 2.5) * 0.08, S.sea + 0.03, fz + 0.05 + (i % 2) * 0.06); b.scale.y = 0.5; g.add(b); }
+  // Foam and spray at the bottom, bubbling.
+  const foam = new THREE.MeshLambertMaterial({ color: '#ffffff' }), bubbles = [];
+  for (let i = 0; i < 12; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.05 + (i % 4) * 0.018, 8, 6), foam); b.userData.base = new THREE.Vector3(fx + Math.cos(i * 2.4) * 0.22 * (0.4 + (i % 3) * 0.3), S.sea + 0.03, fz + 0.12 + Math.sin(i * 2.4) * 0.16); b.position.copy(b.userData.base); b.scale.y = 0.55; g.add(b); bubbles.push(b); }
+  // Ripples spreading over the pool.
+  const ripples = [];
+  for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.24, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6, depthWrite: false })); r.position.set(fx, S.sea + 0.035, fz + 0.15); r.userData.ph = i / 3; g.add(r); ripples.push(r); }
+  let t = 0;
+  g.userData.update = dt => {
+    t += dt;
+    tex.offset.y += dt * 1.1;
+    bubbles.forEach((b, i) => { const k = (t * 1.6 + i * 0.37) % 1; b.position.y = b.userData.base.y + Math.sin(k * Math.PI) * 0.05; b.scale.setScalar(0.8 + Math.sin(k * Math.PI) * 0.35); b.scale.y *= 0.55; });
+    ripples.forEach(r => { const k = (t * 0.45 + r.userData.ph) % 1; r.scale.setScalar(1 + k * 3); r.material.opacity = 0.6 * (1 - k); });
+  };
   return g;
 }

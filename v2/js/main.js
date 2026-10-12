@@ -6,6 +6,7 @@ import { Model } from './model.js';
 import { mountSite } from './sitescreen.js';
 import { mountRooms, trayThumbs } from './rooms.js';
 import { h, emo, say, hush, sfx, toast, speechOn, setSpeech, soundOn, setSound } from './ui.js';
+import { icon, MARK } from './icons.js';
 
 // Finn's wooden-block model from the photos: green classrooms along the beach, orange bars round the meadow,
 // a blue pool in the middle, a ring of green curves and an orange drum by the waterfall.
@@ -28,13 +29,13 @@ async function boot() {
   const app = document.getElementById('app');
   const shell = h(`<div class="shell">
     <header class="top">
-      <div class="brand">${emo('🏫')}<div><small>Astra Architect</small><b>Finn's Dream School</b></div></div>
-      <nav class="tabs"><button data-go="rooms" type="button">${emo('🧱')} Rooms</button><button data-go="site" type="button">${emo('🏝️')} Site</button></nav>
+      <div class="brand">${MARK}<div><small>Astra Architect</small><b>Finn's Dream School</b></div></div>
+      <nav class="tabs"><button data-go="rooms" type="button">${icon('rooms')} Rooms</button><button data-go="site" type="button">${icon('site')} Site</button></nav>
       <div class="acts">
-        <button class="ab" data-a="finn" type="button">${emo('🧸')} Finn's model</button>
-        <button class="ab" data-a="clear" type="button">${emo('🌱')} Empty site</button>
-        <button class="ab round" data-a="speech" type="button" aria-label="Read aloud">🔊</button>
-        <button class="ab round" data-a="sound" type="button" aria-label="Sounds">🎵</button>
+        <button class="ab" data-a="finn" type="button">${icon('blocks')} Finn's model</button>
+        <button class="ab" data-a="clear" type="button">${icon('leaf')} Empty site</button>
+        <button class="ab round" data-a="speech" type="button" aria-label="Read aloud">${icon('speaker')}</button>
+        <button class="ab round" data-a="sound" type="button" aria-label="Sounds">${icon('music')}</button>
       </div>
     </header>
     <main class="stage"><div class="world"></div><div class="overlay"></div><div class="rooms-host" hidden></div></main>

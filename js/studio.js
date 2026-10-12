@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { store } from './core/store.js';
-import { ROOMS, FORMS, TRAY, LEVEL_H, MAX_LEVEL, MATERIALS, MATERIAL_ORDER, WISHES, FEATURES } from './core/catalogue.js';
+import { ROOMS, FORMS, TRAY, GROUPS, PAINT, LEVEL_H, MAX_LEVEL, MATERIALS, MATERIAL_ORDER, WISHES, FEATURES, formCells } from './core/catalogue.js';
 import { loadSite, site, cellGround, ZONE_NAMES, zone } from './core/site.js';
 import { indexDesign, placeCheck, stackLevel, REASONS, footprint, key, roomGroups, mood, bounds, DIRS } from './core/design.js';
 import { getWorld, CLIP, clipPlane } from './core/scene.js';
@@ -50,7 +50,9 @@ export async function mountStudio(host, opts = {}) {
     ghost: null,         // { cell, ok, why }
     selected: null,      // design id
     moving: null,        // design id being moved
-    faces: !!preset.faces,
+    faces: preset.full ? !!store.modLoad('studio', 'faces') : !!preset.faces,
+    form: null,          // the shape chosen for the current room tool
+    iso: preset.iso ?? true,
     floor: 0,
     brief: {},
     history: [],
@@ -99,7 +101,7 @@ export async function mountStudio(host, opts = {}) {
 
   function addCell(c) {
     snapshot();
-    const cell = { id: S.design.nextId++, form: c.form, room: c.room, x: c.x, z: c.z, level: c.level, rot: c.rot || 0, material: c.material || 'colour' };
+    const cell = { id: S.design.nextId++, form: c.form, room: c.room, x: c.x, z: c.z, level: c.level, rot: c.rot || 0, material: c.material || 'colour', colour: c.colour || null };
     S.design.cells.push(cell);
     refresh();
     sfx.pop();
@@ -136,30 +138,36 @@ export async function mountStudio(host, opts = {}) {
   // ---------- Layout: tray ----------
   const tray = root.querySelector('.tray');
   function drawTray() {
-    const rooms = TRAY.filter(r => !allowed || allowed.has(r));
-    tray.innerHTML = `<div class="tt">Rooms</div>`;
-    const hand = h(`<button class="tile-btn hand ${S.tool === null ? 'on' : ''}" type="button">${icon('hand')}<span>Pick</span></button>`);
+    const allowedRooms = TRAY.filter(r => !allowed || allowed.has(r));
+    tray.innerHTML = '';
+    const hand = h(`<button class="tile-btn tool ${S.tool === null ? 'on' : ''}" type="button">${icon('hand')}<span>Pick</span></button>`);
     hand.addEventListener('click', () => setTool(null));
-    tray.append(hand);
-    for (const id of rooms) {
-      const R = ROOMS[id];
-      const b = h(`<button class="tile-btn ${S.tool === id ? 'on' : ''}" type="button" data-room="${id}"><span class="sw" style="background:${R.colour}"></span>${emo(R.emoji)}<span>${esc(R.name)}</span></button>`);
-      b.addEventListener('click', () => setTool(S.tool === id ? null : id));
-      tray.append(b);
+    const bin = h(`<button class="tile-btn tool bin ${S.tool === 'bin' ? 'on' : ''}" type="button">${icon('trash')}<span>Bin</span></button>`);
+    bin.addEventListener('click', () => setTool(S.tool === 'bin' ? null : 'bin'));
+    tray.append(hand, bin);
+    const groups = allowedRooms.length > 6 ? GROUPS : [{ name: 'Rooms', rooms: allowedRooms }];
+    for (const grp of groups) {
+      const rooms = grp.rooms.filter(r => allowedRooms.includes(r));
+      if (!rooms.length) continue;
+      if (groups.length > 1) tray.append(h(`<div class="tt">${esc(grp.name)}</div>`));
+      for (const id of rooms) {
+        const R = ROOMS[id];
+        const b = h(`<button class="tile-btn ${S.tool === id ? 'on' : ''}" type="button" data-room="${id}"><span class="blk">${formIcon(R.form, 'iso', R.colour)}${emo(R.emoji, 'stk')}</span><span class="lbl">${esc(R.name)}</span></button>`);
+        b.addEventListener('click', () => setTool(S.tool === id ? null : id));
+        tray.append(b);
+      }
     }
   }
   function setTool(id) {
     S.tool = id;
     S.moving = null;
+    S.form = id && ROOMS[id] ? (preset.formFor?.[id] || ROOMS[id].form) : null;
+    S.rot = 0;
     clearGhost();
     select(null);
     drawTray();
-    if (id) {
-      sfx.tap();
-      const R = ROOMS[id];
-      S.rot = 0;
-      say(`${R.name}. Tap where it should go.`);
-    }
+    drawShapeStrip();
+    if (id) { sfx.tap(); say(id === 'bin' ? 'Tap a block to take it away.' : `${ROOMS[id].name}. Tap where it should go.`); }
     emit('tool', { tool: id });
   }
 
@@ -212,6 +220,26 @@ export async function mountStudio(host, opts = {}) {
   const sunPill = h(`<div class="pill" style="display:none">${emo('🌅')}<input type="range" min="0" max="1000" aria-label="Move the sun">${emo('🌇')}</div>`);
   if (preset.brief !== false) top.append(chips);
   top.append(sunPill);
+  const shapeStrip = h(`<div class="shape-strip" style="display:none"></div>`);
+  top.append(shapeStrip);
+  function drawShapeStrip() {
+    const R = S.tool && ROOMS[S.tool];
+    const turnable = S.form && (NEEDS_TURN.has(S.form) || S.form === 'curve');
+    if (!R || (R.forms.length < 2 && !turnable)) { shapeStrip.style.display = 'none'; shapeStrip.innerHTML = ''; return; }
+    shapeStrip.style.display = '';
+    shapeStrip.innerHTML = `<span class="tt">Shape</span>`;
+    for (const f of R.forms) {
+      const b = h(`<button class="shape-btn ${S.form === f ? 'on' : ''}" type="button" aria-label="${esc(FORMS[f].name)}">${formIcon(f, 'iso', R.colour)}<span>${esc(FORMS[f].name)}</span></button>`);
+      if (S.form === f) b.querySelector('svg').style.transform = `rotate(${S.rot * 90}deg)`;
+      b.addEventListener('click', () => { S.form = f; S.rot = 0; drawShapeStrip(); sfx.tap(); say(FORMS[f].good); emit('shapePick', { form: f }); });
+      shapeStrip.append(b);
+    }
+    if (turnable) {
+      const t = h(`<button class="shape-btn turn" type="button" aria-label="Turn">${icon('rotate')}<span>Turn</span></button>`);
+      t.addEventListener('click', () => { S.rot = (S.rot + 1) & 3; drawShapeStrip(); sfx.tap(); emit('turn'); });
+      shapeStrip.append(t);
+    }
+  }
   const sunInput = sunPill.querySelector('input');
   sunInput.value = Math.round((S.design.sun ?? 0.32) * 1000);
   world.setSun(S.design.sun ?? 0.32);
@@ -248,6 +276,7 @@ export async function mountStudio(host, opts = {}) {
   const faceObjs = [];
   function setFaces(on) {
     S.faces = on;
+    if (preset.full) store.modSave('studio', 'faces', on);
     facesBtn && facesBtn.classList.toggle('on', on);
     updateFaces();
     if (on) say('Every room has a face. Tap a face to find out how it feels.');
@@ -311,8 +340,16 @@ export async function mountStudio(host, opts = {}) {
     const R = ROOMS[room];
     form = form || R.form;
     rot = rot ?? bestRot(form, x, z, level);
-    const cell = { id: -1, form, room, x, z, level, rot, material: 'colour' };
-    const chk = placeCheck(S.idx, cell, ignoreId);
+    const cell = { id: -1, form, room, x, z, level, rot, material: 'colour', colour: S.moving ? (S.idx.byId.get(S.moving)?.colour || null) : null };
+    let chk = placeCheck(S.idx, cell, ignoreId);
+    // A long shape that does not fit this way round may fit turned.
+    if (!chk.ok && formCells(form, 0).length > 1) {
+      for (let k = 1; k < 4; k++) {
+        const alt = { ...cell, rot: (rot + k) & 3 };
+        const c2 = placeCheck(S.idx, alt, ignoreId);
+        if (c2.ok) { cell.rot = alt.rot; chk = c2; break; }
+      }
+    }
     S.ghost = { cell, ok: chk.ok, why: chk.why, ignoreId };
     if (ghostMesh) ghostGroup.remove(ghostMesh);
     ghostMesh = new THREE.Mesh(formGeometry(form, 'blocks'), ghostMaterial(chk.ok));
@@ -339,9 +376,6 @@ export async function mountStudio(host, opts = {}) {
     const hgt = FORMS[form].levels * LEVEL_H;
     ghostTag.position.set(ghostMesh.position.x, ghostMesh.position.y + hgt + 0.3, ghostMesh.position.z);
     world.groups.lab.add(ghostTag);
-    showFloatbar('ghost');
-    if (!chk.ok) { sfx.no(); say(REASONS[chk.why] || 'That will not fit there.'); }
-    else sfx.tap();
     if (S.view === 'plan') drawPlanView();
     emit('ghost', { ok: chk.ok });
   }
@@ -351,7 +385,7 @@ export async function mountStudio(host, opts = {}) {
   function confirmGhost() {
     const gh = S.ghost;
     if (!gh) return;
-    if (!gh.ok) { sfx.no(); say(REASONS[gh.why] || 'That will not fit there.'); return; }
+    if (!gh.ok) { sfx.no(); say(REASONS[gh.why] || 'That will not fit there.'); shakeGhost(); return; }
     if (S.moving) {
       snapshot();
       const c = S.idx.byId.get(S.moving);
@@ -360,12 +394,39 @@ export async function mountStudio(host, opts = {}) {
       clearGhost();
       refresh();
       sfx.pop();
+      flashMood(c, gh.mood);
       emit('move', { cell: c });
       return;
     }
+    const mood = gh.mood;
     const cell = addCell(gh.cell);
     clearGhost();
-    void cell;
+    flashMood(cell, mood);
+  }
+  // A wobble when something will not fit, then the ghost goes away.
+  function shakeGhost() {
+    if (!ghostMesh) return;
+    if (S.view === 'plan') { setTimeout(clearGhost, 320); return; }
+    const m = ghostMesh, x0 = m.position.x;
+    let t = 0;
+    const fn = dt => { t += dt; m.position.x = x0 + Math.sin(t * 50) * 0.06 * Math.max(0, 1 - t / 0.35); if (t > 0.35) { world.updaters.delete(fn); if (ghostMesh === m) clearGhost(); } };
+    world.updaters.add(fn);
+  }
+  // A little face and a word above a block that has just been built or moved.
+  let flashObj = null, flashTimer = 0;
+  function flashMood(cell, m) {
+    dropLabel(flashObj); flashObj = null; clearTimeout(flashTimer);
+    const R = ROOMS[cell.room];
+    const fe = !m ? '✅' : m.face === 'happy' ? '😊' : m.face === 'sad' ? '😟' : '🙂';
+    const txt = !m ? R.name : m.face === 'sad' ? `Not next to ${shortName(m.disliked[0])}!` : m.face === 'happy' ? `Loves ${shortName(m.liked[0])}` : R.name;
+    const el = h(`<div class="label3d"><div class="ghost-tag flash">${emo(fe)}<span>${esc(txt)}</span></div></div>`);
+    flashObj = new CSS2DObject(el);
+    const ps = footprint(cell);
+    const cx = ps.reduce((a, p) => a + p.x + 0.5, 0) / ps.length, cz = ps.reduce((a, p) => a + p.z + 0.5, 0) / ps.length;
+    flashObj.position.set(cx, (cell.level + FORMS[cell.form].levels) * LEVEL_H + 0.35 + (cell.level === 0 ? cellGround(cell.x, cell.z) : 0), cz);
+    world.groups.lab.add(flashObj);
+    flashTimer = setTimeout(() => { dropLabel(flashObj); flashObj = null; }, 2600);
+    if (m && m.face === 'sad') sayAuto(`${txt} Tap it and move it if you like.`);
   }
   function turnGhost() {
     if (!S.ghost) return;
@@ -380,18 +441,17 @@ export async function mountStudio(host, opts = {}) {
     hideFloatbar();
     floatbar = h(`<div class="floatbar"></div>`);
     const fb = (html, cls, fn, label) => { const b = h(`<button class="fb ${cls}" type="button" aria-label="${esc(label)}">${html}</button>`); b.addEventListener('pointerdown', e => e.stopPropagation()); b.addEventListener('click', e => { e.stopPropagation(); fn(); }); floatbar.append(b); return b; };
-    if (kind === 'ghost') {
-      const c = S.ghost.cell;
-      if (NEEDS_TURN.has(c.form)) fb(icon('rotate'), '', turnGhost, 'Turn');
-      fb(`${icon('check')} ${S.moving ? 'Move here' : 'Build'}`, S.ghost.ok ? 'go' : 'bad', confirmGhost, 'Build');
-      fb(icon('close'), 'no', () => { if (S.moving) { S.moving = null; } clearGhost(); }, 'Cancel');
-    } else if (kind === 'select') {
+    if (kind === 'select') {
       const c = S.idx.byId.get(S.selected);
       const R = ROOMS[c.room];
       fb(emo(R.emoji), '', () => say(`${R.name}. ${R.card}`), 'About this room');
+      if (!['stairs', 'slide', 'climbing', 'lookout'].includes(c.room) && c.form !== 'curve') {
+        fb(`${icon('plus')} Bigger`, 'go', () => growRoom(c), 'Bigger');
+        if (groupOf(c)?.forms.size > 1) fb(`${icon('minus')} Smaller`, '', () => shrinkRoom(c), 'Smaller');
+      }
       if (NEEDS_TURN.has(c.form) || c.form === 'curve') fb(icon('rotate'), '', () => turnSelected(), 'Turn');
       if (R.forms.length > 1) fb(icon('shape'), '', () => openPanel('shape'), 'Change shape');
-      fb(icon('paint'), '', () => openPanel('paint'), 'Paint');
+      fb(icon('paint'), '', () => openPanel('colour'), 'Colour');
       fb(icon('move'), '', () => startMove(), 'Move');
       fb(icon('trash'), 'no', () => removeCell(S.selected), 'Bin');
       fb(icon('close'), '', () => select(null), 'Done');
@@ -429,7 +489,7 @@ export async function mountStudio(host, opts = {}) {
     }
     const W = viewport.clientWidth, H = viewport.clientHeight;
     const fw = floatbar.offsetWidth || 300;
-    x = clamp(x, fw / 2 + 280, W - fw / 2 - 96);
+    x = clamp(x, fw / 2 + 320, W - fw / 2 - 96);
     y = clamp(y, 150, H - 20);
     floatbar.style.left = x + 'px';
     floatbar.style.top = y + 'px';
@@ -461,13 +521,45 @@ export async function mountStudio(host, opts = {}) {
     }
     sfx.no(); say('There is no room to turn it here.');
   }
+  // Rooms grow a block at a time, like dragging out a pool in SimCity: the long side first, next to the tapped block.
+  function groupOf(c) { return roomGroups(S.idx).find(g => g.forms.has(c.id)); }
+  function growRoom(c) {
+    const g = groupOf(c);
+    if (!g) return;
+    const xs = g.cells.map(p => p.x), zs = g.cells.map(p => p.z);
+    const w = Math.max(...xs) - Math.min(...xs) + 1, d = Math.max(...zs) - Math.min(...zs) + 1;
+    const dirs = w >= d ? [[1, 0], [-1, 0], [0, 1], [0, -1]] : [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    const fc = formCells(c.form, c.rot);
+    const fw = Math.max(...fc.map(p => p[0])) + 1, fd = Math.max(...fc.map(p => p[1])) + 1;
+    const anchors = [c, ...S.design.cells.filter(o => g.forms.has(o.id) && o.id !== c.id)];
+    for (const [dx, dz] of dirs) for (const a of anchors) {
+      const cand = { form: c.form, room: c.room, level: c.level, rot: c.rot, material: c.material, colour: c.colour, id: -1, x: a.x + dx * fw, z: a.z + dz * fd };
+      if (placeCheck(S.idx, cand).ok) {
+        const cell = addCell(cand);
+        select(c.id);
+        flashMood(cell, null);
+        emit('grow', { cell });
+        return;
+      }
+    }
+    sfx.no(); say('There is no room to make it bigger here. Try turning it, or moving something.');
+  }
+  function shrinkRoom(c) {
+    const g = groupOf(c);
+    if (!g || g.forms.size < 2) { sfx.no(); say('That is as small as it goes. Use the bin to take it away.'); return; }
+    const ids = [...g.forms].filter(id => id !== c.id).sort((a, b) => b - a);
+    removeCell(ids[0]);
+    if (S.idx.byId.has(c.id)) select(c.id);
+    emit('shrink', { cell: c });
+  }
   function startMove() {
     const c = S.idx.byId.get(S.selected);
     S.moving = c.id;
     S.tool = null;
+    S.rot = c.rot;
     select(null);
+    drawTray();
     say('Tap where it should go.');
-    showGhost(c.x, c.z, c.level, { form: c.form, room: c.room, rot: c.rot, ignoreId: c.id });
   }
 
   // ---------- Panels: shape and paint ----------
@@ -478,35 +570,44 @@ export async function mountStudio(host, opts = {}) {
     const c = S.idx.byId.get(S.selected);
     if (!c) return;
     const R = ROOMS[c.room];
-    panel = h(`<div class="sheet-panel"><div class="head"><h3>${kind === 'shape' ? `Shape for the ${esc(R.name.toLowerCase())}` : `What is the ${esc(R.name.toLowerCase())} made of?`}</h3></div><div class="optrow"></div></div>`);
+    const title = kind === 'shape' ? `Shape for the ${R.name.toLowerCase()}` : `Colour for the ${R.name.toLowerCase()}`;
+    panel = h(`<div class="sheet-panel"><div class="head"><h3>${esc(title)}</h3></div><div class="optrow"></div></div>`);
     const close = h(`<button class="btn ghost round small" type="button" aria-label="Close">${icon('close')}</button>`);
     close.addEventListener('click', closePanel);
     panel.querySelector('.head').append(close);
     const row = panel.querySelector('.optrow');
+    const apply = (fn, ev) => { snapshot(); fn(); refresh(); select(c.id); openPanel(kind); sfx.pop(); emit(ev, { cell: c }); };
     if (kind === 'shape') {
       for (const f of R.forms) {
-        const b = h(`<button class="opt ${c.form === f ? 'on' : ''}" type="button">${formIcon(f)}<span>${esc(FORMS[f].name)}</span></button>`);
+        const b = h(`<button class="opt ${c.form === f ? 'on' : ''}" type="button">${formIcon(f, 'form', c.colour || R.colour)}<span>${esc(FORMS[f].name)}</span></button>`);
         b.addEventListener('click', () => {
           say(FORMS[f].good);
           if (f === c.form) return;
           for (let r = 0; r < 4; r++) {
             const cand = { ...c, form: f, rot: (c.rot + r) & 3 };
-            if (placeCheck(S.idx, cand, c.id).ok) { snapshot(); c.form = f; c.rot = cand.rot; refresh(); select(c.id); openPanel('shape'); sfx.pop(); emit('shape', { cell: c }); return; }
+            if (placeCheck(S.idx, cand, c.id).ok) { apply(() => { c.form = f; c.rot = cand.rot; }, 'shape'); return; }
           }
           sfx.no(); say(`A ${FORMS[f].name.toLowerCase()} will not fit here.`);
         });
         row.append(b);
       }
     } else {
-      for (const m of MATERIAL_ORDER) {
-        const M = MATERIALS[m];
-        const b = h(`<button class="opt ${((c.material || 'colour') === m) ? 'on' : ''}" type="button">${m === 'colour' ? `<span class="sw" style="background:${R.colour}"></span>` : emo(M.emoji)}<span>${esc(M.name)}</span></button>`);
-        b.addEventListener('click', () => {
-          snapshot(); c.material = m; refresh(); select(c.id); openPanel('paint'); sfx.pop(); say(M.card);
-          if (S.mode === 'blocks') { toast('Switch to Building to see the materials', '🏠'); }
-          emit('paint', { cell: c });
-        });
+      const def = h(`<button class="opt ${!c.colour ? 'on' : ''}" type="button"><span class="sw" style="background:${R.colour}"></span><span>Room colour</span></button>`);
+      def.addEventListener('click', () => apply(() => { c.colour = null; }, 'paint'));
+      row.append(def);
+      for (const pc of PAINT) {
+        const b = h(`<button class="opt ${c.colour === pc.hex ? 'on' : ''}" type="button"><span class="sw" style="background:${pc.hex}"></span><span>${esc(pc.name)}</span></button>`);
+        b.addEventListener('click', () => apply(() => { c.colour = pc.hex; }, 'paint'));
         row.append(b);
+      }
+      const mrow = h(`<div class="optrow"></div>`);
+      panel.append(h(`<div style="font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)">Made of (shows in Building)</div>`), mrow);
+      for (const m of MATERIAL_ORDER) {
+        if (m === 'colour') continue;
+        const M = MATERIALS[m];
+        const b = h(`<button class="opt ${(c.material || 'colour') === m ? 'on' : ''}" type="button">${emo(M.emoji)}<span>${esc(M.name)}</span></button>`);
+        b.addEventListener('click', () => { apply(() => { c.material = c.material === m ? 'colour' : m; }, 'paint'); say(M.card); if (S.mode === 'blocks') toast('Switch to Building to see the materials', '🏠'); });
+        mrow.append(b);
       }
     }
     root.appendChild(panel);
@@ -549,21 +650,29 @@ export async function mountStudio(host, opts = {}) {
     const t = targetFromRay(world.rayFrom(clientX, clientY));
     tapAt(t);
   }
-  function tapAt(t) {
-    if (!t) { if (S.selected) select(null); return; }
+  function tapAt(t, phase = 'up') {
+    if (!t) { if (phase === 'up' && S.selected) select(null); return; }
     if (S.moving) {
       const c = S.idx.byId.get(S.moving);
-      if (S.ghost && S.ghost.cell.x === t.x && S.ghost.cell.z === t.z) { confirmGhost(); return; }
-      showGhost(t.x, t.z, t.hitId === S.moving ? c.level : t.level, { form: c.form, room: c.room, rot: c.rot, ignoreId: c.id });
+      const level = t.hitId === S.moving ? c.level : t.level;
+      if (phase === 'down') { showGhost(t.x, t.z, level, { form: c.form, room: c.room, rot: S.rot, ignoreId: c.id }); return; }
+      if (!S.ghost) showGhost(t.x, t.z, level, { form: c.form, room: c.room, rot: S.rot, ignoreId: c.id });
+      confirmGhost();
+      return;
+    }
+    if (S.tool === 'bin') {
+      if (phase === 'down') return;
+      if (t.hitId) { removeCell(t.hitId); emit('binTap'); }
+      else { sfx.no(); say('Tap a block to take it away.'); }
       return;
     }
     if (S.tool) {
-      const gh = S.ghost;
-      if (gh && gh.cell.x === t.x && gh.cell.z === t.z && gh.cell.level === t.level) { confirmGhost(); return; }
-      if (gh && gh.ok && t.hitId === null && footprint(gh.cell).some(p => p.x === t.x && p.z === t.z)) { confirmGhost(); return; }
-      showGhost(t.x, t.z, t.level, { room: S.tool, form: preset.formFor?.[S.tool] });
+      if (phase === 'down') { showGhost(t.x, t.z, t.level, { room: S.tool, form: S.form }); return; }
+      if (!S.ghost) showGhost(t.x, t.z, t.level, { room: S.tool, form: S.form });
+      confirmGhost();
       return;
     }
+    if (phase === 'down') return;
     if (t.hitId) { if (S.selected === t.hitId) select(null); else select(t.hitId); }
     else {
       if (S.selected) select(null);
@@ -576,21 +685,29 @@ export async function mountStudio(host, opts = {}) {
     }
   }
 
-  // Taps versus drags on the 3D canvas.
+  // Touch on the 3D canvas: finger down shows where a block would go, lifting it builds; a drag turns the view instead.
   let down = null;
-  const onDown = e => { if (S.view === 'walk') return; down = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, multi: false }; };
-  const onMove = e => { if (down && e.pointerId !== down.id) down.multi = true; };
+  const onDown = e => {
+    if (S.view === 'walk' || S.view === 'section') return;
+    down = { x: e.clientX, y: e.clientY, id: e.pointerId, multi: false };
+    if (((S.tool && S.tool !== 'bin') || S.moving) && S.view === 'model') { const t = targetFromRay(world.rayFrom(e.clientX, e.clientY)); if (t) tapAt(t, 'down'); }
+  };
+  const onMove = e => {
+    if (!down) return;
+    if (e.pointerId !== down.id) { down.multi = true; clearGhost(); return; }
+    if (S.ghost && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) clearGhost();
+  };
   const onUp = e => {
     if (!down || e.pointerId !== down.id) return;
     const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
-    const quick = performance.now() - down.t < 650;
     const d = down; down = null;
-    if (moved < 10 && quick && !d.multi) handleTap(e.clientX, e.clientY);
-    else if (moved >= 10 && S.view === 'model') emit('orbit');
+    if (moved < 10 && !d.multi) handleTap(e.clientX, e.clientY);
+    else { clearGhost(); if (moved >= 10 && S.view === 'model') emit('orbit'); }
   };
   world.canvas.addEventListener('pointerdown', onDown);
   world.canvas.addEventListener('pointermove', onMove);
   world.canvas.addEventListener('pointerup', onUp);
+  world.canvas.addEventListener('pointercancel', () => { down = null; clearGhost(); });
 
   // ---------- Views ----------
   let section = null, walk = null;
@@ -609,12 +726,13 @@ export async function mountStudio(host, opts = {}) {
     CLIP.length = 0;
     world.camera = world.cam;
     world.controls.enabled = true;
+    world.setIso(v === 'model' && S.iso);
     if (v === 'plan') {
       world.stop();
       // Fit the school into the clear area between the tray and the right-hand buttons.
       const W = viewport.clientWidth, H = viewport.clientHeight;
-      planView = fitView(S.design, Math.max(200, W - 400), Math.max(200, H - 140));
-      planView.x0 -= 290 / planView.s; planView.z0 -= 76 / planView.s;
+      planView = fitView(S.design, Math.max(200, W - 440), Math.max(200, H - 140));
+      planView.x0 -= 326 / planView.s; planView.z0 -= 76 / planView.s;
       drawPlanView();
       say('This is the plan. It shows the school from above, like a map, with the walls, doors and windows.');
     } else {
@@ -660,6 +778,7 @@ export async function mountStudio(host, opts = {}) {
     }
     if (S.view === 'section' && section) { section.zoom(f); return; }
     if (S.view !== 'model') return;
+    if (world.iso) { world.ortho.zoom = clamp(world.ortho.zoom / f, 0.3, 7); world.ortho.updateProjectionMatrix(); return; }
     const c = world.controls;
     const off = world.cam.position.clone().sub(c.target);
     const len = clamp(off.length() * f, c.minDistance, c.maxDistance);
@@ -674,22 +793,33 @@ export async function mountStudio(host, opts = {}) {
     }
     const target = b ? new THREE.Vector3(b.cx, 0.4, b.cz) : new THREE.Vector3(24, 0, 24);
     const size = b ? Math.max(8, Math.max(b.x1 - b.x0, b.z1 - b.z0) * 1.25 + 3) : 40;
+    if (world.iso) {
+      const zoom = clamp(12 / Math.max(5, size * (close ? 0.42 : 0.56)), 0.3, 7);
+      if (instant) { world.controls.target.copy(target); world.placeIso(target); world.ortho.zoom = zoom; world.ortho.updateProjectionMatrix(); world.controls.update(); }
+      else animateCam(target, null, 0.7, zoom);
+      return;
+    }
     const dist = close ? size * 0.7 : size;
     const pos = target.clone().add(new THREE.Vector3(0.45, 0.62, 0.95).normalize().multiplyScalar(dist));
     if (instant) { world.controls.target.copy(target); world.cam.position.copy(pos); world.controls.update(); }
     else animateCam(target, pos);
   }
   let camAnim = null;
-  function animateCam(target, pos, dur = 0.7) {
+  function animateCam(target, pos, dur = 0.7, zoom = null) {
     const c = world.controls;
     const t0 = c.target.clone(), p0 = world.cam.position.clone();
+    const iso = world.iso;
+    const off = world.ortho.position.clone().sub(c.target), z0 = world.ortho.zoom;
     let t = 0;
     if (camAnim) world.updaters.delete(camAnim);
     camAnim = dt => {
       t = Math.min(1, t + dt / dur);
       const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
       c.target.lerpVectors(t0, target, e);
-      world.cam.position.lerpVectors(p0, pos, e);
+      if (iso) {
+        world.ortho.position.copy(c.target).add(off);
+        if (zoom) { world.ortho.zoom = z0 + (zoom - z0) * e; world.ortho.updateProjectionMatrix(); }
+      } else if (pos) world.cam.position.lerpVectors(p0, pos, e);
       if (t >= 1) { world.updaters.delete(camAnim); camAnim = null; }
     };
     world.updaters.add(camAnim);
@@ -706,32 +836,35 @@ export async function mountStudio(host, opts = {}) {
     if (planCanvas.width !== Math.round(W * dpr)) { planCanvas.width = Math.round(W * dpr); planCanvas.height = Math.round(H * dpr); }
     const g = planCanvas.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawPlan(g, W, H, S.idx, S.doors, planView, { level: S.floor, mapImg: mapImage, faces: S.faces, ghost: S.ghost, select: S.selected ? S.idx.byId.get(S.selected) : null, redraw: () => drawPlanView(), bubbles: S.bubbles, traffic: S.traffic });
+    drawPlan(g, W, H, S.idx, S.doors, planView, { level: S.floor, mapImg: mapImage, faces: S.faces, ghost: S.ghost, paths: dv.pathCells, select: S.selected ? S.idx.byId.get(S.selected) : null, redraw: () => drawPlanView(), bubbles: S.bubbles, traffic: S.traffic });
     positionFloatbar();
   }
-  // Plan interactions: one finger pans, a tap builds or picks.
+  // Plan interactions: finger down previews, lifting builds or picks; a drag pans.
   let pdown = null;
-  planCanvas.addEventListener('pointerdown', e => { pdown = { x: e.clientX, y: e.clientY, vx: planView.x0, vz: planView.z0, t: performance.now(), moved: false }; planCanvas.setPointerCapture(e.pointerId); });
+  function planTarget(e) {
+    const r = planCanvas.getBoundingClientRect();
+    const x = Math.floor(planView.x0 + (e.clientX - r.left) / planView.s), z = Math.floor(planView.z0 + (e.clientY - r.top) / planView.s);
+    const here = S.idx.occ.get(key(x, z, S.floor));
+    if (S.tool && S.tool !== 'bin') return { x, z, level: here ? stackLevel(S.idx, x, z) : S.floor, hitId: null };
+    if (S.moving) return { x, z, level: S.floor, hitId: null };
+    return { x, z, level: S.floor, hitId: here ? here.id : null };
+  }
+  planCanvas.addEventListener('pointerdown', e => {
+    pdown = { x: e.clientX, y: e.clientY, vx: planView.x0, vz: planView.z0, moved: false };
+    planCanvas.setPointerCapture(e.pointerId);
+    if (S.tool || S.moving) tapAt(planTarget(e), 'down');
+  });
   planCanvas.addEventListener('pointermove', e => {
     if (!pdown) return;
     const dx = e.clientX - pdown.x, dy = e.clientY - pdown.y;
-    if (Math.hypot(dx, dy) > 10) pdown.moved = true;
+    if (!pdown.moved && Math.hypot(dx, dy) > 10) { pdown.moved = true; clearGhost(); }
     if (pdown.moved) { planView.x0 = pdown.vx - dx / planView.s; planView.z0 = pdown.vz - dy / planView.s; drawPlanView(); }
   });
   planCanvas.addEventListener('pointerup', e => {
     if (!pdown) return;
     const d = pdown; pdown = null;
     if (d.moved) { emit('pan'); return; }
-    const r = planCanvas.getBoundingClientRect();
-    const x = Math.floor(planView.x0 + (e.clientX - r.left) / planView.s), z = Math.floor(planView.z0 + (e.clientY - r.top) / planView.s);
-    const here = S.idx.occ.get(key(x, z, S.floor));
-    if (S.tool || S.moving) {
-      const t = { x, z, level: S.floor, hitId: null };
-      if (here && !S.moving) { t.level = stackLevel(S.idx, x, z); }
-      tapAt(t);
-      return;
-    }
-    tapAt({ x, z, level: S.floor, hitId: here ? here.id : null });
+    tapAt(planTarget(e), 'up');
   });
   planCanvas.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY > 0 ? 1.15 : 0.87); }, { passive: false });
 
@@ -808,6 +941,7 @@ export async function mountStudio(host, opts = {}) {
       clearGhost(); clearFaceObjs();
       if (selMesh) ghostGroup.remove(selMesh);
       CLIP.length = 0;
+      world.setIso(false);
       world.camera = world.cam;
       world.controls.enabled = true;
       world.sky.visible = true;
@@ -828,6 +962,7 @@ export async function mountStudio(host, opts = {}) {
   drawTray();
   drawRail();
   refresh({ silent: true });
+  world.setIso(S.iso);
   frameModel(true);
   if (preset.setup) await preset.setup(api);
   if (preset.tasks) setTasks(preset.tasks);

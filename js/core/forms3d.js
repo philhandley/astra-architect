@@ -181,16 +181,16 @@ export function materialTexture(id) {
 const matCache = new Map();
 function cached(k, make) { if (!matCache.has(k)) matCache.set(k, make()); return matCache.get(k); }
 
-export function blockMaterial(roomId) {
-  const col = ROOMS[roomId]?.colour || '#cccccc';
-  return cached('b' + roomId, () => new THREE.MeshLambertMaterial({ color: col, map: grainTexture(), clippingPlanes: CLIP }));
+export function blockMaterial(roomId, colour = null) {
+  const col = colour || ROOMS[roomId]?.colour || '#cccccc';
+  return cached('b' + col, () => new THREE.MeshLambertMaterial({ color: col, clippingPlanes: CLIP }));
 }
 
 // Outside walls in Building mode: the chosen material, or a soft version of the room colour.
-export function wallMaterial(roomId, matId) {
-  return cached(`w${roomId}:${matId}`, () => {
-    const R = ROOMS[roomId];
-    if (!matId || matId === 'colour') return new THREE.MeshLambertMaterial({ color: mix(R.colour, '#ffffff', 0.25), map: materialTexture('render'), clippingPlanes: CLIP });
+export function wallMaterial(roomId, matId, colour = null) {
+  const base = colour || ROOMS[roomId]?.colour || '#cccccc';
+  return cached(`w${base}:${matId}`, () => {
+    if (!matId || matId === 'colour') return new THREE.MeshLambertMaterial({ color: mix(base, '#ffffff', 0.18), map: materialTexture('render'), clippingPlanes: CLIP });
     if (matId === 'glass') return new THREE.MeshLambertMaterial({ color: '#ffffff', map: materialTexture('glass'), transparent: true, opacity: 0.8, clippingPlanes: CLIP });
     return new THREE.MeshLambertMaterial({ color: '#ffffff', map: materialTexture(matId), clippingPlanes: CLIP });
   });
@@ -218,6 +218,7 @@ export const shared = {
   get track() { return cached('track', () => new THREE.MeshLambertMaterial({ color: '#c1440e', clippingPlanes: CLIP })); },
   get line() { return cached('line', () => new THREE.MeshBasicMaterial({ color: '#ffffff', clippingPlanes: CLIP })); },
   get stair() { return cached('stair', () => new THREE.MeshLambertMaterial({ color: '#b9bec6', clippingPlanes: CLIP })); },
+  get path() { return cached('path', () => new THREE.MeshLambertMaterial({ color: '#eadfc6', clippingPlanes: CLIP })); },
 };
 
 export function ghostMaterial(ok) {
@@ -225,8 +226,8 @@ export function ghostMaterial(ok) {
 }
 
 export function materialFor(c, mode) {
-  if (mode === 'blocks') return blockMaterial(c.room);
-  return wallMaterial(c.room, c.material);
+  if (mode === 'blocks') return blockMaterial(c.room, c.colour);
+  return wallMaterial(c.room, c.material, c.colour);
 }
 
 export { MATERIALS };

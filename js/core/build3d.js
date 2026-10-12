@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { FORMS, ROOMS, LEVEL_H, mix } from './catalogue.js';
 import { key, footprint, roomGroups, DIRS } from './design.js';
-import { BOX, isRoomCell, computeDoors, wedgeDir } from './arch.js';
+import { BOX, isRoomCell, computeDoors, wedgeDir, computePaths } from './arch.js';
 import { cellGround } from './site.js';
 import { formGeometry, placeObject, materialFor, wallMaterial, interiorMaterial, floorMaterial, shared, formBox, blockMaterial } from './forms3d.js';
 import { emojiImage } from './emoji.js';
@@ -11,6 +11,7 @@ import { CLIP } from './scene.js';
 import { staticParts } from './models.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
+let PATH_GEO = null;
 
 // ---------- Emoji stickers ----------
 const stickerTex = new Map();
@@ -27,7 +28,7 @@ function emojiTexture(ch, plain = false) {
   stickerTex.set(k, t);
   return t;
 }
-const stickerGeo = new THREE.CircleGeometry(0.26, 24).rotateX(-Math.PI / 2);
+const stickerGeo = new THREE.CircleGeometry(0.3, 24).rotateX(-Math.PI / 2);
 stickerGeo.userData.cached = true;
 const stickerMats = new Map();
 function stickerMat(ch) {
@@ -35,6 +36,18 @@ function stickerMat(ch) {
   return stickerMats.get(ch);
 }
 export function fishTexture(ch) { return emojiTexture(ch, true); }
+
+// Little flourishes on the toy blocks (a black hat on a tower, a white rim on a cylinder, a tip on a dome).
+const ACC = {};
+const accGeo = (k, mk) => ACC[k] || (ACC[k] = mk());
+function accent(g, c) {
+  const put = (geoKey, mk, mat, y, x = 0, z = 0) => { const m = new THREE.Mesh(accGeo(geoKey, mk), mat); m.position.set(x, y, z); m.castShadow = true; m.userData.cellId = c.id; g.add(m); };
+  if (c.form === 'tower') put('cap', () => new THREE.BoxGeometry(0.72, 0.07, 0.72), shared.dark, 2 * LEVEL_H + 0.02);
+  if (c.form === 'cylinder') put('rim', () => new THREE.TorusGeometry(0.44, 0.028, 8, 32).rotateX(Math.PI / 2), shared.parapet, LEVEL_H - 0.01);
+  if (c.form === 'dome') put('tip', () => new THREE.SphereGeometry(0.08, 10, 8), shared.parapet, 0.9);
+  if (c.form === 'long') { put('band', () => new THREE.BoxGeometry(0.06, LEVEL_H * 0.6, 1.02), shared.parapet, LEVEL_H / 2, 0); }
+  if (c.form === 'roof') put('ridge', () => new THREE.BoxGeometry(1.0, 0.05, 0.06), shared.dark, 0.42);
+}
 
 // Top surface height of a form, relative to its base.
 function topOf(form) {
@@ -75,20 +88,36 @@ export class DesignView {
     this.clear();
     this.idx = idx;
     this.doors = computeDoors(idx);
+    this.pathCells = computePaths(idx, this.doors);
     if (mode === 'blocks') this.buildBlocks(idx);
     else this.buildBuilding(idx, mode === 'cutaway');
+    this.drawPaths(idx);
   }
 
   pickables() { return [...this.byId.values()]; }
+
+  // Overlapping sandy octagons make a soft, continuous path.
+  drawPaths(idx) {
+    const cells = [...this.pathCells].map(k => k.split(',').map(Number)).filter(([x, z]) => !idx.occ.has(key(x, z, 0)));
+    if (!cells.length) return;
+    const geo = PATH_GEO || (PATH_GEO = new THREE.CylinderGeometry(0.56, 0.56, 0.035, 8));
+    const im = new THREE.InstancedMesh(geo, shared.path, cells.length);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+    cells.forEach(([x, z], i) => { p.set(x + 0.5, Math.max(0, cellGround(x, z)) + 0.018, z + 0.5); m4.compose(p, q, s); im.setMatrixAt(i, m4); });
+    im.receiveShadow = true;
+    im.userData.isPath = true;
+    this.group.add(im);
+  }
 
   // ---------- Blocks mode ----------
   buildBlocks(idx) {
     for (const c of idx.design.cells) {
       const g = new THREE.Group();
-      const m = new THREE.Mesh(formGeometry(c.form, 'blocks'), blockMaterial(c.room));
+      const m = new THREE.Mesh(formGeometry(c.form, 'blocks'), blockMaterial(c.room, c.colour));
       m.castShadow = true; m.receiveShadow = true;
       m.userData.cellId = c.id;
       g.add(m);
+      accent(g, c);
       // Sticker on top, unless something sits on it.
       const covered = footprint(c).filter(p => p.level === c.level + FORMS[c.form].levels - 1).every(p => idx.occ.has(key(p.x, p.z, p.level + 1)));
       if (!covered && ROOMS[c.room]) {
@@ -122,7 +151,7 @@ export class DesignView {
       const [x, z, l] = k.split(',').map(Number);
       const g0 = l === 0 ? cellGround(x, z) : 0;
       const y0 = l * LEVEL_H + g0, y1 = (l + 1) * LEVEL_H + g0;
-      const ext = quadsFor(wallMaterial(c.room, c.material), `w${c.room}:${c.material || 'colour'}`);
+      const ext = quadsFor(wallMaterial(c.room, c.material, c.colour), `w${c.colour || c.room}:${c.material || 'colour'}`);
       const int = quadsFor(interiorMaterial(c.room), `i${c.room}`);
       const glassWall = c.material === 'glass';
       for (const [dx, dz] of DIRS) {
@@ -136,7 +165,7 @@ export class DesignView {
         wallQuads(int, x, z, dx, dz, 0.035, y0, yw, cut ? (door ? { u0: 0.31, u1: 0.69, y: yw } : null) : holeC, true);
         if (!internal) {
           wallQuads(ext, x, z, dx, dz, 0, y0, yw, cut ? (door ? { u0: 0.31, u1: 0.69, y: yw } : null) : holeC, false);
-          if (door) doorFrames.push({ x, z, dx, dz, y: y0, room: c.room });
+          if (door) doorFrames.push({ x, z, dx, dz, y: y0, room: c.room, colour: c.colour || ROOMS[c.room].colour });
           else if (!glassWall) windows.push({ x, z, dx, dz, y: y0 + 0.43, wide: c.room === 'classroom' || c.room === 'art' });
           if (c.room === 'climbing') holds.push({ x, z, dx, dz, y0 });
         }
@@ -225,7 +254,7 @@ export class DesignView {
       const merged = mergeBoxes(parts);
       fg.copy(merged);
       const frames = new THREE.InstancedMesh(fg, new THREE.MeshLambertMaterial({ color: '#ffffff', clippingPlanes: CLIP }), doorFrames.length);
-      doorFrames.forEach((d, i) => { face(d, 0); m4.compose(p, q, s.set(1, 1, 1)); frames.setMatrixAt(i, m4); frames.setColorAt(i, new THREE.Color(ROOMS[d.room].colour)); });
+      doorFrames.forEach((d, i) => { face(d, 0); m4.compose(p, q, s.set(1, 1, 1)); frames.setMatrixAt(i, m4); frames.setColorAt(i, new THREE.Color(d.colour)); });
       frames.castShadow = true;
       this.group.add(frames);
     }
@@ -277,7 +306,7 @@ export class DesignView {
       return g;
     }
     if (c.room === 'slide' || c.form === 'wedge') {
-      add(formGeometry('wedge', 'building'), new THREE.MeshLambertMaterial({ color: R.colour, clippingPlanes: CLIP }));
+      add(formGeometry('wedge', 'building'), new THREE.MeshLambertMaterial({ color: c.colour || R.colour, clippingPlanes: CLIP }));
       const len = Math.hypot(1, LEVEL_H);
       for (const s of [-1, 1]) { const r = add(new THREE.BoxGeometry(len, 0.07, 0.05), shared.rail); r.position.set(0, LEVEL_H / 2 + 0.05, s * 0.45); r.rotation.z = Math.atan2(LEVEL_H, 1); }
       return g;

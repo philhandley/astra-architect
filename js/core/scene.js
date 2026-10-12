@@ -6,6 +6,7 @@ import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 export const CLIP = [];                    // shared clipping planes for the section view
 export const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 100);
 
+export const ISO_DIR = new THREE.Vector3(1, 1.05, 1).normalize();
 let world = null;
 if (typeof window !== "undefined") Object.defineProperty(window, "__world", { get: () => world });
 export function getWorld() {
@@ -53,13 +54,14 @@ class World {
     c.target.set(18, 0, 28);
 
     // Light
-    this.hemi = new THREE.HemisphereLight(0xe8f2ff, 0x8b7a55, 1.45);
+    this.hemi = new THREE.HemisphereLight(0xeaf2ff, 0xb8a98a, 1.9);
     scene.add(this.hemi);
     const sun = new THREE.DirectionalLight(0xfff1dc, 2.6);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.bias = -0.0006;
     sun.shadow.normalBias = 0.02;
+    sun.shadow.intensity = 0.62;
     const sc = sun.shadow.camera;
     sc.left = -24; sc.right = 24; sc.top = 24; sc.bottom = -24; sc.near = 1; sc.far = 140;
     scene.add(sun, sun.target);
@@ -137,6 +139,9 @@ class World {
       this.cam.clearViewOffset();
     }
     this.cam.updateProjectionMatrix();
+    if (d && this.w) this.ortho.setViewOffset(this.w, this.h + 2 * d, 0, 2 * d, this.w, this.h);
+    else this.ortho.clearViewOffset();
+    this.fitOrtho();
   }
 
   // Orthographic camera framing: centre (cx, cy) and half-height in world units.
@@ -147,10 +152,39 @@ class World {
   fitOrtho() {
     const v = this.orthoView;
     if (!v || !this.host) return;
-    const aspect = (this.host.clientWidth || 1) / (this.host.clientHeight || 1);
+    const hh = this.host.clientHeight || 1;
+    const aspect = (this.host.clientWidth || 1) / hh;
+    const k = this.viewShift ? (hh + 2 * this.viewShift) / hh : 1;   // taller picture when a panel covers the bottom
     const o = this.ortho;
-    o.left = -v.halfH * aspect; o.right = v.halfH * aspect; o.top = v.halfH; o.bottom = -v.halfH;
+    o.left = -v.halfH * aspect; o.right = v.halfH * aspect; o.top = v.halfH * k; o.bottom = -v.halfH * k;
     o.updateProjectionMatrix();
+  }
+
+  // The isometric model view: an orthographic camera looking down at the board, turned by one finger.
+  setIso(on) {
+    const c = this.controls;
+    if (on) {
+      if (!this.iso) {
+        this.iso = true;
+        this.placeIso(c.target);
+        if (!this.ortho.zoom || this.ortho.zoom === 1) this.ortho.zoom = 1;
+        this.setOrthoView(0, 0, 12);
+      }
+      this.camera = this.ortho;
+      c.object = this.ortho;
+      c.minZoom = 0.3; c.maxZoom = 7;
+      c.update();
+    } else {
+      this.iso = false;
+      this.camera = this.cam;
+      c.object = this.cam;
+      c.update();
+    }
+  }
+  placeIso(target) {
+    this.ortho.position.copy(target).addScaledVector(ISO_DIR, 80);
+    this.ortho.up.set(0, 1, 0);
+    this.ortho.lookAt(target);
   }
 
   start() {
@@ -168,7 +202,7 @@ class World {
     for (const fn of this.updaters) {
       try { fn(dt, this.time); } catch (e) { console.error(e); this.updaters.delete(fn); }
     }
-    if (this.camera === this.cam && this.controls.enabled) this.controls.update();
+    if ((this.camera === this.cam || this.iso) && this.controls.enabled) this.controls.update();
     this.render();
     this.watchSpeed(dt);
     requestAnimationFrame(this._loop);
@@ -199,7 +233,7 @@ class World {
     for (let t = 0; t < sec; t += step) {
       this.time += step;
       for (const fn of this.updaters) { try { fn(step, this.time); } catch (e) { console.error(e); } }
-      if (this.camera === this.cam && this.controls.enabled) this.controls.update();
+      if ((this.camera === this.cam || this.iso) && this.controls.enabled) this.controls.update();
     }
     this.render();
   }
@@ -217,7 +251,7 @@ class World {
     this.sun.target.updateMatrixWorld();
     const warm = 1 - Math.sin(Math.PI * t);                // low sun is warmer
     this.sun.color.setRGB(1, 0.94 - 0.14 * warm, 0.86 - 0.3 * warm);
-    this.sun.intensity = 2.0 + 0.9 * Math.sin(Math.PI * t);
+    this.sun.intensity = 1.25 + 0.75 * Math.sin(Math.PI * t);
     this.sky.material.uniforms.sunDir.value.copy(dir);
     this.sky.material.uniforms.warm.value = warm;
   }

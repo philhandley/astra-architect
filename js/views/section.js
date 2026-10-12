@@ -38,6 +38,8 @@ export function startSection(api, world, root) {
   CLIP.push(clipPlane, backPlane);
   world.camera = world.ortho;
   world.controls.enabled = false;
+  const savedZoom = world.ortho.zoom;
+  world.ortho.zoom = 1;
   // Section drawings leave out the trees and shade the cut ground solid.
   const trees = world.groups.terrain.children.filter(o => o.isInstancedMesh);
   trees.forEach(t => { t.visible = false; });
@@ -125,6 +127,7 @@ export function startSection(api, world, root) {
       CLIP.length = 0;
       world.scene.background = null;
       world.sky.visible = true;
+      world.ortho.zoom = savedZoom;
       world.camera = world.cam;
       world.controls.enabled = true;
     },

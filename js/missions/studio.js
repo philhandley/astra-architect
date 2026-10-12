@@ -17,6 +17,7 @@ const groupsOf = (api, room) => roomGroups(api.idx).filter(g => g.room === room)
 
 export const PRESETS = {
   site: {
+    iso: false,
     rooms: ['yoga'],
     tools: ['sun', 'undo', 'zoom', 'mode'],
     briefIds: ['yoga-waterfall'],

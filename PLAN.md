@@ -12,6 +12,8 @@ Built and live at https://philhandley.github.io/astra-architect/ :
 - All seven missions with their play steps, the sorting game and the shape lab with the arch test, the Ideas book with Try it, the drawing sheet, patches, Crew Log and the grown-up's corner.
 - Installable PWA that works offline after one visit (tested with headless Edge).
 
+Second pass the same day, after Phil tried it: the Model view is now an isometric board (one finger turns it) in flat Monument Valley pastels with Block'hood-style path tiles that join every door to the gate; building is one tap (finger down previews, lift builds); the room tray shows big tinted block icons in five groups with Pick and Bin tools; a Shape strip with Turn appears when a room is chosen; the selection toolbar has Bigger, Smaller, Shape, Colour (twelve paint colours plus materials), Move and Bin; the pupils are children drawn in code (big heads, jumpers, backpacks) with their own walk, run, sit, jump, climb, slide and swim animations.
+
 Not built yet (later phases): rule tiles (If, When), teachers, sound beyond simple effects, share links, mission cover pictures. Changed from the plan: Water2 was replaced by a light custom water shader (Water2 renders the scene three times, too heavy for a tablet), and the Co-pilot role was removed (the app is Finn's own).
 
 A tablet app where Finn (the Architect) and a grown-up (the Client) design a school on the

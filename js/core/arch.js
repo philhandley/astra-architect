@@ -2,7 +2,7 @@
 // The 3D building skin, the plan drawing and the pupils' route finding all use this, so they always agree.
 import { FORMS, ROOMS, LEVEL_H } from './catalogue.js';
 import { key, roomGroups, DIRS } from './design.js';
-import { zone, isWalkGround, isWater, site, cellGround } from './site.js';
+import { zone, isWalkGround, isWater, site, cellGround, groundAt } from './site.js';
 
 export const BOX = new Set(['cube', 'long', 'tower', 'steps']);          // drawn as merged walls in Building mode
 export const OPEN_ROOM = new Set(['cylinder', 'dome', 'curve', 'arch']); // rooms with their own shape
@@ -71,7 +71,7 @@ export function wedgeDir(c) {
 
 // ---------- Walkable graph ----------
 // Nodes are places a pupil can stand: "x,z,l". Edges have a cost; slides are one way.
-export function buildGraph(idx, doors) {
+export function buildGraph(idx, doors, paths = computePaths(idx, doors)) {
   const S = site();
   const nodes = new Map();      // key -> { x, z, l, y, kind, room, cell }
   const edges = new Map();      // key -> [{ to, cost, kind }]
@@ -133,7 +133,8 @@ export function buildGraph(idx, doors) {
         continue;
       }
       // Outdoors to outdoors (ground, roofs, pads, decks). Pools you can walk into, but it is slow.
-      const cost = (m.kind === 'pool' || n.kind === 'pool') ? 2 : (zone(m.x, m.z) === 'f' && m.l === 0 ? 1.35 : 1);
+      const onPath = m.l === 0 && m.kind === 'ground' && paths && paths.has(`${m.x},${m.z}`);
+      const cost = (m.kind === 'pool' || n.kind === 'pool') ? 2 : onPath ? 0.7 : (zone(m.x, m.z) === 'f' && m.l === 0 ? 1.4 : 1.1);
       link(k, mk, cost);
     }
   }
@@ -208,6 +209,56 @@ export function reachable(graph, from) {
 export function gateKey() {
   const [gx, gz] = site().gate;
   return key(gx, gz, 0);
+}
+
+// ---------- Paths ----------
+// Sandy paths that join every ground-floor room's door to the gate, the way a village grows round its green.
+export function computePaths(idx, doors) {
+  const S = site();
+  const [gx, gz] = S.gate;
+  const paths = new Set([`${gx},${gz}`]);
+  if (!idx.design.cells.length) return paths;
+  const groups = roomGroups(idx).filter(g => g.level === 0);
+  const groupOf = new Map();
+  groups.forEach((g, i) => g.cells.forEach(c => groupOf.set(`${c.x},${c.z}`, i)));
+  const best = new Map();
+  for (const d of doors.values()) {
+    if (d.l !== 0) continue;
+    const gi = groupOf.get(`${d.x},${d.z}`);
+    if (gi === undefined) continue;
+    const ox = d.x + d.dx, oz = d.z + d.dz;
+    if (!pathPassable(idx, ox, oz)) continue;
+    const dist = Math.abs(ox - gx) + Math.abs(oz - gz);
+    const cur = best.get(gi);
+    if (!cur || dist < cur.dist) best.set(gi, { x: ox, z: oz, dist });
+  }
+  for (const t of [...best.values()].sort((a, b) => a.dist - b.dist)) connectPath(idx, paths, t.x, t.z);
+  return paths;
+}
+function pathPassable(idx, x, z) {
+  const o = idx.occ.get(key(x, z, 0));
+  if (o) return o.form === 'slab' || o.form === 'pad';          // decks, bridges and ground tiles can be crossed
+  return isWalkGround(zone(x, z)) && groundAt(x + 0.5, z + 0.5) < 0.6;
+}
+// Breadth-first from a door to the nearest cell already on a path, then add that route.
+function connectPath(idx, paths, sx, sz) {
+  const start = `${sx},${sz}`;
+  if (paths.has(start)) return;
+  const prev = new Map([[start, null]]);
+  const q = [[sx, sz]];
+  let found = null, guard = 0;
+  while (q.length && guard++ < 6000 && !found) {
+    const [x, z] = q.shift();
+    for (const [dx, dz] of DIRS) {
+      const nx = x + dx, nz = z + dz, k = `${nx},${nz}`;
+      if (prev.has(k) || !pathPassable(idx, nx, nz)) continue;
+      prev.set(k, `${x},${z}`);
+      if (paths.has(k)) { found = k; break; }
+      q.push([nx, nz]);
+    }
+  }
+  if (!found) return;
+  for (let k = prev.get(found); k; k = prev.get(k)) paths.add(k);
 }
 
 export const groundIsWater = (x, z) => isWater(zone(x, z));

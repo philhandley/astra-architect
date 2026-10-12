@@ -4,7 +4,7 @@
 - `site/map.jpg`: the painted site map Finn and his grown-up made for his school homework (mountains, waterfall, meadow, beach and sea). Used with permission.
 
 ## 3D models (CC0 1.0, public domain)
-- Characters (`models/characters/`, including `Textures/colormap.png`): **Mini Characters** by Kenney, www.kenney.nl, https://kenney.nl/assets/mini-characters. Creative Commons Zero (CC0).
+- Pupils: little children drawn in code (`js/sim/kid.js`), no downloaded models.
 - Trees and rocks (`models/nature/`): **Nature Kit** by Kenney, www.kenney.nl, https://kenney.nl/assets/nature-kit. CC0.
 - Furniture (`models/furniture/`): **Furniture Kit** by Kenney, www.kenney.nl, https://kenney.nl/assets/furniture-kit. CC0.
 

@@ -6,7 +6,7 @@ import { computeDoors } from '../core/arch.js';
 import { ROOMS, WISHES, LEVEL_H, FORMS } from '../core/catalogue.js';
 import { checkBrief, trackLoops } from '../core/brief.js';
 import { loadSite } from '../core/site.js';
-import { getWorld, CLIP, clipPlane } from '../core/scene.js';
+import { getWorld, CLIP, clipPlane, ISO_DIR } from '../core/scene.js';
 import { buildTerrain } from '../core/terrain.js';
 import { DesignView } from '../core/build3d.js';
 import { drawPlan, loadMapImage, fitView } from '../core/plan2d.js';
@@ -61,13 +61,16 @@ async function renderViews(idx) {
   const pr = r.getPixelRatio();
   r.setPixelRatio(1);
   const shot = (w, hgt) => { r.setSize(w, hgt, false); world.render(); const c = document.createElement('canvas'); c.width = w; c.height = hgt; c.getContext('2d').drawImage(world.canvas, 0, 0, w, hgt); return c; };
-  // Model view from the sea side, looking up at the mountains.
-  world.camera = world.cam;
-  world.cam.aspect = 1100 / 700; world.cam.updateProjectionMatrix();
+  // An axonometric view, the architect's favourite, from the south-east.
   const span = Math.max(8, Math.max(b.x1 - b.x0, b.z1 - b.z0));
-  world.controls.target.set(b.cx, 0.5, b.cz);
-  world.cam.position.set(b.cx + span * 0.55, span * 0.75 + 3, b.cz + span * 1.05 + 3);
-  world.cam.lookAt(world.controls.target);
+  const savedOrtho = { pos: world.ortho.position.clone(), quat: world.ortho.quaternion.clone(), zoom: world.ortho.zoom, view: world.orthoView ? { ...world.orthoView } : null };
+  world.camera = world.ortho;
+  world.ortho.zoom = 1;
+  world.ortho.position.set(b.cx, 0.4, b.cz).addScaledVector(ISO_DIR, 80);
+  world.ortho.up.set(0, 1, 0);
+  world.ortho.lookAt(b.cx, 0.4, b.cz);
+  const mh = span * 0.5 + 2;
+  world.ortho.left = -mh * (1100 / 700); world.ortho.right = mh * (1100 / 700); world.ortho.top = mh; world.ortho.bottom = -mh; world.ortho.updateProjectionMatrix();
   world.focusShadows(b.cx, b.cz, span / 2 + 6);
   const model = shot(1100, 700);
   // Section: from the sea, cut through the biggest room, keeping only a thin slice behind it.
@@ -102,6 +105,8 @@ async function renderViews(idx) {
   world.cam.position.copy(saved.pos); world.controls.target.copy(saved.target);
   r.setPixelRatio(pr);
   r.setSize(size.x, size.y, false);
+  world.ortho.position.copy(savedOrtho.pos); world.ortho.quaternion.copy(savedOrtho.quat); world.ortho.zoom = savedOrtho.zoom;
+  if (savedOrtho.view) world.setOrthoView(savedOrtho.view.cx, savedOrtho.view.cy, savedOrtho.view.halfH);
   world.resize();
   world.setViewShift(saved.shift);
   dv.sync(idx, prevMode);

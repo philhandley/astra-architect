@@ -233,24 +233,31 @@ img.emo { width: 1.25em; height: 1.25em; vertical-align: -0.25em; display: inlin
 
 .rail { position: absolute; top: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 6; pointer-events: none; }
 .rail > * { pointer-events: auto; }
-.rail.left { left: 12px; width: 262px; }
+.rail.left { left: 12px; width: 300px; }
 .rail.right { right: 12px; width: 76px; align-items: center; }
-.tray {
-  background: rgba(255,255,255,0.94); border-radius: 24px; padding: 8px; box-shadow: var(--shadow); display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; align-content: start;
-  overflow-y: auto; max-height: 100%; scrollbar-width: none;
-}
+.tray { background: rgba(255,255,255,0.94); border-radius: 26px; padding: 10px; box-shadow: var(--shadow); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; overflow-y: auto; max-height: 100%; scrollbar-width: none; }
 .tray::-webkit-scrollbar { display: none; }
-.tray .tt { grid-column: 1 / -1; font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); padding: 2px 6px; display: flex; align-items: center; justify-content: space-between; }
-.tile-btn {
-  appearance: none; border: 0; cursor: pointer; background: var(--paper-2); border-radius: 18px; padding: 8px 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px;
-  font: 600 12px/1.1 var(--font); color: var(--ink); min-height: 78px; justify-content: center; position: relative; box-shadow: 0 0 0 0 transparent inset; text-align: center;
-}
-.tile-btn img { width: 38px; height: 38px; }
-.tile-btn .sw { position: absolute; left: 8px; top: 8px; width: 12px; height: 12px; border-radius: 50%; }
+.tray .tt { grid-column: 1 / -1; font-size: 13px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); padding: 8px 6px 0; }
+.tile-btn { appearance: none; border: 0; cursor: pointer; background: var(--paper-2); border-radius: 20px; padding: 6px 6px 8px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; font: 700 15px/1.1 var(--font); color: var(--ink); min-height: 128px; position: relative; text-align: center; }
+.tile-btn .blk { position: relative; width: 86px; height: 86px; display: grid; place-items: center; }
+.tile-btn .blk svg.iso { width: 86px; height: 86px; }
+.tile-btn .blk img.stk { position: absolute; width: 36px; height: 36px; left: 50%; top: 13px; transform: translateX(-50%); filter: drop-shadow(0 1px 2px rgba(0,0,0,.3)); }
+.tile-btn .lbl { min-height: 2.2em; display: flex; align-items: center; }
 .tile-btn.on { background: #fff; box-shadow: 0 0 0 4px var(--blue) inset, var(--shadow); }
-.tile-btn.hand img, .tile-btn.hand svg { width: 38px; height: 38px; }
+.tile-btn.tool { flex-direction: row; min-height: 62px; justify-content: center; gap: 8px; font-size: 15px; }
+.tile-btn.tool svg { width: 30px; height: 30px; flex: none; }
+.tile-btn.tool.bin { background: var(--red-soft); color: var(--red); }
+.tile-btn.tool.bin.on { background: #fff; box-shadow: 0 0 0 4px var(--red) inset, var(--shadow); }
 .tile-btn:active { transform: scale(.96); }
-.tile-btn.locked { opacity: .35; }
+.shape-strip { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.96); padding: 6px 10px 6px 16px; border-radius: 26px; box-shadow: var(--shadow); flex-basis: 100%; justify-content: center; flex-wrap: wrap; }
+.shape-strip .tt { font-size: 13px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin-right: 4px; }
+.shape-btn { appearance: none; border: 0; cursor: pointer; background: var(--paper-2); border-radius: 18px; width: 84px; height: 84px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: 700 12px/1 var(--font); color: var(--ink); }
+.shape-btn svg { width: 54px; height: 54px; transition: transform .2s; }
+.shape-btn.on { background: #fff; box-shadow: 0 0 0 4px var(--blue) inset; }
+.shape-btn.turn { background: var(--blue-soft); color: var(--blue); }
+.shape-btn.turn svg { width: 32px; height: 32px; }
+.ghost-tag.flash { animation: flashin .25s; }
+@keyframes flashin { from { transform: scale(.6); opacity: 0; } }
 .topright { position: absolute; top: 12px; right: 100px; z-index: 6; display: flex; gap: 8px; }
 .rbtn {
   appearance: none; border: 0; cursor: pointer; width: 66px; min-height: 60px; border-radius: 20px; background: rgba(255,255,255,0.95); color: var(--ink); box-shadow: var(--shadow);
@@ -263,7 +270,7 @@ img.emo { width: 1.25em; height: 1.25em; vertical-align: -0.25em; display: inlin
 .rgroup .rbtn { box-shadow: none; }
 .rspacer { flex: 1; min-height: 6px; }
 
-.studio .topstrip { position: absolute; top: 12px; left: 286px; right: 470px; display: flex; justify-content: center; gap: 10px; z-index: 6; pointer-events: none; flex-wrap: wrap; }
+.studio .topstrip { position: absolute; top: 12px; left: 326px; right: 470px; display: flex; justify-content: center; gap: 10px; z-index: 6; pointer-events: none; flex-wrap: wrap; }
 .studio .topstrip > * { pointer-events: auto; }
 .brief-chips { display: flex; gap: 6px; background: rgba(255,255,255,0.94); padding: 6px; border-radius: 999px; box-shadow: var(--shadow); }
 .brief-chip { appearance: none; border: 0; background: var(--paper-2); width: 54px; height: 54px; border-radius: 50%; position: relative; cursor: pointer; display: grid; place-items: center; }
@@ -277,7 +284,7 @@ img.emo { width: 1.25em; height: 1.25em; vertical-align: -0.25em; display: inlin
 .pill input[type=range] { width: 220px; height: 44px; accent-color: var(--orange); }
 .pill img { width: 30px; height: 30px; }
 
-.tasks { position: absolute; left: 288px; bottom: 14px; z-index: 6; background: rgba(255,255,255,0.96); border-radius: 22px; box-shadow: var(--shadow); padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
+.tasks { position: absolute; left: 326px; bottom: 14px; z-index: 6; background: rgba(255,255,255,0.96); border-radius: 22px; box-shadow: var(--shadow); padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
 .tasks .tt { font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; min-height: 28px; }
 .tasks .tt .fold svg { width: 20px; height: 20px; transition: transform .2s; }
 .tasks.folded .task { display: none; }

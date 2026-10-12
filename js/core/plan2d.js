@@ -62,9 +62,15 @@ export function drawPlan(g, W, H, idx, doors, view, opts = {}) {
   for (const [k, c] of idx.occ) { const [x, z, l] = k.split(',').map(Number); if (l === L) cellsAt.push({ x, z, c }); }
   const drawn = new Set();
 
+  // Paths on the ground floor.
+  if (opts.paths && L === 0) {
+    g.fillStyle = 'rgba(226,210,176,0.95)';
+    for (const k of opts.paths) { const [px, pz] = k.split(',').map(Number); if (!idx.occ.has(key(px, pz, 0))) g.fillRect(X(px) + 1, Z(pz) + 1, s - 2, s - 2); }
+  }
+
   // Room fills.
   for (const { x, z, c } of cellsAt) {
-    const R = ROOMS[c.room];
+    const R = { ...ROOMS[c.room], colour: c.colour || ROOMS[c.room].colour };
     const f = c.form;
     if (BOX.has(f) || f === 'arch') {
       g.fillStyle = mix(R.colour, '#ffffff', 0.55);

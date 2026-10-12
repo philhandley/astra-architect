@@ -43,7 +43,7 @@ def filename(e):
 
 def main():
     found = set()
-    for p in list((ROOT / 'js').rglob('*.js')) + list((ROOT / 'content').rglob('*.json')):
+    for p in list((ROOT / 'js').rglob('*.js')) + list((ROOT / 'v2' / 'js').rglob('*.js')) + list((ROOT / 'content').rglob('*.json')):
         for e in clusters(p.read_text(encoding='utf-8')):
             found.add(e)
     OUT.mkdir(parents=True, exist_ok=True)

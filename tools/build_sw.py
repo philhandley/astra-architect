@@ -15,7 +15,7 @@ EXTRA_CDN = [
     'https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap',
 ]
 INCLUDE = ['index.html', 'manifest.webmanifest']
-INCLUDE_DIRS = ['css', 'js', 'content', 'assets']
+INCLUDE_DIRS = ['css', 'js', 'content', 'assets', 'v2']
 SKIP_EXT = {'.md', '.py', '.tif', '.gif', '.raw'}
 SKIP_NAMES = {'zones.raw.json'}
 
@@ -39,7 +39,7 @@ def main():
     version = h.hexdigest()[:10]
     local = ['./'] + [p.relative_to(ROOT).as_posix() for p in files]
     addons = set()
-    for p in (ROOT / 'js').rglob('*.js'):
+    for p in list((ROOT / 'js').rglob('*.js')) + list((ROOT / 'v2').rglob('*.js')):
         for m in re.finditer(r"""['"]three/addons/([^'"]+)['"]""", p.read_text(encoding='utf-8')):
             addons.add(m.group(1))
     cdn = [THREE + 'build/three.module.js'] + [THREE + 'examples/jsm/' + a for a in sorted(addons)] + EXTRA_CDN

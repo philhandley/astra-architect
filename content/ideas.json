@@ -1,0 +1,1260 @@
+[
+  {
+    "id": "evelyn",
+    "name": "Evelyn Grace Academy",
+    "architect": "Zaha Hadid Architects",
+    "place": "Brixton, London, UK",
+    "year": 2010,
+    "idea": "A running track through the school",
+    "text": "A long red running track goes right through this school, from one entrance to the other. Ready, steady, run!",
+    "number": {
+      "text": "The track is 100 metres long, about as long as one football pitch.",
+      "source": "https://www.archiweb.cz/en/n/foreign/gymnazium-v-brixtonu-od-zahy-hadid"
+    },
+    "link": "https://www.zha.com/architecture/evelyn-grace-academy/",
+    "emoji": "🏃",
+    "cells": [
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 3,
+        "z": 0,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 3,
+        "z": 1,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 3,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 3,
+        "z": 3,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 3,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 3,
+        "z": 5,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 3,
+        "z": 6,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 3,
+        "z": 7,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "changing",
+        "x": 2,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "changing",
+        "x": 4,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "changing",
+        "x": 2,
+        "z": 5,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "changing",
+        "x": 4,
+        "z": 5,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 2,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 4,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 2,
+        "z": 5,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 4,
+        "z": 5,
+        "level": 1,
+        "rot": 0
+      }
+    ]
+  },
+  {
+    "id": "frederiksbjerg",
+    "name": "Frederiksbjerg School",
+    "architect": "Henning Larsen Architects with GPP Arkitekter",
+    "place": "Aarhus, Denmark",
+    "year": 2016,
+    "idea": "A school you climb through",
+    "text": "This school in Denmark has climbing walls inside, and children move in lots of places every day. Moving helps you learn!",
+    "number": {
+      "text": "More than 900 children come here, about thirty classes of thirty.",
+      "source": "https://dac.dk/en/magazine/places/frederiksbjerg-school-357"
+    },
+    "link": "https://dac.dk/en/magazine/places/frederiksbjerg-school-357",
+    "emoji": "🧗",
+    "cells": [
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 1,
+        "z": 1,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 4,
+        "z": 1,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "tower",
+        "room": "climbing",
+        "x": 3,
+        "z": 1,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "steps",
+        "room": "stairs",
+        "x": 6,
+        "z": 1,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "library",
+        "x": 7,
+        "z": 0,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "library",
+        "x": 7,
+        "z": 1,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "slab",
+        "room": "bridge",
+        "x": 7,
+        "z": 0,
+        "level": 1,
+        "rot": 1
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 4,
+        "z": 1,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "library",
+        "x": 1,
+        "z": 1,
+        "level": 1,
+        "rot": 0
+      }
+    ]
+  },
+  {
+    "id": "yuecheng",
+    "name": "YueCheng Courtyard Kindergarten",
+    "architect": "MAD Architects",
+    "place": "Beijing, China",
+    "year": 2019,
+    "idea": "Slides from a bumpy roof",
+    "text": "The roof of this kindergarten in Beijing is wavy, with bumps and dips to run over. Slides and stairs take you down into the courtyards.",
+    "number": {
+      "text": "390 children aged 1.5 to 6 come here, about thirteen classes of thirty.",
+      "source": "https://divisare.com/projects/433427-mad-architects-hufton-crow-tian-fangfang-arch-exist-iwan-baan-creatar-images-yuecheng-courtyard-kindergarten"
+    },
+    "link": "https://divisare.com/projects/433427-mad-architects-hufton-crow-tian-fangfang-arch-exist-iwan-baan-creatar-images-yuecheng-courtyard-kindergarten",
+    "emoji": "🛝",
+    "cells": [
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 1,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 5,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 1,
+        "z": 5,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 5,
+        "z": 5,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "wedge",
+        "room": "slide",
+        "x": 3,
+        "z": 2,
+        "level": 0,
+        "rot": 2
+      },
+      {
+        "form": "steps",
+        "room": "stairs",
+        "x": 4,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "wedge",
+        "room": "slide",
+        "x": 4,
+        "z": 5,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "wedge",
+        "room": "slide",
+        "x": 0,
+        "z": 5,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "wedge",
+        "room": "slide",
+        "x": 7,
+        "z": 2,
+        "level": 0,
+        "rot": 2
+      },
+      {
+        "form": "slab",
+        "room": "bridge",
+        "x": 1,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "slab",
+        "room": "bridge",
+        "x": 5,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "slab",
+        "room": "bridge",
+        "x": 1,
+        "z": 5,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "slab",
+        "room": "bridge",
+        "x": 5,
+        "z": 5,
+        "level": 1,
+        "rot": 0
+      }
+    ]
+  },
+  {
+    "id": "tiantai",
+    "name": "Tiantai No. 2 Primary School",
+    "architect": "LYCS Architecture",
+    "place": "Tiantai, Zhejiang, China",
+    "year": 2014,
+    "idea": "A running track on the roof",
+    "text": "This school in China has its running track on the roof, going round and round. The classrooms are underneath it.",
+    "number": {
+      "text": "The roof track is 200 metres round, about as long as two football pitches end to end.",
+      "source": "https://designboom.com/?p=215772"
+    },
+    "link": "https://designboom.com/?p=215772",
+    "emoji": "🔄",
+    "cells": [
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 1,
+        "z": 1,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 3,
+        "z": 1,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 4,
+        "z": 2,
+        "level": 0,
+        "rot": 1
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 4,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 2,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 1,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 1,
+        "z": 2,
+        "level": 0,
+        "rot": 1
+      },
+      {
+        "form": "steps",
+        "room": "stairs",
+        "x": 5,
+        "z": 1,
+        "level": 0,
+        "rot": 2
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 1,
+        "z": 1,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 2,
+        "z": 1,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 3,
+        "z": 1,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 4,
+        "z": 1,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 4,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 4,
+        "z": 3,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 4,
+        "z": 4,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 3,
+        "z": 4,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 2,
+        "z": 4,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 1,
+        "z": 4,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 1,
+        "z": 3,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 1,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      }
+    ]
+  },
+  {
+    "id": "fuji",
+    "name": "Fuji Kindergarten",
+    "architect": "Tezuka Architects",
+    "place": "Tachikawa, Tokyo, Japan",
+    "year": 2007,
+    "idea": "A roof you run round",
+    "text": "The roof of this school in Tokyo is one big curvy playground. Even children who don't usually run race round it!",
+    "number": {
+      "text": "Up to 600 children come here, about twenty classes of thirty.",
+      "source": "https://www.azuremagazine.com/?p=90308"
+    },
+    "link": "https://www.azuremagazine.com/?p=90308",
+    "emoji": "⭕",
+    "cells": [
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 2,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 3,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 4,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 4,
+        "z": 3,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 4,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 3,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 2,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 2,
+        "z": 3,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 3,
+        "z": 3,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "steps",
+        "room": "stairs",
+        "x": 1,
+        "z": 3,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 2,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 3,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 4,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 4,
+        "z": 3,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 4,
+        "z": 4,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 3,
+        "z": 4,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 2,
+        "z": 4,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "track",
+        "x": 2,
+        "z": 3,
+        "level": 1,
+        "rot": 0
+      }
+    ]
+  },
+  {
+    "id": "farming",
+    "name": "Farming Kindergarten",
+    "architect": "Vo Trong Nghia Architects",
+    "place": "Dong Nai, Vietnam",
+    "year": 2013,
+    "idea": "A green roof for growing food",
+    "text": "This school in Vietnam grows food on its green roof. The roof goes round in a loop, and children can grow vegetables on it.",
+    "number": {
+      "text": "The roof garden is 200 square metres, nearly half a basketball court.",
+      "source": "https://www.arch2o.com/?p=133390"
+    },
+    "link": "https://www.designboom.com/architecture/vo-trong-nghia-architects-farming-kindergarten-vietnam-04-30-2014/",
+    "emoji": "🥕",
+    "cells": [
+      {
+        "form": "curve",
+        "room": "classroom",
+        "x": 4,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "curve",
+        "room": "classroom",
+        "x": 2,
+        "z": 4,
+        "level": 0,
+        "rot": 1
+      },
+      {
+        "form": "curve",
+        "room": "classroom",
+        "x": 2,
+        "z": 2,
+        "level": 0,
+        "rot": 2
+      },
+      {
+        "form": "curve",
+        "room": "classroom",
+        "x": 4,
+        "z": 2,
+        "level": 0,
+        "rot": 3
+      },
+      {
+        "form": "steps",
+        "room": "stairs",
+        "x": 1,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 5,
+        "z": 4,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 4,
+        "z": 5,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 5,
+        "z": 5,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 2,
+        "z": 4,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 2,
+        "z": 5,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 3,
+        "z": 5,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 2,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 3,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 2,
+        "z": 3,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 4,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 5,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 5,
+        "z": 3,
+        "level": 1,
+        "rot": 0
+      }
+    ]
+  },
+  {
+    "id": "cathedral",
+    "name": "Cathedral Grammar Junior School",
+    "architect": "Andrew Barrie Lab with Tezuka Architects",
+    "place": "Christchurch, New Zealand",
+    "year": 2016,
+    "idea": "A roof deck and a slide",
+    "text": "This school in New Zealand has steps up to a roof deck, where you can look out over the park. Then you slide back down to the green courtyard!",
+    "number": {
+      "text": "There are seven classrooms, one for every day of the week.",
+      "source": "https://www.andrewbarrielab.com/cathedral-grammar-junior-school"
+    },
+    "link": "https://www.andrewbarrielab.com/cathedral-grammar-junior-school",
+    "emoji": "🏫",
+    "cells": [
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 1,
+        "z": 3,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 4,
+        "z": 3,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 1,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 2,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 4,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "steps",
+        "room": "stairs",
+        "x": 0,
+        "z": 3,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "wedge",
+        "room": "slide",
+        "x": 3,
+        "z": 3,
+        "level": 0,
+        "rot": 2
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 3,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "slab",
+        "room": "bridge",
+        "x": 1,
+        "z": 3,
+        "level": 1,
+        "rot": 0
+      }
+    ]
+  },
+  {
+    "id": "arches",
+    "name": "School of Dancing Arches",
+    "architect": "Samira Rathod Design Associates",
+    "place": "Bhadran, Gujarat, India",
+    "year": 2019,
+    "idea": "Arches grown from a child's scribble",
+    "text": "This school in India began as a child's wiggly scribble. Each arch is made of bricks, and each one holds two classrooms and a corridor.",
+    "number": {
+      "text": "The school covers 18,000 square feet, about six tennis courts.",
+      "source": "https://designessentiamagazine.com/school-of-dancing-arches-srda/"
+    },
+    "link": "https://brickarchitecture.com/projects/school-of-dancing-arches-samira-rathod-design-associates",
+    "emoji": "🌈",
+    "cells": [
+      {
+        "form": "arch",
+        "room": "classroom",
+        "x": 1,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "arch",
+        "room": "classroom",
+        "x": 4,
+        "z": 2,
+        "level": 0,
+        "rot": 1
+      },
+      {
+        "form": "arch",
+        "room": "classroom",
+        "x": 5,
+        "z": 5,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "arch",
+        "room": "classroom",
+        "x": 2,
+        "z": 5,
+        "level": 0,
+        "rot": 1
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 1,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 2,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 4,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 4,
+        "z": 3,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 5,
+        "z": 5,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 6,
+        "z": 5,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 2,
+        "z": 5,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 2,
+        "z": 6,
+        "level": 1,
+        "rot": 0
+      }
+    ]
+  },
+  {
+    "id": "pitisuksa",
+    "name": "Pitisuksa Chiang Rai School",
+    "architect": "1922 Architects",
+    "place": "Chiang Rai, Thailand",
+    "year": 2026,
+    "idea": "Classrooms beside a line of water",
+    "text": "This school in Thailand has two ponds joined by a wiggly canal. The first pond is right by the gate, so children can choose how to arrive.",
+    "number": {
+      "text": "The school has six classrooms, like six doors in a row.",
+      "source": "https://art4d.com/en/2026/03/pitisuksa-chiang-rai-school-airport-campus"
+    },
+    "link": "https://art4d.com/en/2026/03/pitisuksa-chiang-rai-school-airport-campus",
+    "emoji": "🐟",
+    "cells": [
+      {
+        "form": "slab",
+        "room": "pool",
+        "x": 0,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "slab",
+        "room": "pool",
+        "x": 2,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "slab",
+        "room": "pool",
+        "x": 4,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "slab",
+        "room": "pool",
+        "x": 6,
+        "z": 4,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 0,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 2,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 4,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 6,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 0,
+        "z": 6,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 2,
+        "z": 6,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 4,
+        "z": 6,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 6,
+        "z": 6,
+        "level": 0,
+        "rot": 0
+      }
+    ]
+  },
+  {
+    "id": "gangjin",
+    "name": "Gangjin Children's Centre",
+    "architect": "JYA-rchitects",
+    "place": "Maryang, Gangjin, South Korea",
+    "year": 2013,
+    "idea": "A roof like sea waves",
+    "text": "The roof of this village centre in South Korea looks like sea waves. Children climb up to a terrace, slide down, and look at the sea.",
+    "number": {
+      "text": "The whole centre is 223 square metres, about the size of one tennis court.",
+      "source": "https://www.archdaily.com/345181/gangjin-children-center-jya-rchitects"
+    },
+    "link": "https://www.archdaily.com/345181/gangjin-children-center-jya-rchitects",
+    "emoji": "🌊",
+    "cells": [
+      {
+        "form": "long",
+        "room": "classroom",
+        "x": 1,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 4,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 5,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 6,
+        "z": 2,
+        "level": 0,
+        "rot": 0
+      },
+      {
+        "form": "steps",
+        "room": "stairs",
+        "x": 7,
+        "z": 2,
+        "level": 0,
+        "rot": 2
+      },
+      {
+        "form": "wedge",
+        "room": "slide",
+        "x": 5,
+        "z": 3,
+        "level": 0,
+        "rot": 3
+      },
+      {
+        "form": "cube",
+        "room": "classroom",
+        "x": 4,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "slab",
+        "room": "bridge",
+        "x": 5,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 1,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      },
+      {
+        "form": "pad",
+        "room": "garden",
+        "x": 2,
+        "z": 2,
+        "level": 1,
+        "rot": 0
+      }
+    ]
+  }
+]

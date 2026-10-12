@@ -1,0 +1,74 @@
+{
+  "id": "scale",
+  "title": "How Big?",
+  "tagline": "Use people to measure a room, and see how many fit inside.",
+  "idea": "Scale",
+  "emoji": "📏",
+  "accent": "blue",
+  "minutes": 10,
+  "patch": { "name": "Measure Master", "icon": "ruler" },
+  "grownUp": [
+    "Architects measure buildings using people, because everyone knows roughly how big a person is. This mission is about scale: how big rooms are for the people who use them.",
+    "The guess sum: a real classroom is about 62 square metres (BB103 for a reception or infant class of 30). If the room were a square, that is about 8 metres across. A six-year-old is about 1.15 metres tall, so about 7 fit across it, head to toe. The card's source is BB103. The height source is the WHO height-for-age reference, 5 to 19 years, median at 6 years: boys about 116 cm (https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/height-for-age-(5-19-years)/hfa-boys-5-19years-per.pdf) and girls about 115 cm (https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/height-for-age-(5-19-years)/hfa-girls-5-19years-per.pdf).",
+    "The Big Question is about one big hall or lots of small cosy rooms. Let the Architect give reasons, and do not pick a winner."
+  ],
+  "steps": [
+    {
+      "type": "story",
+      "title": "Measuring with people",
+      "text": "Architects often measure a building using people, because everyone knows roughly how big a person is. They ask how many children would fit in a room.",
+      "emoji": "🧒📏🏫",
+      "ask": "How many children do you think would fit across your classroom if they lay down?"
+    },
+    {
+      "type": "guess",
+      "title": "Lying down across a classroom",
+      "prompt": "About how many six-year-olds, lying head to toe, would fit across a real classroom?",
+      "choices": [
+        { "label": "About 2", "emoji": "🧍" },
+        { "label": "About 7", "emoji": "🧒" },
+        { "label": "About 30", "emoji": "🏫" }
+      ],
+      "answer": 1,
+      "reveal": "Picture a square classroom about 8 metres across. A six-year-old is about 1.15 metres tall, so about seven of them fit in a row, head to toe.",
+      "source": "https://assets.publishing.service.gov.uk/media/5f23ec238fa8f57acac33720/BB103_Area_Guidelines_for_Mainstream_Schools.pdf"
+    },
+    {
+      "type": "play",
+      "module": "studio",
+      "title": "Make a big classroom",
+      "intro": "Make a classroom big enough for a crowd of pupils, fill it, then walk in as the Architect.",
+      "data": { "preset": "scale" }
+    },
+    {
+      "type": "question",
+      "title": "One big hall or lots of cosy rooms?",
+      "scenario": "Should everyone learn together in one big hall, or in lots of small cosy rooms?",
+      "options": [
+        { "label": "One big hall", "emoji": "🏛️", "detail": "Everyone can gather together, and the whole school can sing a song at once." },
+        { "label": "Lots of small cosy rooms", "emoji": "🛋️", "detail": "Small rooms feel calm and homely, and a few pupils can work quietly." },
+        { "label": "A big hall with cosy corners", "emoji": "🪑", "detail": "Everyone can gather together, and the cosy corners give a quiet place to read." }
+      ],
+      "reveal": "Architects think about how many people gather, how quiet each room is and how easy it is to find your way around. Some schools choose one big space, and others choose lots of small rooms.",
+      "followUp": "Would you rather read a book in a big hall or in a cosy room, and why?"
+    },
+    {
+      "type": "athome",
+      "title": "Chalk a classroom outside",
+      "need": ["Chalk", "A clean, flat patch of ground, like a patio", "A grown-up to help"],
+      "steps": [
+        "With the chalk, draw a rectangle on the ground as big as you think your classroom would be.",
+        "Ask a grown-up to lie down head to toe across the rectangle, then add another person, then another.",
+        "Count how many people fit across, and talk about whether your guess was close."
+      ],
+      "why": "Lying down head to toe is a simple way to picture how big a room is for the people who use it."
+    },
+    {
+      "type": "finish",
+      "debrief": [
+        "What was your favourite part?",
+        "What is the biggest thing you have ever measured, and how did you measure it?"
+      ]
+    }
+  ]
+}

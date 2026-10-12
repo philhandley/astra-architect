@@ -1,0 +1,8 @@
+# Photos of the real block model and the precedent sheet (other people's photos): never publish
+reference/
+/IMG_*
+
+# Local only
+dev/shots/
+__pycache__/
+.claude/

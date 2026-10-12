@@ -1,0 +1,75 @@
+{
+  "id": "drawings",
+  "title": "Drawings and Light",
+  "tagline": "Draw a school three ways, then let the sun in through the windows.",
+  "idea": "Plan, section and light",
+  "emoji": "✏️",
+  "accent": "plum",
+  "minutes": 10,
+  "patch": { "name": "Three Drawings", "icon": "pencil" },
+  "grownUp": [
+    "This mission is about three ways to draw a building: the plan from above, the section cut through the middle, and the elevation from the side. Architects draw all three so the building makes sense.",
+    "The sun and the windows are the light lesson. Let the Architect move the sun and see when the classroom gets bright or glary.",
+    "The Big Question has no right answer. Big windows for the waves and small windows for less glare are both good reasons."
+  ],
+  "steps": [
+    {
+      "type": "story",
+      "title": "Three ways to draw a building",
+      "text": "Architects draw a building in three ways. A plan shows it from above, a section is a cut through the middle, and an elevation shows one side from outside.",
+      "emoji": "📐✂️🏠",
+      "ask": "If you were floating above your school, what would you see?",
+      "source": "https://digitaldesign.aalto.fi/digital-design-workflows/vector/2d-cad-drafting/drawing-2d-section-and-projection/"
+    },
+    {
+      "type": "guess",
+      "title": "Which drawing is from above?",
+      "prompt": "Which of these drawings shows the whole building from above?",
+      "choices": [
+        { "label": "Section", "emoji": "✂️" },
+        { "label": "Plan", "emoji": "📐" },
+        { "label": "Elevation", "emoji": "🏠" }
+      ],
+      "answer": 1,
+      "reveal": "A plan is the drawing from above, a bit like a map of the rooms. A section cuts through the building to show the inside, and an elevation shows one side.",
+      "source": "https://digitaldesign.aalto.fi/digital-design-workflows/vector/2d-cad-drafting/drawing-2d-section-and-projection/"
+    },
+    {
+      "type": "play",
+      "module": "studio",
+      "title": "Cut, look and light it",
+      "intro": "Look at the plan, slide the section through, look from the sea, then move the sun and give a classroom a sea window.",
+      "data": { "preset": "drawings" }
+    },
+    {
+      "type": "question",
+      "title": "Big windows or small?",
+      "scenario": "Should the classroom windows be big, to watch the waves, or small, to keep the sun's glare off the board? A third choice is roof windows that let light in from above.",
+      "options": [
+        { "label": "Big windows for the waves", "emoji": "🌊", "detail": "You can see the sea and the sky, and the room feels open and bright." },
+        { "label": "Small windows for less glare", "emoji": "🪟", "detail": "Less sun shines straight at the board, so everyone can read the words more easily." },
+        { "label": "Roof windows", "emoji": "☀️", "detail": "Light comes down from above, so the room is bright without anyone looking straight at the sun." }
+      ],
+      "reveal": "Architects think about the view, the glare and how much light a room needs. Some schools choose big windows with a view, and others choose small windows or roof lights.",
+      "followUp": "Which window would you choose for your classroom, and what would you like to look at through it?"
+    },
+    {
+      "type": "athome",
+      "title": "Torch through a card house",
+      "need": ["An empty cereal box or a card box", "A torch", "Scissors, with a grown-up to help", "A dark room"],
+      "steps": [
+        "With a grown-up, cut a few windows in the sides of the box. Make one of them big and one of them small.",
+        "In the dark room, shine the torch through the windows and watch where the light lands inside the box.",
+        "Move the torch to the side, then above the box, and see how the light changes. Talk about where the real sun would be."
+      ],
+      "why": "The torch is the sun. Cutting windows in different places shows how architects let light in and keep the glare out."
+    },
+    {
+      "type": "finish",
+      "debrief": [
+        "What was your favourite part?",
+        "Which of the three drawings would you use to show a friend your school, and why?"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "id": "openday",
+  "title": "Open Day",
+  "tagline": "Run a whole school day, fix one thing, and choose the right materials.",
+  "idea": "The whole school",
+  "emoji": "🔔",
+  "accent": "yellow",
+  "minutes": 10,
+  "patch": { "name": "Open Day", "icon": "star" },
+  "grownUp": [
+    "This mission brings the whole school together for one day: bells, lessons, lunch and the report. The Architect watches what works and fixes one thing.",
+    "The materials story and the Big Question are about warmth, light and strength. Let the Architect give reasons, and say that different buildings choose different materials.",
+    "The bridge test is safe to try at home with household things. Stop as soon as anything bends or wobbles, and keep the books on a sturdy table."
+  ],
+  "steps": [
+    {
+      "type": "story",
+      "title": "Open Day at school",
+      "text": "On Open Day the whole school runs for a day. The bells ring, pupils go to their lessons, and the architect watches to see what works.",
+      "emoji": "🔔🏫🎈",
+      "ask": "What would you watch for first on Open Day?"
+    },
+    {
+      "type": "play",
+      "module": "studio",
+      "title": "Run a whole school day",
+      "intro": "Fill in the bell timetable, run the school day, read the report, fix one thing and run it again.",
+      "data": { "preset": "openday" }
+    },
+    {
+      "type": "story",
+      "title": "What is it made of?",
+      "text": "Architects choose materials carefully. Wood feels warm, glass lets light in, and stone is strong and lasts a long time.",
+      "emoji": "🪵🪟🪨",
+      "ask": "Which material do you like the look of most, and why?"
+    },
+    {
+      "type": "question",
+      "title": "Wood, glass or stone?",
+      "scenario": "What should the aquarium arch be made of?",
+      "options": [
+        { "label": "Wood", "emoji": "🪵", "detail": "It feels warm and friendly, and it can be shaped into a smooth curve." },
+        { "label": "Glass", "emoji": "🪟", "detail": "Light pours in and you can see the fish from outside, but glass can feel cold and shows every fingerprint." },
+        { "label": "Stone", "emoji": "🪨", "detail": "It is very strong and lasts a long time, but it is heavy and can feel cold." }
+      ],
+      "reveal": "Architects weigh up warmth, light, strength and how long a material will last. Real buildings use all three, and each choice gives something different.",
+      "followUp": "Which material would make your aquarium feel the most like a special place, and why?"
+    },
+    {
+      "type": "athome",
+      "title": "Which bridge holds most books?",
+      "need": ["A piece of card, like a cereal box", "A wooden ruler", "A plastic ruler", "A pile of books, with a grown-up"],
+      "steps": [
+        "Lay the card across two stacks of books, with a gap between the stacks. Add books on top one at a time.",
+        "Do the same with the wooden ruler, then the plastic ruler, across the same gap.",
+        "Stop as soon as a bridge bends or slips. Count the books on each one, and talk about which material held the most."
+      ],
+      "why": "Architects test materials to see which ones are strong enough, and the answer can surprise you."
+    },
+    {
+      "type": "play",
+      "module": "studio",
+      "title": "Make your drawing sheet",
+      "intro": "Make your drawing sheet to take to school, so your class can see your dream school.",
+      "data": { "preset": "sheet" }
+    },
+    {
+      "type": "finish",
+      "debrief": [
+        "What was your favourite part?",
+        "If your school ran for a day, what would you change first, and why?"
+      ]
+    }
+  ]
+}

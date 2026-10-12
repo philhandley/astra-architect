@@ -1,0 +1,87 @@
+{
+  "id": "circulation",
+  "title": "Getting Around",
+  "tagline": "Plan the routes for pupils, from the gate to class, the pool and the roof.",
+  "idea": "Circulation and coding",
+  "emoji": "🚶",
+  "accent": "red",
+  "minutes": 10,
+  "patch": { "name": "Route Planner", "icon": "footsteps" },
+  "grownUp": [
+    "This mission is about circulation, the way people move through a building, and about coding, which is giving clear steps in order.",
+    "In the coding games, ask the Architect to guess where the pupil will end up before pressing Go, then to fix one tile if the pupil gets stuck.",
+    "The Big Question has no right answer. A finish line gives runners a goal, and a loop lets them keep going. Both are good reasons."
+  ],
+  "steps": [
+    {
+      "type": "story",
+      "title": "How people move around",
+      "text": "Circulation is how people move around a building, through doors, corridors, stairs and slides. Good circulation means nobody gets lost and nobody has to rush.",
+      "emoji": "🚪🪜🛝",
+      "ask": "Where in your school would people hurry, and where would they stop to chat?"
+    },
+    {
+      "type": "story",
+      "title": "Coding is giving clear steps",
+      "text": "Coding means giving very clear instructions, one step at a time. You will give your pupils picture tiles, such as Go to the pool, Swim and Again.",
+      "emoji": "🧩🏊🔁",
+      "ask": "What would you tell your pupil to do first?"
+    },
+    {
+      "type": "play",
+      "module": "studio",
+      "title": "Code your first pupil",
+      "intro": "Code a pupil from the gate to a classroom, then to the pool for a swim, and guess where they end up before you press Go.",
+      "data": { "preset": "code1" }
+    },
+    {
+      "type": "guess",
+      "title": "Which one only goes down?",
+      "prompt": "Which of these is a way that only goes down?",
+      "choices": [
+        { "label": "Stairs", "emoji": "🪜" },
+        { "label": "Slide", "emoji": "🛝" },
+        { "label": "Climbing wall", "emoji": "🧗" }
+      ],
+      "answer": 1,
+      "reveal": "A slide only goes down, so people use stairs or a climbing wall to get back up. Stairs and climbing walls can be used to go up as well as down."
+    },
+    {
+      "type": "play",
+      "module": "studio",
+      "title": "Run laps on the roof",
+      "intro": "Put the running track on the roof, add a way up, and code a pupil to run laps using the Again tile.",
+      "data": { "preset": "code2" }
+    },
+    {
+      "type": "question",
+      "title": "Finish line or round and round?",
+      "scenario": "Should the roof track have a finish line, or go round and round for ever?",
+      "options": [
+        { "label": "A finish line", "emoji": "🏁", "detail": "Runners have a goal, and they can say they finished the race." },
+        { "label": "Round and round for ever", "emoji": "🔁", "detail": "Nobody has to stop, so runners can keep going for as long as they like." },
+        { "label": "A finish line on a loop", "emoji": "🌀", "detail": "Runners can finish a race, and then keep going round if they want to." }
+      ],
+      "reveal": "Architects think about what runners want, how much room there is and whether the track is easy for everyone to use. Some tracks are straight with a finish, and others are loops with no end.",
+      "followUp": "On your roof track, how would you know when you had finished a race?"
+    },
+    {
+      "type": "athome",
+      "title": "Walk your route at home",
+      "need": ["A pencil", "Paper", "A grown-up to walk with you"],
+      "steps": [
+        "Walk slowly from the front door to your bedroom, and notice each door, corridor and stair.",
+        "Draw a map of the route as you walk, with a small dot at each doorway.",
+        "Walk it again, and mark with a star each place where people hurry or stop."
+      ],
+      "why": "Architects watch how people move before they decide where the doors and stairs should go."
+    },
+    {
+      "type": "finish",
+      "debrief": [
+        "What was your favourite part?",
+        "Where would people hurry or gather in your school, and why?"
+      ]
+    }
+  ]
+}

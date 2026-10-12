@@ -1,0 +1,88 @@
+{
+  "id": "programme",
+  "title": "The Shopping List",
+  "tagline": "Choose the rooms, then work out which ones are happiest as neighbours.",
+  "idea": "Programme",
+  "emoji": "🛒",
+  "accent": "orange",
+  "minutes": 10,
+  "patch": { "name": "Happy Neighbours", "icon": "bubbles" },
+  "grownUp": [
+    "A programme is the list of rooms a building needs. The Architect's wishes, from the chill-out room to the running track, are the start of the list.",
+    "Rooms have neighbours they like and neighbours they do not. Ask why a swimming pool wants a changing room close by, and why a library needs to be quiet.",
+    "The bubble diagram at home is an architect's first drawing. Keep it simple, and do not worry about neat lines."
+  ],
+  "steps": [
+    {
+      "type": "story",
+      "title": "An architect's shopping list",
+      "text": "A programme is a list of all the rooms a school needs. The Architect's wishes are the start of the list.",
+      "emoji": "🛒📝",
+      "ask": "Which wish would you put on the list first?"
+    },
+    {
+      "type": "story",
+      "title": "Rooms like good neighbours",
+      "text": "Rooms have neighbours they like and neighbours they do not. A quiet library does not want a noisy hall right next door.",
+      "emoji": "📚🎉🤫",
+      "ask": "Which room would you put next to the library, and which room would you keep far away?"
+    },
+    {
+      "type": "play",
+      "module": "sort",
+      "title": "Sort the room cards",
+      "intro": "Tap each room into noisy or quiet, then into wet or dry.",
+      "data": { "sets": ["noise", "wet"] }
+    },
+    {
+      "type": "guess",
+      "title": "Who wants to be next to the pool?",
+      "prompt": "Which room most wants to be next to the swimming pool?",
+      "choices": [
+        { "label": "Library", "emoji": "📚" },
+        { "label": "Changing room", "emoji": "🚿" },
+        { "label": "Art room", "emoji": "🎨" }
+      ],
+      "answer": 1,
+      "reveal": "Swimmers need a changing room close by, so they do not have to walk far in wet swimming costumes. A government guide for school buildings says changing rooms should be near the sports areas.",
+      "source": "https://assets.publishing.service.gov.uk/media/5f23ec238fa8f57acac33720/BB103_Area_Guidelines_for_Mainstream_Schools.pdf"
+    },
+    {
+      "type": "play",
+      "module": "studio",
+      "title": "Make every face happy",
+      "intro": "Build a classroom, a hall and a library, then make sure every room's face is happy.",
+      "data": { "preset": "neighbours" }
+    },
+    {
+      "type": "question",
+      "title": "Pool next door, or far away?",
+      "scenario": "Should the swimming pool sit right next to the chill-out room, or far away from it?",
+      "options": [
+        { "label": "Right next to it", "emoji": "🤝", "detail": "Nobody has far to walk, so swimmers can get in and out quickly." },
+        { "label": "Far away", "emoji": "🧘", "detail": "The chill-out room stays calm and peaceful, because the pool is at the other end." },
+        { "label": "Close, with a corridor between", "emoji": "🚪", "detail": "The corridor catches some of the noise, and the walk is still short." }
+      ],
+      "reveal": "Architects think about noise, wet feet and how far people walk. Some schools put the pool next to calm rooms, and others keep them well apart.",
+      "followUp": "If the pool was close to the chill-out room, what could you do to keep the noise out?"
+    },
+    {
+      "type": "athome",
+      "title": "Draw your house bubbles",
+      "need": ["A big sheet of paper", "Coloured pencils or crayons"],
+      "steps": [
+        "Draw one circle for each room in your house, and write its name inside it.",
+        "Put the circles for rooms that are next to each other close together, and the rooms that are far apart in different corners.",
+        "Join rooms with a line where people walk between them, and make the busiest lines thicker."
+      ],
+      "why": "A bubble diagram is an architect's first drawing. It shows which rooms should be neighbours before anyone draws any walls."
+    },
+    {
+      "type": "finish",
+      "debrief": [
+        "What was your favourite part?",
+        "Which two rooms would you put next to each other at school, and why?"
+      ]
+    }
+  ]
+}

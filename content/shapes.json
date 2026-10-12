@@ -1,0 +1,90 @@
+{
+  "id": "shapes",
+  "title": "Shapes That Work",
+  "tagline": "Meet the shapes, pull out an arch's keystone and see what holds it up.",
+  "idea": "Form",
+  "emoji": "🔺",
+  "accent": "teal",
+  "minutes": 10,
+  "patch": { "name": "Arch Builder", "icon": "arch" },
+  "grownUp": [
+    "This mission is about form: why some shapes stand up and others do not. The arch is the star of the show. In the game, pulling out the keystone makes the arch fall, and that is the point.",
+    "Ask what the stones are doing in the arch, and let the Architect guess before you talk about pushing. The at-home human arch shows the same push with hands.",
+    "The Big Question has no right answer. Architects choose tunnels, domes and towers for different reasons, so let the Architect explain their choice."
+  ],
+  "steps": [
+    {
+      "type": "story",
+      "title": "Blocks for little builders",
+      "text": "Friedrich Froebel made play blocks for little children, and the architect Frank Lloyd Wright played with smooth wooden blocks like these when he was a boy.",
+      "emoji": "⚽🧊🥫",
+      "ask": "Which block would make the best tower, and which one would roll away?",
+      "source": "https://cabinetmagazine.org/issues/9/brosterman.php"
+    },
+    {
+      "type": "play",
+      "module": "shapes",
+      "title": "Pull the keystone out",
+      "intro": "Meet the shapes, then pull the keystone out of the arch and watch what happens.",
+      "data": {}
+    },
+    {
+      "type": "guess",
+      "title": "Why does an arch stand up?",
+      "prompt": "Why does an arch stay up without falling down?",
+      "choices": [
+        { "label": "It has glue inside", "emoji": "🧴" },
+        { "label": "The stones push against each other", "emoji": "🧱" },
+        { "label": "It is hollow", "emoji": "🕳️" }
+      ],
+      "answer": 1,
+      "reveal": "The weight on top pushes the stones against each other, and the stones push back. No glue is needed, which is why an arch is so strong.",
+      "source": "https://www.pbs.org/wgbh/buildingbig/educator/act_mini_arch.html"
+    },
+    {
+      "type": "story",
+      "title": "A roof with no end",
+      "text": "Fuji Kindergarten in Tokyo has a ring-shaped roof that children run round. It is an endless ring, with no start, no end and no middle.",
+      "emoji": "🏃🏫🌳",
+      "ask": "Would you like to run round a roof like this with your friends? What would you talk about?",
+      "source": "https://www.outdoordesign.com.au/news-info/tokyo-roof-run/5669"
+    },
+    {
+      "type": "play",
+      "module": "studio",
+      "title": "Build the fish tunnel",
+      "intro": "Build the aquarium with an arch or a ring of curves, so the fish swim all round you.",
+      "data": { "preset": "aquarium" }
+    },
+    {
+      "type": "question",
+      "title": "Tunnel, dome or tower?",
+      "scenario": "Should the aquarium be a tunnel you walk through, a dome over the fish, or a tall tower?",
+      "options": [
+        { "label": "A tunnel", "emoji": "🚇", "detail": "You walk right through the water, with fish above, beside and below you." },
+        { "label": "A dome", "emoji": "🫧", "detail": "A round roof with no pillars inside lets the fish swim in one big bowl." },
+        { "label": "A tower", "emoji": "🗼", "detail": "A tall shape lets you look down through the layers of water as you climb." }
+      ],
+      "reveal": "Architects think about how people move, how the fish live and how the building looks from outside. Aquariums around the world come in many different shapes.",
+      "followUp": "If you could visit any shape of fish house, which would you choose, and why?"
+    },
+    {
+      "type": "athome",
+      "title": "Make a human arch",
+      "need": ["Two grown-ups", "A safe, flat, clear space", "A soft toy to be the keystone"],
+      "steps": [
+        "The two grown-ups stand a little apart, to be the sides of the arch, and lean in gently until their hands meet at the top.",
+        "Keep the pushing gentle. Feel how the hands push against each other, and how they hold the shape.",
+        "Slip the soft toy into the gap at the top, as the keystone, and see if the arch holds."
+      ],
+      "why": "An arch stays up because its stones push against each other, a bit like two pairs of hands pushing together."
+    },
+    {
+      "type": "finish",
+      "debrief": [
+        "What was your favourite part?",
+        "What shape would you pick for a building that people walk round, and why?"
+      ]
+    }
+  ]
+}

@@ -40,8 +40,11 @@ export function outline(b) {
     return { kind: 'ring', W, D, r, Wi, Di, ri, inside: (x, z, m) => inRR(x, z, W, D, r, m) && !inRR(x, z, Wi, Di, ri, -m) };
   }
   if (s === 'arc') {
-    const R = Math.min(b.w, b.d) - GAP - 0.45, t = 0.85, cx = -b.w / 2 + GAP, cz = -b.d / 2 + GAP, R0 = R - t / 2, R1 = R + t / 2;
-    return { kind: 'arc', cx, cz, R0, R1, inside: (x, z, m) => { const dd = Math.hypot(x - cx, z - cz); return dd > R0 + m && dd < R1 - m && x > cx + m && z > cz + m; } };
+    const one = Math.min(b.w, b.d) < 2;
+    const R = one ? 0.47 : Math.min(b.w, b.d) - GAP - 0.45, t = one ? 0.9 : 0.85, cx = -b.w / 2 + GAP, cz = -b.d / 2 + GAP, R0 = Math.max(0, R - t / 2), R1 = R + t / 2;
+    const rot = b.w === b.d ? (b.rot || 0) : 0, ph = rot * Math.PI / 2, co = Math.cos(ph), si = Math.sin(ph);
+    const un = (x, z) => [x * co + z * si, -x * si + z * co];      // back to the unturned frame
+    return { kind: 'arc', cx, cz, R0, R1, rot, inside: (x, z, m) => { const [u, v] = un(x, z); const dd = Math.hypot(u - cx, v - cz); return dd > R0 + m && dd < R1 - m && u > cx + m && v > cz + m; } };
   }
   return { kind: 'rr', W, D, r: 0.04, inside: (x, z, m) => inRR(x, z, W, D, 0.04, m) };
 }
@@ -100,14 +103,15 @@ class Bag {
 
 // Build the cut room. Coordinates are local to the piece (centred, y = 0 at the piece's base).
 // floorY: where this storey's floor is, inside the piece. Returns { group, seats, walk, inside }.
-export function cutRoom(b, hex, floorY) {
+export function cutRoom(b, hex, floorY, cutH = CUT) {
   const o = outline(b), g = new THREE.Group(), sh = shapesOf(o);
   // Everything below this floor stays solid; the floor and cut walls sit on top.
-  if (floorY > 0.001) { const base = new THREE.Mesh(slab(sh.floor, floorY), mat(hex)); base.castShadow = base.receiveShadow = true; g.add(base); }
+  if (floorY > 0.001) { const base = new THREE.Mesh(slab(sh.floor, floorY), mat(hex)); base.castShadow = base.receiveShadow = true; if (o.rot) base.rotation.y = -o.rot * Math.PI / 2; g.add(base); }
+  const shell = new THREE.Group(); if (o.rot) shell.rotation.y = -o.rot * Math.PI / 2; g.add(shell);
   const floor = new THREE.Mesh(slab(sh.floor, 0.02), mat(lighten(hex, 0.8)));
-  floor.position.y = floorY; floor.receiveShadow = true; g.add(floor);
-  const walls = new THREE.Mesh(slab(sh.walls, CUT), [mat('#ffffff'), mat(hex)]);
-  walls.position.y = floorY; walls.castShadow = walls.receiveShadow = true; g.add(walls);
+  floor.position.y = floorY; floor.receiveShadow = true; shell.add(floor);
+  const walls = new THREE.Mesh(slab(sh.walls, cutH), [mat('#ffffff'), mat(hex)]);
+  walls.position.y = floorY; walls.castShadow = walls.receiveShadow = true; shell.add(walls);
   // Furniture on a grid of spots inside the walls.
   const unit = UNITS[b.type] || UNITS.classroom, bag = new Bag(), seats = [];
   const step = ['classroom', 'ringhouse', 'lunch', 'art', 'yoga'].includes(b.type) ? 0.22 : 0.3, m = WALL + 0.06;

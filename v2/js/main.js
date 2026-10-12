@@ -10,19 +10,26 @@ import { icon, MARK } from './icons.js';
 
 // Finn's wooden-block model from the photos: green classrooms along the beach, orange bars round the meadow,
 // a blue pool in the middle, a ring of green curves and an orange drum by the waterfall.
+// Finn's wooden-block model, as it stands on the table: an arc of orange bars round the top-left of the meadow
+// (some stacked on red bars), a curve of green curved blocks inside it, the blue pool in the middle, an arc of
+// green classroom cubes along the beach, and the orange drum right by the waterfall.
 const FINNS_MODEL = [
-  { type: 'classroom', shape: 'box', colour: 'lime', x: 8, z: 11, w: 1, d: 1, level: 0, h: 1 },
-  { type: 'classroom', shape: 'box', colour: 'lime', x: 9, z: 10, w: 1, d: 1, level: 0, h: 1 },
-  { type: 'classroom', shape: 'box', colour: 'lime', x: 10, z: 10, w: 1, d: 1, level: 0, h: 1 },
-  { type: 'classroom', shape: 'box', colour: 'lime', x: 11, z: 10, w: 1, d: 1, level: 0, h: 1 },
-  { type: 'classroom', shape: 'box', colour: 'lime', x: 12, z: 9, w: 1, d: 1, level: 0, h: 1 },
-  { type: 'classroom', shape: 'box', colour: 'lime', x: 13, z: 9, w: 1, d: 1, level: 0, h: 1 },
-  { type: 'hall', shape: 'box', colour: 'orange', x: 2, z: 6, w: 3, d: 1, level: 0, h: 2 },
-  { type: 'lunch', shape: 'box', colour: 'red', x: 5, z: 6, w: 2, d: 1, level: 0, h: 1 },
-  { type: 'art', shape: 'box', colour: 'orange', x: 2, z: 7, w: 1, d: 2, level: 0, h: 1 },
-  { type: 'pool', shape: 'pool', colour: 'blue', x: 4, z: 9, w: 3, d: 1, level: 0, h: 1 },
-  { type: 'aquarium', shape: 'ring', colour: 'lime', x: 7, z: 6, w: 2, d: 2, level: 0, h: 1 },
-  { type: 'yoga', shape: 'drum', colour: 'orange', x: 10, z: 6, w: 1, d: 1, level: 0, h: 1 },
+  { type: 'hall', shape: 'box', colour: 'orange', x: 2, z: 6, w: 2, d: 1, level: 0, h: 1 },
+  { type: 'music', shape: 'box', colour: 'orange', x: 4, z: 6, w: 2, d: 1, level: 0, h: 1 },
+  { type: 'art', shape: 'box', colour: 'orange', x: 1, z: 6, w: 1, d: 2, level: 0, h: 1 },
+  { type: 'lunch', shape: 'box', colour: 'red', x: 1, z: 8, w: 1, d: 2, level: 0, h: 1 },
+  { type: 'library', shape: 'box', colour: 'orange', x: 1, z: 8, w: 1, d: 2, level: 1, h: 1 },
+  { type: 'lunch', shape: 'box', colour: 'red', x: 1, z: 10, w: 2, d: 1, level: 0, h: 1 },
+  { type: 'maker', shape: 'box', colour: 'orange', x: 1, z: 10, w: 2, d: 1, level: 1, h: 1 },
+  { type: 'aquarium', shape: 'arc', colour: 'forest', x: 2, z: 7, w: 3, d: 3, level: 0, h: 1, rot: 2 },
+  { type: 'pool', shape: 'pool', colour: 'blue', x: 5, z: 8, w: 3, d: 1, level: 0, h: 1 },
+  { type: 'classroom', shape: 'box', colour: 'forest', x: 3, z: 12, w: 1, d: 1, level: 0, h: 1 },
+  { type: 'classroom', shape: 'box', colour: 'forest', x: 4, z: 11, w: 1, d: 1, level: 0, h: 1 },
+  { type: 'classroom', shape: 'box', colour: 'lime', x: 5, z: 11, w: 1, d: 1, level: 0, h: 1 },
+  { type: 'classroom', shape: 'box', colour: 'lime', x: 6, z: 11, w: 1, d: 1, level: 0, h: 1 },
+  { type: 'classroom', shape: 'box', colour: 'lime', x: 7, z: 10, w: 1, d: 1, level: 0, h: 1 },
+  { type: 'classroom', shape: 'box', colour: 'lime', x: 8, z: 10, w: 1, d: 1, level: 0, h: 1 },
+  { type: 'yoga', shape: 'drum', colour: 'orange', x: 11, z: 6, w: 1, d: 1, level: 0, h: 1 },
 ];
 
 async function boot() {

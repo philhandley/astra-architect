@@ -5,6 +5,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LEVEL } from './catalogue.js';
 import { TREE_GREENS } from './site.js';
+import { addFacade, addTerrace, contactShadow } from './facade.js';
 
 const GAP = 0.035;                   // a hair of space round every piece, so each reads as its own block
 const ROOF = 0.4;
@@ -408,6 +409,60 @@ function stripes(hex) {
   return canvasTex('stripes' + hex, (g, s) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, s, s); g.fillStyle = hex; for (let i = 0; i < 4; i++) g.fillRect(i * s / 4, 0, s / 8, s); }, 64);
 }
 
+// ---------- links and landscape ----------
+Object.assign(BUILD, {
+  bridge(w, d, H, c) {
+    // A bridge between buildings: a coloured deck with glass sides.
+    const L = Math.max(w, d), W = Math.min(w, d) - 0.3, g = new THREE.Group(), inner = new THREE.Group();
+    inner.add(mesh(new RoundedBoxGeometry(L, 0.07, W, 2, 0.02).translate(0, 0.035, 0), mat(c)));
+    for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(L, 0.12, 0.012), glass()); p.position.set(0, 0.13, s * (W / 2 - 0.006)); p.raycast = () => {}; inner.add(p); inner.add(mesh(new THREE.BoxGeometry(L, 0.014, 0.03).translate(0, 0.195, s * (W / 2 - 0.01)), mat(WHITE))); }
+    if (d > w) inner.rotation.y = Math.PI / 2;
+    g.add(inner); g.userData.walk = { w: d > w ? W - 0.1 : L - 0.1, d: d > w ? L - 0.1 : W - 0.1, y: 0.07 };
+    return g;
+  },
+  tube(w, d, H, c) {
+    // A covered tube walkway with round windows, like a giant play tunnel.
+    const L = Math.max(w, d), W = Math.min(w, d) - 0.32, th = Math.min(0.38, H * 0.8), g = new THREE.Group(), inner = new THREE.Group();
+    inner.add(mesh(new RoundedBoxGeometry(L, th, W, 4, Math.min(W, th) * 0.45).translate(0, th / 2, 0), mat(c)));
+    const n = Math.max(2, Math.round(L * 2.5));
+    for (let i = 0; i < n; i++) for (const s of [-1, 1]) {
+      const x = -L / 2 + (L * (i + 0.5)) / n;
+      inner.add(mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.02, 18).rotateX(Math.PI / 2).translate(x, th * 0.55, s * (W / 2 + 0.004)), mat(WHITE)));
+      inner.add(mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.022, 18).rotateX(Math.PI / 2).translate(x, th * 0.55, s * (W / 2 + 0.008)), mat('#bfe4f3', { emissive: '#7fc6e0', emissiveIntensity: 0.18 }), false));
+    }
+    if (d > w) inner.rotation.y = Math.PI / 2;
+    g.add(inner);
+    return g;
+  },
+  canopy(w, d, H, c) {
+    // A covered walkway on the ground: a thin coloured roof on slim white columns.
+    const L = Math.max(w, d), W = Math.min(w, d) - 0.2, g = new THREE.Group(), inner = new THREE.Group(), hh = 0.36;
+    inner.add(mesh(new RoundedBoxGeometry(L - 0.06, 0.04, W, 2, 0.015).translate(0, hh, 0), mat(c)));
+    inner.add(mesh(new THREE.BoxGeometry(L - 0.04, 0.012, W - 0.1).translate(0, 0.006, 0), mat('#efe9dd')));
+    const n = Math.max(2, Math.round(L) + 1);
+    for (let i = 0; i < n; i++) for (const s of [-1, 1]) inner.add(mesh(new THREE.CylinderGeometry(0.018, 0.018, hh, 8).translate(-L / 2 + 0.08 + ((L - 0.16) * i) / (n - 1), hh / 2, s * (W / 2 - 0.05)), mat(WHITE)));
+    if (d > w) inner.rotation.y = Math.PI / 2;
+    g.add(inner); g.userData.walk = { w: d > w ? W - 0.2 : L - 0.2, d: d > w ? L - 0.2 : W - 0.2, y: 0.012 };
+    return g;
+  },
+  terraces(w, d, H, c) {
+    // Tree terraces: rings of seats stepping up round a big tree (after MVRDV's Back to the Roots).
+    const g = new THREE.Group(), R = Math.min(w, d) / 2 - GAP, tiers = 3, step = (R - 0.32) / tiers, seats = [];
+    g.add(mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.03, 32).translate(0, 0.015, 0), mat('#8fcf5b')));
+    for (let k = 0; k < tiers; k++) {
+      const r0 = 0.32 + k * step, r1 = r0 + step, hh = 0.06 * (k + 1);
+      const s = new THREE.Shape(); s.absarc(0, 0, r1, 0, Math.PI * 2, false);
+      const hole = new THREE.Path(); hole.absarc(0, 0, r0, 0, Math.PI * 2, true); s.holes.push(hole);
+      const ring = mesh(new THREE.ExtrudeGeometry(s, { depth: hh, bevelEnabled: false, curveSegments: 40 }).rotateX(-Math.PI / 2), mat(k % 2 ? '#8fcf5b' : c));
+      g.add(ring);
+      if (k % 2 === 0) { const n = Math.round(r1 * 9); for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2 + k; seats.push([Math.cos(a) * (r0 + step * 0.5), hh, Math.sin(a) * (r0 + step * 0.5)]); } }
+    }
+    const tree = roundTree(Math.min(0.5, R * 0.42), TREE_GREENS[2]); tree.position.y = 0.03; g.add(tree);
+    g.userData.seats = seats;
+    return g;
+  },
+});
+
 // ---------- Astra Nova pieces ----------
 Object.assign(BUILD, {
   rocket(w, d, H, c) {
@@ -564,7 +619,13 @@ export function buildPiece(box, opts = {}) {
   const H = box.h * LEVEL;
   const make = BUILD[box.shape] || BUILD.box;
   const g = make(box.w, box.d, H, box.hex, { ...opts, id: box.id || 1 });
+  if (box.shape === 'arc' && box.rot && box.w === box.d) { const inner = new THREE.Group(); while (g.children.length) inner.add(g.children[0]); inner.rotation.y = -box.rot * Math.PI / 2; g.add(inner); }
   if (box.surface && box.surface !== 'plain' && !opts.ghost) applySurface(g, box);
+  if (!opts.ghost) {
+    addFacade(g, box, H);
+    if (opts.open && (box.shape === 'box' || box.shape === 'drum')) addTerrace(g, box, H);
+    if ((box.level || 0) === 0 && !['tree', 'turbine', 'weather', 'circle', 'track', 'garden', 'pool', 'bridge', 'canopy'].includes(box.shape)) g.add(contactShadow(box));
+  }
   if (opts.ghost) g.traverse(o => { if (o.isMesh) { o.material = opts.ghost; o.castShadow = false; } });
   return g;
 }

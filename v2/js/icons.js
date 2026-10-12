@@ -24,6 +24,8 @@ const P = {
   music: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
   floors: '<path d="M12 4 3 8.5l9 4.5 9-4.5z"/><path d="m3 12.5 9 4.5 9-4.5M3 16.5 12 21l9-4.5"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/><path d="M12 3v2"/>',
+  walk: '<circle cx="13" cy="4.5" r="2"/><path d="M10 21l2-6 3 3v3M8.5 12.5 11 8h3l2.5 3.5L19 12"/><path d="M11 8l-1.5 5.5L12 15"/>',
   rocket: '<path d="M12 2c3 2.5 4.5 6 4.5 10L15 16H9l-1.5-4C7.5 8 9 4.5 12 2z"/><circle cx="12" cy="9.5" r="1.6"/><path d="M9 16l-2.5 3 2.5-.5M15 16l2.5 3-2.5-.5M10.5 19.5 12 22l1.5-2.5"/>',
 };
 export const icon = (name, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ''}</svg>`;

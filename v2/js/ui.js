@@ -54,6 +54,8 @@ export const sfx = {
   no() { tone(200, 0, 0.14, 'square', 0.06, -40); },
   bin() { tone(180, 0, 0.18, 'sine', 0.22, -90); },
   whoosh() { tone(300, 0, 0.25, 'sine', 0.06, 500); },
+  bell() { for (let i = 0; i < 4; i++) { tone(988, i * 0.32, 0.3, 'sine', 0.12); tone(784, i * 0.32 + 0.16, 0.3, 'sine', 0.1); } },
+  cheer() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.07, 0.22, 'triangle', 0.1)); },
 };
 
 export function toast(text) {

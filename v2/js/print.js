@@ -163,7 +163,8 @@ function path(g, b, X, Z, s) {
   if (o.kind === 'rr') rr(o.W, o.D, o.r);
   else if (o.kind === 'ring') { rr(o.W, o.D, o.r); rr(o.Wi, o.Di, o.ri); }
   else {
-    const ax = X(b.x + b.w / 2 + o.cx), az = Z(b.z + b.d / 2 + o.cz);
-    g.arc(ax, az, o.R1 * s, 0, Math.PI / 2); g.arc(ax, az, o.R0 * s, Math.PI / 2, 0, true); g.closePath();
+    const ph = (o.rot || 0) * Math.PI / 2, co = Math.cos(ph), si = Math.sin(ph);
+    const ax = X(b.x + b.w / 2 + o.cx * co - o.cz * si), az = Z(b.z + b.d / 2 + o.cx * si + o.cz * co);
+    g.arc(ax, az, o.R1 * s, ph, ph + Math.PI / 2); g.arc(ax, az, Math.max(0.01, o.R0) * s, ph + Math.PI / 2, ph, true); g.closePath();
   }
 }

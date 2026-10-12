@@ -2,10 +2,13 @@
 // drag the room to move it (anything on top comes too), tap on top of a room to stack another on it.
 // "Inside" cuts every building at one floor to show furniture and people.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PROGRAMMES, SHAPES, PALETTE, SURFACES, NO_SURFACE, LEVEL, MAX_SIZE, MAX_LEVELS, TRAY, colourHex } from './catalogue.js';
 import { GRID, square } from './site.js';
 import { buildPiece, disposePiece, ghostMaterial } from './shapes.js';
 import { cutRoom, outline, CUTTABLE, storeyFloor } from './inside.js';
+import { SchoolDay, Trails, PERIODS } from './day.js';
+import { startWalk } from './walk.js';
 import { Crowd } from './crowd.js';
 import { WHY } from './model.js';
 import { icon } from './icons.js';
@@ -17,6 +20,8 @@ export function mountSite(root, world, model, siteView, thumbs) {
     <div class="side">
       <button class="sbtn" data-a="undo" aria-label="Undo">${icon('undo')}<span>Undo</span></button>
       <button class="sbtn inside" data-a="inside" aria-label="Look inside">${icon('inside')}<span>Inside</span></button>
+      <button class="sbtn day" data-a="day" aria-label="School day">${icon('bell')}<span>School day</span></button>
+      <button class="sbtn" data-a="walk" aria-label="Walk inside">${icon('walk')}<span>Walk</span></button>
       <button class="sbtn" data-a="left" aria-label="Turn left">${icon('left')}<span>Turn</span></button>
       <button class="sbtn" data-a="right" aria-label="Turn right">${icon('right')}<span>Turn</span></button>
       <button class="sbtn" data-a="in" aria-label="Closer">${icon('in')}<span>Closer</span></button>
@@ -25,18 +30,20 @@ export function mountSite(root, world, model, siteView, thumbs) {
       <button class="sbtn" data-a="print" aria-label="Print drawings">${icon('print')}<span>Print</span></button>
     </div>
     <div class="floors" hidden></div>
+    <div class="daybar" hidden></div>
     <div class="selbar" hidden></div>
     <div class="hint"></div>
   </div>`);
   root.appendChild(ui);
   const trayIn = ui.querySelector('.tray-in'), selbar = ui.querySelector('.selbar'), hint = ui.querySelector('.hint'), floorsEl = ui.querySelector('.floors');
-  const tray = ui.querySelector('.tray');
+  const tray = ui.querySelector('.tray'), daybar = ui.querySelector('.daybar'), sideEl = ui.querySelector('.side');
 
   const design = new THREE.Group(); design.name = 'design';
   world.scene.add(design);
   const pieces = new Map();                 // box id -> Group
-  const S = { tool: null, selected: null, drag: null, inside: false, floor: 0 };
+  const S = { tool: null, selected: null, drag: null, inside: false, floor: 0, day: false, walking: null, cutH: undefined };
   const crowd = new Crowd(world);
+  const trails = new Trails(world);
 
   // ---------- the tray ----------
   function drawTray() {
@@ -87,11 +94,11 @@ export function mountSite(root, world, model, siteView, thumbs) {
   // In the inside view: rooms on this floor are cut open; rooms above are hidden; rooms below stay solid.
   function makeInside(b) {
     const L = S.floor;
-    if (b.level > L) return null;
+    if (b.level > L) return S.day ? { g: makeGroup(b, ghostUp) } : null;
     const spans = b.level <= L && L < b.level + b.h;
     if (!spans || !CUTTABLE.has(b.shape)) { const g = makeGroup(b); return { g }; }
     const floorY = storeyFloor(b, L);
-    const room = cutRoom(b, colourHex(b.colour), floorY);
+    const room = cutRoom(b, colourHex(b.colour), floorY, S.cutH);
     const g = room.group;
     plinth(b, g, null);
     g.position.set(b.x + b.w / 2, yOf(b), b.z + b.d / 2);
@@ -110,14 +117,35 @@ export function mountSite(root, world, model, siteView, thumbs) {
       zones.push(...peopleFor(b, g, room));
     }
     zones.push(...strollers());
-    crowd.set(zones, model.boxes.length * 7 + (S.inside ? 101 : 0) + S.floor);
+    yard();
+    if (!S.day) crowd.set(zones, model.boxes.length * 7 + (S.inside ? 101 : 0) + S.floor);
     const occ = new Set();
     for (const b of model.boxes) if (b.level === 0) for (const [x, z] of model.squares(b)) occ.add(`${x},${z}`);
     siteView.clearTrees(occ);
     if (S.selected && !model.byId.has(S.selected)) select(null); else if (S.selected) placeHandles();
     if (S.inside) drawFloors();
   }
-  model.onChange(() => redraw());
+  model.onChange(() => { if (S.day) stopDay(); redraw(); });
+  const ghostUp = new THREE.MeshLambertMaterial({ color: '#ffffff', transparent: true, opacity: 0.22, depthWrite: false });
+  ghostUp.userData.ghost = true;
+
+  // A pale paved yard spreads round the buildings, like the plazas in MVRDV's drawings.
+  let yardMesh = null;
+  function yard() {
+    if (yardMesh) { design.remove(yardMesh); yardMesh.geometry.dispose(); yardMesh = null; }
+    const occ = new Set(), pave = [];
+    for (const b of model.boxes) if (b.level === 0) for (const [x, z] of model.squares(b)) occ.add(`${x},${z}`);
+    if (!occ.size) return;
+    for (let z = 0; z < GRID.d; z++) for (let x = 0; x < GRID.w; x++) {
+      const q = square(x, z); if (!q?.build || q.zone === 'clearing' || occ.has(`${x},${z}`)) continue;
+      let near = false; for (let dz = -1; dz <= 1 && !near; dz++) for (let dx = -1; dx <= 1; dx++) if (occ.has(`${x + dx},${z + dz}`)) { near = true; break; }
+      if (near) pave.push(new THREE.BoxGeometry(1.02, 0.014, 1.02).translate(x + 0.5, q.base + 0.007, z + 0.5));
+    }
+    if (!pave.length) return;
+    yardMesh = new THREE.Mesh(mergeGeometries(pave.map(g => { g.deleteAttribute('uv'); return g; })), new THREE.MeshLambertMaterial({ color: '#f1ece2' }));
+    yardMesh.receiveShadow = true; yardMesh.raycast = () => {};
+    design.add(yardMesh);
+  }
 
   // ---------- people ----------
   const DENSITY = { classroom: 1, hall: 2.5, library: 1, lunch: 0.6, art: 1, music: 1, yoga: 0.3, aquarium: 2, ringhouse: 0.6, archway: 1 };
@@ -125,20 +153,22 @@ export function mountSite(root, world, model, siteView, thumbs) {
     const out = [], cx = b.x + b.w / 2, cz = b.z + b.d / 2, y0 = yOf(b), P = PROGRAMMES[b.type];
     if (room) {
       const area = model.squares(b).length;
-      out.push({ ox: cx, oy: y0 + room.floorY, oz: cz, w: b.w, d: b.d, inside: room.inside, margin: 0.12, seats: room.seats, fill: 0.85,
+      out.push({ boxId: b.id, ox: cx, oy: y0 + room.floorY, oz: cz, w: b.w, d: b.d, inside: room.inside, margin: 0.12, seats: room.seats, fill: 0.85,
         walkers: Math.max(1, Math.round((DENSITY[b.type] ?? 1) * area)), adults: true, kind: b.type === 'hall' ? 'run' : 'walk', speed: b.type === 'hall' ? 0.6 : 0.28 });
       return out;
     }
     // Swimmers in the pool.
     let swim = null; g.traverse(o => { if (o.userData.swim) swim = o.userData.swim; });
-    if (swim) out.push({ ox: cx, oy: y0 + swim.y, oz: cz, w: swim.w, d: swim.d, inside: (x, z) => Math.abs(x) < swim.w / 2 && Math.abs(z) < swim.d / 2, margin: 0, walkers: Math.max(2, Math.round(b.w * b.d * 1.5)), kind: 'swim', speed: 0.25 });
+    let walk = null; g.traverse(o => { if (o.userData.walk) walk = o.userData.walk; });
+    if (walk) out.push({ boxId: b.id, ox: cx, oy: y0 + walk.y, oz: cz, w: walk.w, d: walk.d, inside: (x, z) => Math.abs(x) < walk.w / 2 && Math.abs(z) < walk.d / 2, margin: 0, walkers: Math.max(1, Math.round(b.w * b.d * 0.7)), speed: 0.25 });
+    if (swim) out.push({ boxId: b.id, ox: cx, oy: y0 + swim.y, oz: cz, w: swim.w, d: swim.d, inside: (x, z) => Math.abs(x) < swim.w / 2 && Math.abs(z) < swim.d / 2, margin: 0, walkers: Math.max(2, Math.round(b.w * b.d * 1.5)), kind: 'swim', speed: 0.25 });
     // Children sitting on the big steps.
     let seats = null; g.traverse(o => { if (o.userData.seats) seats = o.userData.seats; });
-    if (seats) out.push({ ox: cx, oy: y0, oz: cz, w: b.w, d: b.d, inside: () => true, seats, fill: 0.8, walkers: 0 });
+    if (seats) out.push({ boxId: b.id, ox: cx, oy: y0, oz: cz, w: b.w, d: b.d, inside: () => true, seats, fill: 0.8, walkers: 0 });
     // A roof terrace on top of an open flat roof.
     if (SHAPES[b.shape]?.flat && model.open(b) && !S.inside) {
       const o = outline(b);
-      out.push({ ox: cx, oy: y0 + b.h * LEVEL + 0.012, oz: cz, w: b.w, d: b.d, inside: o.inside, margin: 0.14, walkers: Math.min(5, Math.max(1, Math.round(model.squares(b).length * 0.8))), speed: 0.22 });
+      out.push({ boxId: b.id, ox: cx, oy: y0 + b.h * LEVEL + 0.012, oz: cz, w: b.w, d: b.d, inside: o.inside, margin: 0.14, walkers: Math.min(5, Math.max(1, Math.round(model.squares(b).length * 0.8))), speed: 0.22 });
     }
     return out;
   }
@@ -287,7 +317,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     if (!b) { handles.visible = false; selbar.hidden = true; defaultHint(); return; }
     placeHandles();
     drawSelbar(b);
-    if (!quiet) { sfx.tap(); say(PROGRAMMES[b.type].name); }
+    if (!quiet) { sfx.tap(); say(PROGRAMMES[b.type].name); cheer(b); }
     setHint('Drag a blue arrow to make it bigger or smaller. Drag the room to move it.');
   }
   function drawSelbar(b) {
@@ -302,7 +332,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     if (P.shapes.length > 1) btn('shape', 'Shape', () => nextShape(b));
     btn('colour', 'Colour', x => swatches(b, x));
     if (!NO_SURFACE.has(b.shape)) btn('surface', 'Walls', x => surfaces(b, x));
-    if (b.w !== b.d) btn('turn', 'Turn', () => turnBox(b));
+    if (b.w !== b.d || b.shape === 'arc') btn('turn', 'Turn', () => turnBox(b));
     btn('copy', 'Copy', () => copyBox(b));
     btn('bin', 'Bin', () => { const fell = model.remove(b.id); sfx.bin(); if (fell) toast('The rooms on top came down too. Undo brings them back.'); select(null); }, 'no');
     btn('done', 'Done', () => select(null), 'ok');
@@ -357,6 +387,8 @@ export function mountSite(root, world, model, siteView, thumbs) {
     sfx.whoosh(); setTimeout(() => sfx.whoosh(), 800); setTimeout(() => sfx.whoosh(), 1300);
   }
   function turnBox(b) {
+    // A square curve turns to face the next corner.
+    if (b.shape === 'arc' && b.w === b.d) { model.update(b.id, { rot: ((b.rot || 0) + 1) % 4 }); sfx.whoosh(); select(b.id, { quiet: true }); return; }
     const cx = b.x + b.w / 2, cz = b.z + b.d / 2;
     const n = { w: b.d, d: b.w, x: Math.round(cx - b.d / 2), z: Math.round(cz - b.w / 2) };
     const r = model.update(b.id, n);
@@ -373,16 +405,16 @@ export function mountSite(root, world, model, siteView, thumbs) {
 
   // ---------- the inside view ----------
   function topFloor() { return Math.max(0, ...model.boxes.map(b => b.level + b.h - 1)); }
-  function setInside(on) {
+  function setInside(on, { quiet = false } = {}) {
     S.inside = on;
     if (on) { S.tool = null; select(null); drawTray(); S.floor = Math.min(S.floor, topFloor()); }
     tray.hidden = on;
     ui.querySelector('.sbtn.inside').classList.toggle('on', on);
     floorsEl.hidden = !on;
-    siteView.grid.visible = !on;
+    siteView.setGridStrong(!on && !!S.tool);
     redraw();
     defaultHint();
-    if (on) { sfx.whoosh(); say('Inside the school! You can see the rooms, the furniture and the people.'); }
+    if (on && !quiet) { sfx.whoosh(); say('Inside the school! You can see the rooms, the furniture and the people.'); }
   }
   const FLOOR_NAMES = ['Ground floor', 'First floor', 'Second floor', 'Third floor', 'Fourth floor', 'Fifth floor', 'Sixth floor', 'Seventh floor'];
   function drawFloors() {
@@ -516,8 +548,71 @@ export function mountSite(root, world, model, siteView, thumbs) {
   canvas.addEventListener('pointercancel', () => { S.drag = null; world.controls.enabled = true; clearGhost(); redraw(); });
   canvas.addEventListener('pointerleave', () => { if (!S.drag) clearGhost(); });
 
+  function cheer(b) {
+    crowd.cheer(b.id);
+    sfx.cheer();
+    const top = new THREE.Vector3(b.x + b.w / 2, yOf(b) + b.h * LEVEL + 0.1, b.z + b.d / 2);
+    const cols = ['#f7c22e', '#e2457d', '#22b2bf', '#a3d140', '#7c46a8', '#f28b30', '#3d8de0'], bits = [];
+    const geo = new THREE.PlaneGeometry(0.05, 0.03);
+    for (let i = 0; i < 46; i++) {
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: cols[i % cols.length], side: THREE.DoubleSide, transparent: true }));
+      m.position.copy(top); m.userData.v = new THREE.Vector3((Math.random() - 0.5) * 1.6, 1.4 + Math.random() * 1.4, (Math.random() - 0.5) * 1.6); m.userData.s = new THREE.Vector3(Math.random() * 9, Math.random() * 9, 0);
+      world.scene.add(m); bits.push(m);
+    }
+    let t = 0;
+    const fn = dt => {
+      t += dt;
+      for (const m of bits) { m.userData.v.y -= dt * 3.2; m.position.addScaledVector(m.userData.v, dt); m.rotation.x += dt * m.userData.s.x; m.rotation.y += dt * m.userData.s.y; m.material.opacity = Math.max(0, 1 - t / 1.8); }
+      if (t > 1.8) { for (const m of bits) { world.scene.remove(m); m.material.dispose(); } geo.dispose(); world.updaters.delete(fn); }
+    };
+    world.updaters.add(fn);
+  }
+
+  // ---------- the school day ----------
+  const day = new SchoolDay({ world, model, crowd, yOf, onPeriod: (i, P) => drawDaybar(i, P), onEnd: () => endDay() });
+  function startDay() {
+    if (!model.boxes.some(b => ['classroom', 'ringhouse', 'treehouse'].includes(b.type))) { sfx.no(); toast('Build a classroom first!'); say('Build a classroom first, so the children have somewhere to learn.'); return; }
+    if (S.walking) return;
+    select(null); S.tool = null; drawTray();
+    S.day = true; S.floor = 0;
+    setInside(true, { quiet: true });
+    floorsEl.hidden = true;
+    trails.clear();
+    crowd.onStep = (x, z) => trails.paint(x, z);
+    day.start();
+    sideEl.querySelector('.sbtn.day').classList.add('on');
+    daybar.hidden = false;
+  }
+  function drawDaybar(i, P) {
+    daybar.innerHTML = PERIODS.map((p, k) => `<div class="period ${k === i ? 'now' : k < i ? 'past' : ''}">${emo(p.emoji)}<span>${esc(p.name)}</span></div>`).join('') + `<button class="fbtn close" type="button">${icon('close')}<span>Stop</span></button>`;
+    daybar.querySelector('.close').addEventListener('click', () => { stopDay(); });
+    sfx.bell();
+    say(i === 0 ? 'Good morning! The children are arriving for lessons.' : i === PERIODS.length - 1 ? 'Home time! Watch the paths they made across the grass.' : `Bell! Time for ${P.name.toLowerCase()}.`);
+    setHint(`${emo(P.emoji)} ${esc(P.name)}. Watch the children walk, and the paths they wear in the grass.`);
+  }
+  function stopDay() { if (day.running) day.stop(true); endDay(); }
+  function endDay() {
+    if (!S.day) return;
+    S.day = false;
+    crowd.onStep = null;
+    daybar.hidden = true;
+    sideEl.querySelector('.sbtn.day').classList.remove('on');
+    setInside(false, { quiet: true });
+    say('The school day is over. Can you see the paths the children made?');
+  }
+
+  // ---------- walking inside ----------
+  function startWalking() {
+    if (S.day) stopDay();
+    select(null); S.tool = null; drawTray();
+    S.cutH = 0.12; S.floor = 0;
+    setInside(true, { quiet: true });
+    ui.hidden = true;
+    S.walking = startWalk({ world, model, root, yOf, setFloor: l => { S.floor = l; redraw(); }, onExit: () => { S.walking = null; ui.hidden = false; S.cutH = undefined; setInside(false, { quiet: true }); } });
+  }
+
   function handleTap(x, y) {
-    if (S.inside) { const b = boxAt(x, y); if (b) say(PROGRAMMES[b.type].name); return; }
+    if (S.inside) { const b = boxAt(x, y); if (b) { say(PROGRAMMES[b.type].name); cheer(b); } return; }
     if (S.tool) { const t = target(x, y); if (t) place(t); return; }
     const b = boxAt(x, y);
     if (b) { if (b.id === S.selected) select(null); else select(b.id); }
@@ -529,7 +624,9 @@ export function mountSite(root, world, model, siteView, thumbs) {
     const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
     sfx.tap();
     if (a === 'undo') { if (!model.undo()) toast('Nothing to undo'); }
-    if (a === 'inside') setInside(!S.inside);
+    if (a === 'inside') { if (S.day) stopDay(); else setInside(!S.inside); }
+    if (a === 'day') { if (S.day) stopDay(); else startDay(); }
+    if (a === 'walk') startWalking();
     if (a === 'left') world.turn(-1);
     if (a === 'right') world.turn(1);
     if (a === 'in') zoomBy(1.3);

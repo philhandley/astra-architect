@@ -147,3 +147,22 @@ svg.ic.big { width: 34px; height: 34px; }
 }
 
 .selbtn.go { background: var(--red); color: #fff; }
+
+/* School day */
+.daybar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 14px; display: flex; gap: 6px; align-items: center; background: rgba(255,255,255,.97); border-radius: 26px; box-shadow: var(--shadow); padding: 8px; pointer-events: auto; }
+.period { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 84px; padding: 6px 4px; border-radius: 16px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.period img { width: 30px; height: 30px; }
+.period.now { background: #fff6d6; box-shadow: 0 0 0 3px #f7c22e inset; color: var(--ink); }
+.period.past { opacity: .45; }
+.sbtn.day.on { background: #f7c22e; color: var(--ink); }
+/* Walking inside */
+.walk-ui { position: absolute; inset: 0; pointer-events: none; }
+.walk-ui > * { pointer-events: auto; }
+.walk-exit { position: absolute; left: 14px; top: 14px; appearance: none; border: 0; cursor: pointer; height: 56px; padding: 0 20px; border-radius: 999px; background: #fff; box-shadow: var(--shadow); font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.joy { position: absolute; left: 40px; bottom: 40px; width: 150px; height: 150px; border-radius: 50%; background: rgba(255,255,255,.55); box-shadow: inset 0 0 0 4px rgba(255,255,255,.9), var(--shadow); touch-action: none; display: grid; place-items: center; }
+.joy .knob { width: 70px; height: 70px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 5px #fff, 0 6px 14px rgba(0,0,0,.25); pointer-events: none; }
+.walk-rooms { position: absolute; left: 220px; right: 16px; bottom: 18px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.wroom { appearance: none; border: 0; cursor: pointer; height: 54px; padding: 0 16px 0 10px; border-radius: 999px; background: rgba(255,255,255,.96); box-shadow: var(--shadow); font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.wroom img { width: 30px; height: 30px; }
+.wroom small { font-weight: 500; color: var(--ink-2); }
+.walk-tip { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); background: rgba(255,255,255,.95); border-radius: 999px; padding: 10px 20px; font-size: 15px; font-weight: 500; box-shadow: var(--shadow); pointer-events: none !important; }

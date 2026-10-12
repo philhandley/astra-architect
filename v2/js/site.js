@@ -121,7 +121,7 @@ export function buildSite(world) {
 
   world.scene.add(group);
   return { group, ground, water, grid, trees,
-    setGridStrong(on) { grid.material.opacity = on ? 0.9 : 0.5; },
+    setGridStrong(on) { grid.material.opacity = on ? 0.85 : 0.0; grid.visible = on; },
     // Trees step out of the way of buildings.
     clearTrees(occupied) {
       const m = new THREE.Matrix4();
@@ -151,6 +151,7 @@ function forestTrees() {
   for (let z = 0; z < s.d; z++) for (let x = 0; x < s.w; x++) {
     if (s.zones[z][x] !== 'f' || r() > 0.42) continue;
     const wx = (x + 0.15 + r() * 0.7) / GRID.k, wz = (z + 0.15 + r() * 0.7) / GRID.k;
+    if (Math.abs(wx - S.waterfall[0]) < 0.55 && wz > S.waterfall[1] - 1.2 && wz < S.waterfall[1] + 0.7) continue;   // keep the falls clear
     const y = groundAt(wx, wz);
     const rad = 0.13 + r() * 0.09, trunkH = 0.12 + r() * 0.06;
     list.push({ sx: Math.floor(wx), sz: Math.floor(wz), p: new THREE.Vector3(wx, y + trunkH + rad * 0.85, wz), q: new THREE.Quaternion(), s: new THREE.Vector3(rad, rad * 1.08, rad),
@@ -191,32 +192,78 @@ function plinth(W, D) {
 
 function waterfall() {
   const [fx, fz] = S.waterfall, g = new THREE.Group();
-  // Find the cliff top just north of the pool.
+  // Find the lip of the cliff just north of the pool.
   let top = 0, tz = fz;
-  for (let d = 0; d < 1.6; d += 0.05) { const h = groundAt(fx, fz - d); if (h > top) { top = h; tz = fz - d; } }
-  const hgt = Math.max(0.2, top - S.sea);
-  // Falling water: white and pale blue streaks that run down the cliff.
-  const c = document.createElement('canvas'); c.width = 64; c.height = 256;
-  const x = c.getContext('2d');
-  x.fillStyle = '#bfe6f3'; x.fillRect(0, 0, 64, 256);
-  for (let i = 0; i < 70; i++) { x.fillStyle = i % 3 ? 'rgba(255,255,255,0.85)' : 'rgba(160,214,234,0.9)'; const w = 2 + Math.random() * 5, px = Math.random() * 64, py = Math.random() * 256, len = 30 + Math.random() * 80; x.fillRect(px, py, w, len); if (py + len > 256) x.fillRect(px, py - 256, w, len); }
-  const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(1, 1.5); tex.colorSpace = THREE.SRGBColorSpace;
-  const mat = new THREE.MeshLambertMaterial({ map: tex, emissive: '#d9f3fb', emissiveIntensity: 0.35, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
-  const fall = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, hgt, 16, 1, true, -Math.PI * 0.55, Math.PI * 1.1), mat);
-  fall.position.set(fx, S.sea + hgt / 2, (tz + fz) / 2 + 0.05);
-  g.add(fall);
-  // Foam and spray at the bottom, bubbling.
-  const foam = new THREE.MeshLambertMaterial({ color: '#ffffff' }), bubbles = [];
-  for (let i = 0; i < 12; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.05 + (i % 4) * 0.018, 8, 6), foam); b.userData.base = new THREE.Vector3(fx + Math.cos(i * 2.4) * 0.22 * (0.4 + (i % 3) * 0.3), S.sea + 0.03, fz + 0.12 + Math.sin(i * 2.4) * 0.16); b.position.copy(b.userData.base); b.scale.y = 0.55; g.add(b); bubbles.push(b); }
+  for (let d = 0; d < 1.6; d += 0.04) { const h = groundAt(fx, fz - d); if (h > top) { top = h; tz = fz - d; } }
+  const bottom = S.sea + 0.02, hgt = Math.max(0.25, top - bottom);
+  // Streaky water: bright white ribbons over pale blue, drawn once and scrolled downwards.
+  const streaks = (seed, gaps) => {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 256;
+    const x = c.getContext('2d');
+    x.fillStyle = gaps ? 'rgba(0,0,0,0)' : '#cfeef8'; x.fillRect(0, 0, 128, 256);
+    let a = seed; const r = () => { a = (a * 16807) % 2147483647; return a / 2147483647; };
+    for (let i = 0; i < (gaps ? 50 : 90); i++) {
+      const w = 2 + r() * 7, px = r() * 128, py = r() * 256, len = 40 + r() * 120;
+      x.fillStyle = r() < 0.75 ? 'rgba(255,255,255,0.95)' : 'rgba(170,222,240,0.95)';
+      x.fillRect(px, py, w, len); if (py + len > 256) x.fillRect(px, py - 256, w, len);
+    }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  // A curved sheet that leaves the lip and drops into the pool, a little wider at the bottom.
+  const sheet = (width, out, tex, opacity) => {
+    const nx = 14, ny = 18, pos = [], uv = [], idx = [];
+    for (let j = 0; j <= ny; j++) {
+      const v = j / ny, y = top - v * hgt, z = tz + (fz + 0.14 - tz) * Math.pow(v, 0.55) + out * Math.sin(v * Math.PI) * 0.5, w = width * (0.85 + 0.3 * v);
+      for (let i = 0; i <= nx; i++) { const u = i / nx, xx = fx + (u - 0.5) * w; pos.push(xx, y, z + Math.sin(u * Math.PI) * 0.06); uv.push(u * 1.6, -v * 2.2); }
+    }
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx); geo.computeVertexNormals();
+    return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex, emissive: '#e6f7fc', emissiveIntensity: 0.45, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false }));
+  };
+  const t1 = streaks(7, false), t2 = streaks(31, true);
+  const back = sheet(0.62, 0.1, t1, 0.96), front = sheet(0.7, 0.16, t2, 0.9);
+  front.renderOrder = 3; back.renderOrder = 2;
+  g.add(back, front);
+  // A foamy white lip along the top.
+  const lip = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.56, 4, 10).rotateZ(Math.PI / 2), new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.2 }));
+  lip.position.set(fx, top + 0.02, tz + 0.02); g.add(lip);
+  // White water at the bottom.
+  const foam = new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.15 }), bubbles = [];
+  for (let i = 0; i < 20; i++) {
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.045 + (i % 5) * 0.015, 9, 7), foam);
+    const a = (i / 20) * Math.PI * 2, rr = 0.12 + (i % 4) * 0.08;
+    b.userData.base = new THREE.Vector3(fx + Math.cos(a) * rr * 1.6, bottom + 0.01, fz + 0.06 + Math.sin(a) * rr * 0.7);
+    b.position.copy(b.userData.base); g.add(b); bubbles.push(b);
+  }
+  // Spray rising and fading.
+  const sc = document.createElement('canvas'); sc.width = sc.height = 64;
+  const sx = sc.getContext('2d'), gr = sx.createRadialGradient(32, 32, 2, 32, 32, 30);
+  gr.addColorStop(0, 'rgba(255,255,255,0.85)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); sx.fillStyle = gr; sx.fillRect(0, 0, 64, 64);
+  const sprayTex = new THREE.CanvasTexture(sc), mist = [];
+  for (let i = 0; i < 10; i++) { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: sprayTex, transparent: true, depthWrite: false })); m.userData.ph = i / 10; m.userData.x = fx + (i % 5 - 2) * 0.14; g.add(m); mist.push(m); }
+  // Boulders round the pool and beside the fall.
+  const rock = [new THREE.MeshLambertMaterial({ color: '#bdb8af' }), new THREE.MeshLambertMaterial({ color: '#d2cdc4' })];
+  for (let i = 0; i < 11; i++) {
+    const a = (i / 11) * Math.PI * 2, rr = 0.5 + (i % 3) * 0.12;
+    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.07 + (i % 4) * 0.035, 0), rock[i % 2]);
+    const x = fx + Math.cos(a) * rr * 1.25, z = fz + 0.1 + Math.sin(a) * rr * 0.75;
+    if (z < tz + 0.1) continue;
+    b.position.set(x, Math.max(bottom, groundAt(x, z)) + 0.02, z); b.rotation.set(i, i * 2, 0); b.scale.y = 0.7; b.castShadow = true; g.add(b);
+  }
+  for (const side of [-1, 1]) { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.12, 0), rock[0]); b.position.set(fx + side * 0.42, top - 0.05, tz + 0.05); b.scale.set(1, 0.8, 0.9); b.castShadow = true; g.add(b); }
   // Ripples spreading over the pool.
   const ripples = [];
-  for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.24, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6, depthWrite: false })); r.position.set(fx, S.sea + 0.035, fz + 0.15); r.userData.ph = i / 3; g.add(r); ripples.push(r); }
+  for (let i = 0; i < 4; i++) { const r = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.25, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6, depthWrite: false })); r.position.set(fx, bottom + 0.016, fz + 0.12); r.scale.z = 0.7; r.userData.ph = i / 4; g.add(r); ripples.push(r); }
   let t = 0;
   g.userData.update = dt => {
     t += dt;
-    tex.offset.y += dt * 1.1;
-    bubbles.forEach((b, i) => { const k = (t * 1.6 + i * 0.37) % 1; b.position.y = b.userData.base.y + Math.sin(k * Math.PI) * 0.05; b.scale.setScalar(0.8 + Math.sin(k * Math.PI) * 0.35); b.scale.y *= 0.55; });
-    ripples.forEach(r => { const k = (t * 0.45 + r.userData.ph) % 1; r.scale.setScalar(1 + k * 3); r.material.opacity = 0.6 * (1 - k); });
+    t1.offset.y += dt * 0.9; t2.offset.y += dt * 1.45; t2.offset.x = Math.sin(t * 0.7) * 0.03;
+    bubbles.forEach((b, i) => { const k = (t * 1.4 + i * 0.29) % 1, e = Math.sin(k * Math.PI); b.position.y = b.userData.base.y + e * 0.05; const s2 = 0.75 + e * 0.45; b.scale.set(s2, s2 * 0.6, s2); });
+    mist.forEach(m => { const k = (t * 0.35 + m.userData.ph) % 1; m.position.set(m.userData.x + Math.sin(t + m.userData.ph * 9) * 0.05, bottom + 0.05 + k * 0.6, fz + 0.1); const s2 = 0.25 + k * 0.5; m.scale.set(s2, s2, 1); m.material.opacity = 0.7 * Math.sin(k * Math.PI); });
+    ripples.forEach(r => { const k = (t * 0.4 + r.userData.ph) % 1; r.scale.set(1 + k * 3.5, 1, (1 + k * 3.5) * 0.7); r.material.opacity = 0.55 * (1 - k); });
   };
   return g;
 }

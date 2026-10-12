@@ -36,6 +36,11 @@ export class PupilsView {
 
   // Draw the simulation state.
   update(day, dt, opts = {}) {
+    // When the camera is far away the children grow a little, so a six-year-old can still follow them.
+    const w = this.world;
+    const big = w.iso ? Math.min(1.35, Math.max(1, 1.2 / (w.ortho.zoom || 1))) : 1;
+    // Moving children need fresh shadows, ten times a second is plenty.
+    if (day.started && w.time - (this.shadowAt || 0) > 0.1) { this.shadowAt = w.time; w.markShadows(); }
     for (const p of day.pupils) {
       const it = this.items.get(p.name);
       if (!it) continue;
@@ -43,6 +48,7 @@ export class PupilsView {
       if (!it.root.visible) continue;
       const swim = p.anim === 'swim';
       it.root.position.set(p.pos.x, p.pos.y + (swim ? -0.1 : 0), p.pos.z);
+      it.root.scale.setScalar(big);
       // Turn smoothly to face the way they are going.
       let d = p.dir - it.kid.root.rotation.y;
       while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;

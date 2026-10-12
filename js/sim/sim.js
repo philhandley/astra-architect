@@ -199,6 +199,7 @@ export class Day {
       if (ins.kind === 'again') {
         const times = ins.arg === 'forever' ? 99 : (+ins.arg || 2);
         const c = p.loops[p.pc] || 0;
+        p.loopMark = { tile: p.pc, lap: Math.min(times, c + 1), n: (p.loopMark?.n || 0) + 1 };
         if (c < times - 1) {
           p.loops[p.pc] = c + 1;
           let start = 0;
@@ -358,8 +359,8 @@ export function report(day) {
     const noway = st.filter(s => s.why === 'noway');
     const full = st.filter(s => s.why === 'full');
     if (noroom.length >= Math.max(1, P.length * 0.5)) lines.push({ kind: 'fix', emoji: ACTIVITIES[act]?.emoji || '❓', text: `There was nowhere for ${actName(act)}, so ${act === 'eat' ? 'everyone got hungry' : 'it was cancelled'}. Which room would help?` });
-    else if (noway.length) lines.push({ kind: 'fix', emoji: '🪜', text: `${say1(noway.length, 'One pupil', '# pupils')} couldn't get to the ${roomName(noway[0].what)}. How could they get there?` });
-    else if (full.length) lines.push({ kind: 'fix', emoji: '😟', text: `The ${roomName(full[0].what)} was too small: ${say1(full.length, 'one pupil', '# pupils')} had to wait outside.` });
+    else if (noway.length) lines.push({ kind: 'fix', emoji: '🪜', room: noway[0].what, why: 'noway', text: `${say1(noway.length, 'One pupil', '# pupils')} couldn't get to the ${roomName(noway[0].what)}. How could they get there?` });
+    else if (full.length) lines.push({ kind: 'fix', emoji: '😟', room: full[0].what, why: 'full', text: `The ${roomName(full[0].what)} was too small: ${say1(full.length, 'one pupil', '# pupils')} had to wait outside.` });
     else lines.push({ kind: 'good', emoji: ACTIVITIES[act]?.emoji || '✅', text: `${capital(actName(act))}: everyone ${act === 'learn' ? 'learned something' : act === 'eat' ? 'had lunch' : act === 'look' ? 'saw the fish' : 'joined in'}!` });
   });
   // Coders.
@@ -368,7 +369,7 @@ export function report(day) {
     if (s) lines.push({ kind: 'fix', emoji: '🧩', text: `${p.name}'s code got stuck: ${stuckWhy(s)}` });
     else lines.push({ kind: 'good', emoji: '🧩', text: `${p.name}'s code worked!${p.did.slide ? ` ${p.name} went down the slide ${numberWord(p.did.slide)} time${p.did.slide > 1 ? 's' : ''}.` : ''}` });
   }
-  if (day.events.some(e => e.type === 'trackGap')) lines.push({ kind: 'fix', emoji: '🏃', text: 'The running track had a gap, so the runners had to turn back. Can you join it into a loop?' });
+  if (day.events.some(e => e.type === 'trackGap')) lines.push({ kind: 'fix', emoji: '🏃', room: 'track', why: 'gap', text: 'The running track had a gap, so the runners had to turn back. Can you join it into a loop?' });
   // Noise next door.
   const lib = day.groups.find(g => g.room === 'library');
   if (lib) {

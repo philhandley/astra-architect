@@ -30,6 +30,28 @@ const POLE = once(() => new THREE.CylinderGeometry(0.012, 0.012, 0.72, 6));
 const FLAG = once(() => { const s = new THREE.Shape(); s.moveTo(0, 0.1); s.lineTo(0.3, 0); s.lineTo(0, -0.1); s.lineTo(0, 0.1); return new THREE.ShapeGeometry(s); });
 const SIGN_GEO = once(() => new THREE.CircleGeometry(0.13, 24));
 
+const BLOB_GEO = () => { if (!BLOB_GEO.g) { BLOB_GEO.g = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2); BLOB_GEO.g.userData.cached = true; } return BLOB_GEO.g; };
+let BLOB_MAT = null;
+function blobMat() {
+  if (BLOB_MAT) return BLOB_MAT;
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.shadowColor = 'rgba(40,34,24,1)'; x.shadowBlur = 22; x.fillStyle = 'rgba(40,34,24,1)';
+  x.beginPath(); x.roundRect(28, 28, 72, 72, 10); x.fill();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  BLOB_MAT = KEEP.keep(new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, clippingPlanes: CLIP }));
+  return BLOB_MAT;
+}
+function openCourt(idx, hole, level) {
+  const xs = hole.map(p => p[0]), zs = hole.map(p => p[1]);
+  const inside = (px, pz) => { let c = false; for (let i = 0, j = hole.length - 1; i < hole.length; j = i++) { const [xi, zi] = hole[i], [xj, zj] = hole[j]; if ((zi > pz) !== (zj > pz) && px < (xj - xi) * (pz - zi) / (zj - zi) + xi) c = !c; } return c; };
+  for (let z = Math.floor(Math.min(...zs)); z < Math.max(...zs); z++) for (let x = Math.floor(Math.min(...xs)); x < Math.max(...xs); x++) {
+    if (!inside(x + 0.5, z + 0.5)) continue;
+    if (idx.occ.has(key(x, z, level))) return false;
+    if (level > 0) { const b = idx.occ.get(key(x, z, level - 1)); if (!b || FORMS[b.form].top !== 'flat') return false; }
+  }
+  return true;
+}
 function courtyard(hole, y0) {
   const g = new THREE.Group();
   const toV = p => new THREE.Vector2(p[0], -p[1]);
@@ -154,31 +176,32 @@ export class DesignView {
     if (mode === 'blocks') this.buildBlocks(idx);
     else this.buildBuilding(idx, mode === 'cutaway');
     this.drawPaths(idx);
+    this.world.markShadows();
   }
 
   pickables() { return [...this.byId.values()]; }
 
   // A new block lands with a squash and a stretch (it bounces back to normal in a third of a second).
-  bounce(id) {
-    const objs = this.group.children.filter(o => o.userData.cellId === id || (o.userData.cells && o.userData.cells.includes(id)));
-    if (!objs.length) return;
+  // Only toy blocks squash (each is its own little group); returns false in Building mode.
+  bounce(id, amp = 1) {
+    if (this.mode !== 'blocks') return false;
+    const o = this.byId.get(id);
+    if (!o) return false;
+    if (this.bouncing) this.bouncing();
+    const base = o.userData.base || (o.userData.base = { y: o.position.y, sx: o.scale.x, sy: o.scale.y, sz: o.scale.z });
     let t = 0;
-    const base = objs.map(o => ({ o, y: o.position.y, sy: o.scale.y, sx: o.scale.x, sz: o.scale.z }));
-    let low = Infinity;
-    objs.forEach(o => { const b = new THREE.Box3().setFromObject(o); if (isFinite(b.min.y)) low = Math.min(low, b.min.y); });
-    if (!isFinite(low)) low = 0;
+    const reset = () => { o.scale.set(base.sx, base.sy, base.sz); o.position.y = base.y; this.world.updaters.delete(fn); this.bouncing = null; };
     const fn = dt => {
       t += dt;
       const k = Math.min(1, t / 0.34);
-      const sq = k < 0.35 ? 1 - 0.18 * Math.sin(k / 0.35 * Math.PI / 2) : 1 + 0.1 * Math.sin((k - 0.35) / 0.65 * Math.PI) * (1 - k);
+      const sq = k < 0.35 ? 1 - 0.18 * amp * Math.sin(k / 0.35 * Math.PI / 2) : 1 + 0.1 * amp * Math.sin((k - 0.35) / 0.65 * Math.PI) * (1 - k);
       const wide = 1 + (1 - sq) * 0.5;
-      for (const b of base) {
-        b.o.scale.set(b.sx * wide, b.sy * sq, b.sz * wide);
-        b.o.position.y = low + (b.y - low) * sq;
-      }
-      if (k >= 1) { for (const b of base) { b.o.scale.set(b.sx, b.sy, b.sz); b.o.position.y = b.y; } this.world.updaters.delete(fn); }
+      o.scale.set(base.sx * wide, base.sy * sq, base.sz * wide);
+      if (k >= 1) reset();
     };
+    this.bouncing = reset;
     this.world.updaters.add(fn);
+    return true;
   }
 
   // Overlapping sandy octagons make a soft, continuous path.
@@ -356,7 +379,16 @@ export class DesignView {
         this.flags.push(cloth);
       }
       // A courtyard closed in by the room becomes a little garden with a tree (like Townscaper).
-      for (const hole of L.holes) this.group.add(courtyard(hole, y0));
+      for (const hole of L.holes) if (!cut && openCourt(idx, hole, g.level)) this.group.add(courtyard(hole, y0));
+      // A soft contact shadow under the room, so it sits on the ground whatever the sun is doing.
+      if (!cut) {
+        const bw = L.bbox.x1 - L.bbox.x0, bd = L.bbox.z1 - L.bbox.z0;
+        const blob = new THREE.Mesh(BLOB_GEO(), blobMat());
+        blob.scale.set(bw / 0.56 * 1.06, 1, bd / 0.56 * 1.06);
+        blob.position.set((L.bbox.x0 + L.bbox.x1) / 2, y0 + 0.008, (L.bbox.z0 + L.bbox.z1) / 2);
+        blob.renderOrder = 1;
+        this.group.add(blob);
+      }
       // A round sign with the room's picture high on the sunny side.
       if (g.room !== 'stairs' && style.win !== 'face' && !cut) {
         const seg = L.segs.filter(sg => sg.len > 0.35).sort((p2, q2) => (q2.n[0] * 0.6 + q2.n[1] * 0.8) - (p2.n[0] * 0.6 + p2.n[1] * 0.8))[0];
@@ -472,7 +504,7 @@ export class DesignView {
     if (c.form === 'roof') { add(formGeometry('roof', 'building'), new THREE.MeshLambertMaterial({ color: '#b5523b', clippingPlanes: CLIP })); return g; }
 
     const aquarium = c.room === 'aquarium';
-    const mat = aquarium ? new THREE.MeshLambertMaterial({ color: '#7fd3d0', emissive: '#0d5f63', emissiveIntensity: 0.3, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, clippingPlanes: CLIP }) : materialFor(c, 'building');
+    const mat = aquarium ? (AQUA || (AQUA = KEEP.keep(new THREE.MeshLambertMaterial({ color: '#7fd3d0', emissive: '#0d5f63', emissiveIntensity: 0.3, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, clippingPlanes: CLIP })))) : materialFor(c, 'building');
     const body = add(formGeometry(c.form, 'building'), this.cut ? seeThrough(mat) : mat);
     if (this.cut) body.castShadow = false;
     if (aquarium) {
@@ -578,6 +610,7 @@ export class DesignView {
         im.castShadow = false;
         im.receiveShadow = true;
         this.group.add(im);
+        this.world.markShadows();
       }
     }
   }
@@ -658,6 +691,7 @@ function mergeBoxes(geos) {
 
 export { mix };
 
+let AQUA = null;
 const stCache = new Map();
 // A see-through copy of a material, for the doll's-house cutaway during the school day.
 function seeThrough(m) {

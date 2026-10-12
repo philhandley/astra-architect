@@ -25,8 +25,28 @@ export function outdoorAt(idx, x, z, l) {
 
 // Doors: for every room group, a few faces onto outdoor places, preferring the north and west sides
 // (so windows look south and east, towards the sun and the sea).
+// Ground cells you can walk to from the gate (flood fill), so doors face the open site, not a closed pocket.
+function groundReach(idx) {
+  const S = site();
+  const [gx, gz] = S.gate;
+  const seen = new Set([`${gx},${gz}`]);
+  const todo = [[gx, gz]];
+  while (todo.length) {
+    const [x, z] = todo.pop();
+    for (const [dx, dz] of DIRS) {
+      const nx = x + dx, nz = z + dz, k = `${nx},${nz}`;
+      if (seen.has(k) || nx < 0 || nz < 0 || nx >= S.w || nz >= S.d) continue;
+      if (!outdoorAt(idx, nx, nz, 0)) continue;
+      seen.add(k); todo.push([nx, nz]);
+    }
+  }
+  return seen;
+}
+
 export function computeDoors(idx) {
   const doors = new Map();                       // "x,z,l,dx,dz" -> { x, z, l, dx, dz, room }
+  const reach = groundReach(idx);
+  const opens = d => (d.l > 0 || reach.has(`${d.x + d.dx},${d.z + d.dz}`) ? 1 : 0);
   for (const g of roomGroups(idx)) {
     const sample = idx.occ.get(key(g.cells[0].x, g.cells[0].z, g.level));
     if (!isRoomCell(sample)) continue;
@@ -44,7 +64,7 @@ export function computeDoors(idx) {
     if (!cands.length) continue;
     // Arch tunnels are open at both ends; other rooms get one door per three cells.
     if (sample.form === 'arch') { for (const d of cands) doors.set(dkey(d), d); continue; }
-    cands.sort((a, b) => a.pri - b.pri || a.z - b.z || a.x - b.x);
+    cands.sort((a, b) => opens(b) - opens(a) || a.pri - b.pri || a.z - b.z || a.x - b.x);
     const want = Math.max(1, Math.ceil(g.cells.length / 3));
     const chosen = [];
     for (const d of cands) {

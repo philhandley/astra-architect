@@ -50,6 +50,10 @@ export async function openDayPanel(api, world, root, opts = {}) {
   lrail.style.display = 'none';
   rrail.style.display = 'none';
   if (tright) tright.style.display = 'none';
+  const chipsEl = root.querySelector('.brief-chips'), oldChips = chipsEl ? chipsEl.style.display : '';
+  if (chipsEl) chipsEl.style.display = 'none';
+  const stepBack = document.querySelector('.runner .back-btn'), oldBack = stepBack ? stepBack.style.visibility : '';
+  if (stepBack) stepBack.style.visibility = 'hidden';
   shift();
   api.frameModel(false, false, true);
   api.setCutaway(true);
@@ -66,7 +70,7 @@ export async function openDayPanel(api, world, root, opts = {}) {
     bellsEl.innerHTML = '';
     S.bells.slice(0, BELLS).forEach((a, i) => {
       const cur = running && day.mode === 'day' ? day.bell : -1;
-      const b = h(`<button class="bell ${i === cur ? 'now' : ''} ${cur > i ? 'past' : ''}" type="button" aria-label="Bell ${i + 1}: ${esc(ACTIVITIES[a]?.name || a)}"><span class="n">${i + 1}</span>${emo(ACTIVITIES[a]?.emoji || '❓')}<span>${esc(ACTIVITIES[a]?.name || a)}</span></button>`);
+      const b = h(`<button class="bell ${i === cur ? 'now' : ''} ${cur > i ? 'past' : ''} ${!running && tab === 'bells' && i === bellPick ? 'pick' : ''}" type="button" aria-label="Bell ${i + 1}: ${esc(ACTIVITIES[a]?.name || a)}"><span class="n">${i + 1}</span>${emo(ACTIVITIES[a]?.emoji || '❓')}<span>${esc(ACTIVITIES[a]?.name || a)}</span></button>`);
       b.addEventListener('click', () => { if (running) return; tab = 'bells'; bellPick = i; drawBody(); sfx.tap(); say(`Bell ${i + 1}: ${ACTIVITIES[a]?.name}. Choose what happens at this bell.`); });
       bellsEl.append(b);
     });
@@ -76,7 +80,7 @@ export async function openDayPanel(api, world, root, opts = {}) {
   function drawCtl() {
     ctl.innerHTML = '';
     if (!running) {
-      if (opts.codeOnly) return;
+      if (opts.codeOnly || tab === 'report') return;
       const run = h(`<button class="btn go" type="button">${icon('play')} Run the day</button>`);
       run.addEventListener('click', () => startRun('day'));
       ctl.append(run);
@@ -96,6 +100,7 @@ export async function openDayPanel(api, world, root, opts = {}) {
   function drawBody() {
     body.innerHTML = ''; dtabs.innerHTML = ''; pslot.innerHTML = ''; codeact.innerHTML = '';
     if (tab === 'report') return drawReport();
+    if (running && day.mode === 'day') return;
     const tb = (id, ic, label) => { const b = h(`<button class="btn small ${tab === id ? '' : 'ghost'}" type="button">${emo(ic)} ${label}</button>`); b.addEventListener('click', () => { tab = id; drawBody(); }); return b; };
     if (!opts.codeOnly) dtabs.append(tb('code', '🧩', 'Code'), tb('bells', '🔔', 'Timetable'));
     if (tab === 'bells') return drawTimetable();
@@ -111,7 +116,7 @@ export async function openDayPanel(api, world, root, opts = {}) {
     }
     if (kind === 'do') return `<button class="ctile do ${cls}" type="button" data-i="${i}">${emo(ACTIVITIES[arg]?.emoji || '❓')}<span>${esc(ACTIVITIES[arg]?.name || arg)}</span></button>`;
     if (kind === 'wait') return `<button class="ctile wait ${cls}" type="button" data-i="${i}">${emo(arg === 'bell' ? '🔔' : '⏳')}<span>${arg === 'bell' ? 'Wait for bell' : 'Wait'}</span></button>`;
-    if (kind === 'again') return `<button class="ctile again ${cls}" type="button" data-i="${i}">${emo('🔁')}<span class="dots3">${arg === 'forever' ? '<b style="font-size:16px">∞</b>' : '<i></i>'.repeat(+arg || 2)}</span></button>`;
+    if (kind === 'again') return `<button class="ctile again ${cls}" type="button" data-i="${i}">${emo('🔁')}<span class="dots3">${arg === 'forever' ? '<b style="font-size:16px">∞</b>' : '<i></i>'.repeat(+arg || 2)}</span><span>Again</span></button>`;
     return '';
   }
   const tileSay = t => {
@@ -135,7 +140,8 @@ export async function openDayPanel(api, world, root, opts = {}) {
     const strip = h(`<div class="strip"></div>`);
     const st = S.pupils[sel].strip || (S.pupils[sel].strip = []);
     strip.innerHTML = `<div class="ctile start">${emo('🚩')}<span>Start</span></div>` + st.map((t, i) => tileHTML(t, i, running && day.pupils[sel]?.tileNow === i ? 'now' : '')).join('') +
-      (st.length < MAX_TILES ? `<div style="color:var(--ink-3);font-size:16px;padding:0 10px">${st.length ? 'Tap a tile to take it off.' : `Tap the tiles below to tell ${esc(P[sel].name)} what to do.`}</div>` : '');
+      (st.length < MAX_TILES ? `<div style="color:var(--ink-3);font-size:16px;padding:0 10px">${st.length ? 'Tap a tile to take it off.' : `Tap the tiles below to tell ${esc(P[sel].name)} what to do.`}</div>` : '') +
+      `<div class="tcount ${st.length >= MAX_TILES ? 'full' : ''}" aria-label="${st.length} of ${MAX_TILES} tiles">${'<i class="on"></i>'.repeat(st.length)}${'<i></i>'.repeat(MAX_TILES - st.length)}</div>`;
     strip.querySelectorAll('.ctile[data-i]').forEach(b => b.addEventListener('click', () => {
       if (running) return;
       const i = +b.dataset.i;
@@ -162,14 +168,16 @@ export async function openDayPanel(api, world, root, opts = {}) {
     const rowGo = h(`<div class="trow"><span class="tlabel">${emo('🚶')}<b>Go to</b></span></div>`);
     const rowDo = h(`<div class="trow"><span class="tlabel">${emo('🤸')}<b>Do</b></span></div>`);
     tray.append(rowGo, rowDo);
+    if (running) tray.style.display = 'none';
     for (const [kind, list] of groups) {
       const g = h(`<div class="grp"></div>`);
       (kind === 'go' ? rowGo : rowDo).append(g);
-      for (const t of list) {
-        const b = h(tileHTML(t, -1, 'small'));
+      for (const t of list.filter(x => !opts.tiles || opts.tiles.some(p => x.startsWith(p)))) {
+        const b = h(tileHTML(t, -1, opts.tiles ? 'mid' : 'small'));
         b.addEventListener('click', () => {
           if (running) return;
           say(tileSay(t));
+          if (t.startsWith('go:') && t !== 'go:gate') api.pulseRoom(t.slice(3));
           if (st.length >= MAX_TILES) { sfx.no(); toast('That is a long program! Take a tile off first.'); return; }
           st.push(t); store.save(); sfx.pop(); drawBody(); api.emit('codeChange', { pupil: sel, strip: [...st] });
         });
@@ -191,11 +199,11 @@ export async function openDayPanel(api, world, root, opts = {}) {
   }
 
   function drawTimetable() {
-    body.append(h(`<p class="muted" style="margin:0;font-size:18px">Pupils without code follow the bells. Tap a bell at the top, then choose what happens. Now choosing for bell ${bellPick + 1}.</p>`));
+    body.append(h(`<p class="muted" style="margin:0;font-size:19px">${emo('🔔')} <b>Bell ${bellPick + 1}.</b> What happens now? Tap a picture.</p>`));
     const row = h(`<div class="ctray"></div>`);
     for (const a of ACTIVITY_ORDER) {
       const b = h(`<button class="ctile do small ${S.bells[bellPick] === a ? 'now' : ''}" type="button">${emo(ACTIVITIES[a].emoji)}<span>${esc(ACTIVITIES[a].name)}</span></button>`);
-      b.addEventListener('click', () => { S.bells[bellPick] = a; store.save(); sfx.pop(); say(`Bell ${bellPick + 1}: ${ACTIVITIES[a].name}.`); bellPick = (bellPick + 1) % BELLS; drawBells(); drawBody(); api.emit('bellSet', { bells: [...S.bells] }); });
+      b.addEventListener('click', () => { S.bells[bellPick] = a; store.save(); sfx.pop(); const was = bellPick + 1; bellPick = (bellPick + 1) % BELLS; say(`Bell ${was}: ${ACTIVITIES[a].name}. Bell ${bellPick + 1}. What happens now?`); drawBells(); drawBody(); api.emit('bellSet', { bells: [...S.bells] }); });
       row.append(b);
     }
     body.append(row);
@@ -208,14 +216,26 @@ export async function openDayPanel(api, world, root, opts = {}) {
     const head = h(`<div class="row"><h3 style="flex:1">${r.title}</h3></div>`);
     const sp = h(`<button class="speak-btn" type="button" aria-label="Read the report">${icon('speaker')}</button>`);
     sp.addEventListener('click', () => say([r.title, ...r.lines.map(l => l.text), r.question].join(' '), sp));
-    const again = h(`<button class="btn go small" type="button">${icon('refresh')} Run it again</button>`);
+    const again = h(`<button class="btn ${r.mode === 'try' ? 'ghost' : 'go'} small" type="button">${icon('refresh')} ${r.mode === 'try' ? 'Try again' : 'Run the day again'}</button>`);
     again.addEventListener('click', () => startRun(r.mode));
-    const back = h(`<button class="btn ghost small" type="button">${icon('back')} Back</button>`);
-    back.addEventListener('click', () => { tab = r.mode === 'try' ? 'code' : 'code'; drawBody(); });
-    head.append(sp, back, again);
+    head.append(sp);
+    if (r.mode === 'try') {
+      const change = h(`<button class="btn go small" type="button">${emo('🧩')} Change the code</button>`);
+      change.addEventListener('click', () => { tab = 'code'; drawBody(); drawCtl(); });
+      head.append(change);
+    }
+    head.append(again);
     box.append(head);
     const grid = h(`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:210px;overflow-y:auto"></div>`);
-    for (const l of r.lines) grid.append(h(`<div class="line ${l.kind === 'good' ? 'good' : l.kind === 'fix' ? 'fix' : ''}">${emo(l.emoji)}<span>${esc(l.text)}</span></div>`));
+    for (const l of r.lines) {
+      const line = h(`<div class="line ${l.kind === 'good' ? 'good' : l.kind === 'fix' ? 'fix' : ''}">${emo(l.emoji)}<span>${esc(l.text)}</span></div>`);
+      if (l.kind === 'fix' && l.room && r.mode === 'day') {
+        const fix = h(`<button class="btn small fixit" type="button">${emo('🔧')} Fix it</button>`);
+        fix.addEventListener('click', () => { close(); api.fixRoom && api.fixRoom(l.room, l.why); });
+        line.append(fix);
+      }
+      grid.append(line);
+    }
     box.append(grid);
     box.append(h(`<div class="line" style="background:var(--blue-soft)">${emo('💬')}<span><b>Talk about it:</b> ${esc(r.question)}</span></div>`));
     body.append(box);
@@ -232,7 +252,7 @@ export async function openDayPanel(api, world, root, opts = {}) {
     q.querySelector('.row').append(skip);
     const row = q.querySelector('.ctray');
     for (const r of ['gate', ...rooms]) {
-      const b = h(`<button class="opt" type="button">${emo(r === 'gate' ? '🚪' : ROOMS[r].emoji)}<span>${esc(r === 'gate' ? 'Gate' : ROOMS[r].name)}</span></button>`);
+      const b = h(`<button class="opt guess" type="button">${r === 'gate' ? emo('🚪') : `<span class="blk">${formIcon(ROOMS[r].form, 'iso', ROOMS[r].colour)}</span>`}<span>${esc(r === 'gate' ? 'Gate' : ROOMS[r].name)}</span></button>`);
       b.addEventListener('click', () => { predicted = r; sfx.tap(); startRun('try'); });
       row.append(b);
     }
@@ -250,6 +270,7 @@ export async function openDayPanel(api, world, root, opts = {}) {
     else sfx.whoosh();
     view.ensure(day.pupils).then(() => day.start());
     drawCtl(); drawBells(); drawBody();
+    requestAnimationFrame(() => requestAnimationFrame(() => api.frameModel(false, false, true)));
     api.emit(mode === 'try' ? 'tryStart' : 'dayStart');
   }
   function stopRun() {
@@ -257,7 +278,7 @@ export async function openDayPanel(api, world, root, opts = {}) {
     day = new Day(api.idx, pupils(), S.bells, {});
     drawCtl(); drawBells(); drawBody();
   }
-  let lastBell = -1, lastTile = -1;
+  let lastBell = -1, lastTile = -1, lastLoop = -1;
   const tick = (dt) => {
     if (!running || paused) { view.update(day, dt, { selected: pupils()[sel]?.name, names: !running }); return; }
     let t = dt * speed;
@@ -276,6 +297,25 @@ export async function openDayPanel(api, world, root, opts = {}) {
     } else {
       const p = day.pupils[sel];
       clock.textContent = p ? `${p.name}'s code` : '';
+      // The camera follows the pupil being tried, a little closer, so Finn can watch his code run.
+      if (p && p.active) {
+        const c = world.controls, k = Math.min(1, dt * 2.5);
+        const dx = (p.pos.x - c.target.x) * k, dy = (p.pos.y - c.target.y) * k, dz = (p.pos.z - c.target.z) * k;
+        c.target.x += dx; c.target.y += dy; c.target.z += dz;
+        const cam = world.iso ? world.ortho : world.cam;
+        cam.position.x += dx; cam.position.y += dy; cam.position.z += dz;
+        if (world.iso && world.ortho.zoom < 2.2) { world.ortho.zoom += (2.2 - world.ortho.zoom) * k * 0.6; world.ortho.updateProjectionMatrix(); }
+      }
+      if (p && p.loopMark && p.loopMark.n !== lastLoop) {
+        lastLoop = p.loopMark.n;
+        const tEl = body.querySelector(`.strip .ctile[data-i="${p.loopMark.tile}"]`);
+        if (tEl) {
+          tEl.classList.add('now', 'lap');
+          tEl.querySelectorAll('.dots3 i').forEach((d, k) => d.classList.toggle('on', k < p.loopMark.lap));
+          setTimeout(() => tEl.classList.remove('lap'), 600);
+          sfx.chime();
+        }
+      }
       if (p && p.tileNow !== lastTile) {
         lastTile = p.tileNow;
         body.querySelectorAll('.strip .ctile[data-i]').forEach(b => b.classList.toggle('now', +b.dataset.i === p.tileNow));
@@ -326,6 +366,8 @@ export async function openDayPanel(api, world, root, opts = {}) {
     view.clear();
     el.remove();
     lrail.style.display = oldL;
+    if (chipsEl) chipsEl.style.display = oldChips;
+    if (stepBack) stepBack.style.visibility = oldBack;
     rrail.style.display = oldR;
     if (tright) tright.style.display = oldT;
     hush();

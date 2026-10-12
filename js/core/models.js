@@ -25,6 +25,7 @@ export function litMaterial(m, extra = {}) {
     const tint = extra.tint;
     const rest = { ...extra };
     delete rest.tint;
+    delete rest.maxW;
     const base = m.color ? m.color.clone() : new THREE.Color(0xffffff);
     const lm = new THREE.MeshLambertMaterial({ color: tint === 'nature' ? natureTint(base) : base, map: m.map || null, ...rest });
     if (lm.map) lm.map.colorSpace = THREE.SRGBColorSpace;

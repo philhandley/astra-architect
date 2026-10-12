@@ -28,7 +28,7 @@ export function makeKid({ colour = '#2f6fe4', seed = 0 } = {}) {
   const root = new THREE.Group();     // placed and turned in the world
   const fig = new THREE.Group();      // bobs up and down, lies flat to swim
   root.add(fig);
-  const add = (parent, g, m, x = 0, y = 0, z = 0) => { const mesh = new THREE.Mesh(g, m); mesh.castShadow = true; mesh.position.set(x, y, z); parent.add(mesh); return mesh; };
+  const add = (parent, g, m, x = 0, y = 0, z = 0) => { const mesh = new THREE.Mesh(g, m); mesh.castShadow = false; mesh.position.set(x, y, z); parent.add(mesh); return mesh; };
 
   // Legs hang from hip pivots.
   const legGeo = geo('leg', () => new THREE.CapsuleGeometry(0.06, 0.12, 3, 8));
@@ -40,7 +40,7 @@ export function makeKid({ colour = '#2f6fe4', seed = 0 } = {}) {
   const body = new THREE.Group();
   body.position.y = 0.24;
   fig.add(body);
-  add(body, geo('body', () => new THREE.CapsuleGeometry(0.165, 0.16, 4, 12)), mat(colour), 0, 0.2, 0);
+  add(body, geo('body', () => new THREE.CapsuleGeometry(0.165, 0.16, 4, 12)), mat(colour), 0, 0.2, 0).castShadow = true;
   if (skirt) add(body, geo('skirt', () => new THREE.ConeGeometry(0.235, 0.15, 14, 1, true)), mat(shade(colour, 0.72)), 0, 0.06, 0);
   else add(body, geo('shorts', () => new THREE.BoxGeometry(0.3, 0.12, 0.2)), mat(legC), 0, 0.02, 0);
   add(body, geo('pack', () => new THREE.BoxGeometry(0.2, 0.24, 0.1)), mat(packC), 0, 0.2, -0.2);
@@ -55,7 +55,7 @@ export function makeKid({ colour = '#2f6fe4', seed = 0 } = {}) {
   const head = new THREE.Group();
   head.position.y = 0.52;
   body.add(head);
-  add(head, geo('head', () => new THREE.SphereGeometry(0.24, 18, 12)), mat(skin));
+  add(head, geo('head', () => new THREE.SphereGeometry(0.24, 18, 12)), mat(skin)).castShadow = true;
   const eyeGeo = geo('eye', () => new THREE.SphereGeometry(0.03, 8, 6));
   const eyes = [add(head, eyeGeo, mat('#1f1f23'), -0.085, 0.03, 0.215), add(head, eyeGeo, mat('#1f1f23'), 0.085, 0.03, 0.215)];
   const mouth = add(head, geo('mouth', () => new THREE.TorusGeometry(0.06, 0.013, 6, 12, Math.PI)), mat('#8c2f39'), 0, -0.06, 0.225);

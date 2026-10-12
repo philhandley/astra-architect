@@ -52,7 +52,7 @@ async function renderViews(idx) {
   const prevMode = dv.mode;
   const saved = { pos: world.cam.position.clone(), target: world.controls.target.clone(), camera: world.camera, shift: world.viewShift || 0, fog: world.scene.fog, bg: world.scene.background, sky: world.sky.visible };
   world.setViewShift(0);
-  world.scene.fog = null;
+  world.scene.fog = world.noFog;
   dv.sync(idx, 'building');
   const b = bounds(idx.design) || { x0: 8, x1: 28, z0: 20, z1: 36, l1: 1, cx: 18, cz: 28 };
   const r = world.renderer;

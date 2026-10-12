@@ -45,6 +45,7 @@ export function styleOf(cells) {
   return { ...BASE, ...(DEFAULT_STYLE[room] || {}), ...own };
 }
 
+const BOX_FORMS = new Set(['cube', 'long', 'tower', 'steps']);
 export const LIFT = 0.28;                 // how high legs raise a room
 // A room stands on legs only on the ground and with nothing on top. The whole room shares one answer.
 export function liftOf(c, idx) {
@@ -59,8 +60,11 @@ function liftedCells(idx) {
     if (g.level !== 0) continue;
     const dc = [...g.forms].map(id => idx.byId.get(id)).filter(Boolean);
     if (!styleOf(dc).legs) continue;
-    if (g.cells.some(p => idx.occ.has(key(p.x, p.z, 1)))) continue;
-    for (const c of dc) out.add(c.id);
+    const box = g.cells.filter(p => { const o = idx.occ.get(key(p.x, p.z, 0)); return o && BOX_FORMS.has(o.form); });
+    for (const part of splitParts(box)) {
+      if (part.some(p => idx.occ.has(key(p.x, p.z, 1)))) continue;
+      for (const p of part) out.add(idx.occ.get(key(p.x, p.z, 0)).id);
+    }
   }
   return out;
 }
@@ -230,7 +234,7 @@ export function layoutGroup(group, idx, doors, style, { cut = false } = {}) {
     if (n && n.room === group.room) continue;
     if (!doors.has(k)) continue;
     const p = nearestOn(segs, x + 0.5 + dx * 0.5, z + 0.5 + dz * 0.5);
-    if (p) doorPts.push({ ...p, outside: !n, dx, dz });
+    if (p) doorPts.push({ ...p, outside: !isRoomish(n), dx, dz });
   }
   // Windows evenly along the walls, keeping clear of corners and doors.
   const windows = [];

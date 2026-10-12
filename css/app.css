@@ -493,3 +493,49 @@ img.emo { width: 1.25em; height: 1.25em; vertical-align: -0.25em; display: inlin
 .ctray .trow, .ctray.rows .grp { gap: 4px; }
 .ctray.rows .grp { padding-right: 6px; margin-right: 2px; }
 .day .btn.gobtn { min-height: 60px; font-size: 22px; }
+
+.sayline { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 700; background: var(--paper); padding: 6px 18px 6px 6px; border-radius: 999px; box-shadow: var(--shadow); }
+.hand-hint { position: absolute; left: 50%; top: 150px; z-index: 5; pointer-events: none; animation: handmove 2.2s ease-in-out infinite; }
+.hand-hint img { width: 72px; height: 72px; filter: drop-shadow(0 4px 6px rgba(0,0,0,.3)); }
+.hand-hint.two { animation-name: handhoop; }
+@keyframes handmove { 0% { transform: translate(-120px, 0); } 40% { transform: translate(-120px, 10px) scale(.9); } 100% { transform: translate(-260px, 300px); } }
+@keyframes handhoop { 0%, 100% { transform: translate(-260px, 260px); } 50% { transform: translate(-260px, 290px) scale(.9); } }
+
+.tasks.nudge { animation: nudge 1.4s ease-in-out infinite; }
+.tasks.nudge .speak-btn { background: var(--blue); color: #fff; box-shadow: none; }
+@keyframes nudge { 0%, 100% { transform: rotate(0); } 10% { transform: rotate(-2deg) scale(1.03); } 20% { transform: rotate(2deg) scale(1.03); } 30% { transform: rotate(0); } }
+.strip .tcount { margin-left: auto; display: grid; grid-template-columns: repeat(4, 12px); gap: 4px; padding: 0 6px; flex: none; }
+.strip .tcount i { width: 12px; height: 12px; border-radius: 4px; background: var(--line); }
+.strip .tcount i.on { background: var(--blue); }
+.strip .tcount.full i.on { background: var(--orange); }
+
+/* Round 2 */
+.tgroup.hint { animation: hintpulse 1.2s ease-in-out infinite; }
+@keyframes hintpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(47,111,228,.55); } 50% { box-shadow: 0 0 0 6px rgba(47,111,228,0); background: var(--blue-soft); } }
+.tasks.picks .tnow::after { content: 'Tap me!'; margin-left: 6px; font-size: 13px; font-weight: 800; color: var(--blue); background: var(--blue-soft); padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+.tray .shape-strip { grid-column: 1 / -1; box-shadow: none; background: var(--paper-2); border-radius: 20px; padding: 8px; justify-content: flex-start; gap: 6px; }
+.tray .shape-strip .tt { flex-basis: 100%; }
+.tray .shape-btn { width: 60px; height: 64px; font-size: 10px; }
+.tray .shape-btn svg { width: 40px; height: 40px; }
+.tray .shape-btn.turn svg { width: 26px; height: 26px; }
+.sheet-panel.style-panel { left: auto; right: 100px; top: 84px; bottom: 14px; transform: none; width: 392px; height: auto; max-height: none; }
+.style-panel .tabs { display: grid; grid-template-columns: repeat(5, 1fr); }
+.style-panel .stab { min-width: 0; height: 70px; font-size: 10.5px; padding: 0 2px; text-align: center; line-height: 1.05; }
+.style-panel .stab svg.sty { width: 36px; height: 36px; }
+.style-panel .optrow { display: grid; grid-template-columns: repeat(3, 1fr); overflow-y: auto; align-content: start; }
+.style-panel .sopt { min-width: 0; }
+.brief-chips .bl { display: flex; align-items: center; gap: 4px; padding: 0 8px 0 6px; font-size: 13px; color: var(--ink-2); }
+.brief-chips .bl img { width: 20px; height: 20px; }
+.ctile.mid { width: 72px; height: 72px; font-size: 11.5px; }
+.ctile.mid img { width: 38px; height: 38px; }
+.ctile.mid .blk svg { width: 44px; height: 44px; }
+.ctile .dots3 i.on { background: #fff; box-shadow: 0 0 0 2px #3a2d00; }
+.ctile.lap { animation: lap .6s; }
+@keyframes lap { 30% { transform: translateY(-8px) scale(1.12); } }
+.ctile.again span:last-child { font-size: 10px; }
+.bell.pick { box-shadow: 0 0 0 4px var(--blue) inset, 0 6px 14px rgba(47,111,228,.3); background: #fff; transform: translateY(-3px); }
+.report .line { position: relative; }
+.report .line .fixit { margin-left: auto; flex: none; }
+.opt.guess .blk svg { width: 50px; height: 50px; }
+.mission-tile .ribbon { font-size: 20px; padding: 8px 18px 8px 12px; top: -18px; }
+.mission-tile .ribbon svg { width: 22px; height: 22px; }

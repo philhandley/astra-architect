@@ -25,7 +25,7 @@ export const PRESETS = {
       { text: 'Turn the site round', emoji: '🔄', say: 'Drag your finger across the site to turn it round.', check: (a, ev) => ev === 'orbit', praise: 'Now you can see the site from every side.' },
       { text: 'Move the sun', emoji: '☀️', say: 'Slide the sun along the bar at the top. Watch the shadows move.', check: (a, ev) => ev === 'sun', praise: 'Morning sun in the east, evening sun in the west.' },
       { text: 'Tap the best view', emoji: '🔭', say: 'Tap the place on the site with the best view. Architects stand there to look.', check: (a, ev) => ev === 'flag' },
-      { text: 'Build your chill-out room', emoji: '🧘', say: 'Choose the chill-out room. Put your finger where it should go, then lift your finger to build it.', check: (a, ev, d) => ev === 'build' && d.cell.room === 'yoga' },
+      { text: 'Build your chill-out room', emoji: '🧘', room: 'yoga', say: 'Choose the chill-out room. Put your finger where it should go, then lift your finger to build it.', check: (a, ev, d) => ev === 'build' && d.cell.room === 'yoga' },
     ],
     async setup(api) { api.toggleSun(true); },
     onGroundTap(t, api) { lookFrom(api, t); },
@@ -37,9 +37,9 @@ export const PRESETS = {
     faces: true,
     briefIds: ['library', 'happy'],
     tasks: [
-      { text: 'Build a classroom', emoji: '✏️', check: a => has(a, 'classroom') },
-      { text: 'Build a hall', emoji: '🤸', check: a => has(a, 'hall') },
-      { text: 'Build a library', emoji: '📚', check: a => has(a, 'library') },
+      { text: 'Build a classroom', emoji: '✏️', room: 'classroom', check: a => has(a, 'classroom') },
+      { text: 'Build a hall', emoji: '🤸', room: 'hall', check: a => has(a, 'hall') },
+      { text: 'Build a library', emoji: '📚', room: 'library', check: a => has(a, 'library') },
       { text: 'Tap a face to hear how a room feels', emoji: '😊', check: (a, ev) => ev === 'faceTap' },
       { text: 'Make every face happy', emoji: '🥳', say: 'Move rooms so nobody is sad. Quiet rooms want to be away from noisy ones.', check: a => { const m = allMoods(a.idx); return ['classroom', 'hall', 'library'].every(r => has(a, r)) && m.every(x => x.m.face !== 'sad'); }, praise: 'Every room is happy. That is a good programme!' },
       { text: 'Look at the bubble diagram', emoji: '🫧', say: 'Tap Bubbles. Architects draw rooms as bubbles to see who is next to who.', check: (a, ev) => ev === 'bubbles' },
@@ -51,7 +51,7 @@ export const PRESETS = {
     views: ['model', 'walk'],
     briefIds: [],
     tasks: [
-      { text: 'Build a classroom', emoji: '✏️', check: a => has(a, 'classroom') },
+      { text: 'Build a classroom', emoji: '✏️', room: 'classroom', check: a => has(a, 'classroom') },
       { text: 'Make it big enough for 8 pupils', emoji: '👥', say: 'Each block holds four pupils. Put two classroom blocks side by side to make one big classroom.', check: a => groupsOf(a, 'classroom').some(g => g.cells.length >= 2) },
       { text: 'Fill it with pupils', emoji: '🧒', say: 'Tap Fill it up to see if everyone fits.', check: (a, ev, d) => ev === 'fill' && d.ok },
       { text: 'Walk in as the Architect', emoji: '🚶', say: 'Tap Walk, then tap the classroom to walk inside.', check: (a, ev) => ev === 'walkArrive' || ev === 'walkMove' },
@@ -64,7 +64,7 @@ export const PRESETS = {
     views: ['model', 'walk'],
     briefIds: ['arch-aquarium'],
     tasks: [
-      { text: 'Build the aquarium', emoji: '🐠', check: a => has(a, 'aquarium') },
+      { text: 'Build the aquarium', emoji: '🐠', room: 'aquarium', check: a => has(a, 'aquarium') },
       { text: 'Make it an arch, or a ring of curves', emoji: '🌈', say: 'The aquarium starts as an arch. Pick it and tap the shape button to try curves. Four curves make a ring.', check: a => brief(a, 'arch-aquarium') },
       { text: 'Switch to Building to see the fish', emoji: '🏠', check: (a, ev, d) => ev === 'mode' && d.mode === 'building' || (a.S.mode === 'building' && ev === 'build') },
       { text: 'Walk through it', emoji: '🚶', say: 'Tap Walk, then tap the aquarium to walk through.', check: (a, ev, d) => ev === 'walkArrive' && /aquarium/i.test(d.label || '') },
@@ -90,7 +90,7 @@ export const PRESETS = {
     views: ['model', 'plan', 'section'],
     briefIds: ['sea-classroom'],
     tasks: [
-      { text: 'Give a classroom a sea view', emoji: '🌊', say: 'Build a classroom near the beach side of the meadow, where its windows look at the sea.', check: a => brief(a, 'sea-classroom') },
+      { text: 'Give a classroom a sea view', emoji: '🌊', room: 'classroom', say: 'Build a classroom near the beach side of the meadow, where its windows look at the sea.', check: a => brief(a, 'sea-classroom') },
       { text: 'Look at the plan', emoji: '📐', check: (a, ev, d) => ev === 'view' && d.view === 'plan' },
       { text: 'Slide the section through the school', emoji: '✂️', check: (a, ev, d) => ev === 'section' && d.t < 0.9 },
       { text: 'Look from the mountains', emoji: '🏔️', check: (a, ev, d) => ev === 'sectionSide' && d.side === 'north' },
@@ -101,7 +101,7 @@ export const PRESETS = {
     tools: ['views', 'day', 'undo', 'zoom', 'mode'],
     views: ['model'],
     briefIds: [],
-    day: { pupils: 1, codeOnly: true },
+    day: { pupils: 1, codeOnly: true, tiles: ['go:', 'do:learn', 'do:swim', 'do:read', 'do:play'] },
     tasks: [
       { text: 'Make sure there is a classroom and a pool', emoji: '🏫', say: 'Your school needs a classroom and a swimming pool for this. Build them if they are missing.', check: a => has(a, 'classroom') && has(a, 'pool') },
       { text: 'Code: Go to the classroom', emoji: '🧩', say: 'Tap Day. Give your pupil the tile Go to the classroom, then press Go.', check: (a, ev, d) => ev === 'tryDone' && d.ended === 'classroom' },
@@ -114,9 +114,13 @@ export const PRESETS = {
     tools: ['views', 'day', 'mode', 'undo', 'zoom'],
     views: ['model', 'walk', 'section'],
     briefIds: ['roof-track'],
-    day: { pupils: 1, codeOnly: true },
+    async setup(api) {
+      const tall = [...api.design.cells].sort((a, b) => b.level - a.level || b.id - a.id)[0];
+      if (tall) { const V = api.world.controls.target.constructor; api.animateCam(new V(tall.x + 0.5, 0.6, tall.z + 0.5), null, 0.8, 2.2); }
+    },
+    day: { pupils: 1, codeOnly: true, tiles: ['go:', 'do:run', 'do:swim', 'do:learn', 'wait:short', 'again:2', 'again:3'] },
     tasks: [
-      { text: 'Put running track on a roof, in a loop', emoji: '🏃', say: 'Choose the running track. Tap on top of some rooms to put track on the roof, and join it up into a loop.', check: a => brief(a, 'roof-track') },
+      { text: 'Put running track on a roof, in a loop', emoji: '🏃', room: 'track', say: 'Choose the running track. Tap on top of some rooms to put track on the roof, and join it up into a loop.', check: a => brief(a, 'roof-track') },
       { text: 'Add stairs or a climbing wall to get up', emoji: '🪜', say: 'Pupils cannot fly! Put stairs next to the building so they can climb up to the roof.', check: a => trackReachable(a) },
       { text: 'Code laps: Go to the track, Run, Again', emoji: '🔁', say: 'Tap Day. Use the tiles Go to the track, Run, then Again.', check: (a, ev, d) => ev === 'tryDone' && (d.did.run || 0) >= 2 },
     ],
@@ -186,6 +190,14 @@ function lookFrom(api, t) {
   api.animateCam(target, pos, 1.1);
   say(looks.length ? `From here you can see ${looks.join(' and ')}. ${looks.includes('the sea') || looks.includes('the waterfall') ? 'What a view!' : ''}` : 'From here you can see the meadow. Try somewhere nearer the water for a better view.');
   api.emit('flag', { x: t.x, z: t.z, looks });
+  if (!api.root.querySelector('.whole-site')) {
+    const b = h(`<button class="btn big whole-site" type="button" style="position:absolute;left:50%;transform:translateX(-50%);bottom:18px;z-index:7">${emo('🗺️')} See the whole site</button>`);
+    const back = () => { clearTimeout(api.siteTimer); b.remove(); api.frameModel(false); };
+    b.addEventListener('click', back);
+    api.root.appendChild(b);
+    clearTimeout(api.siteTimer);
+    api.siteTimer = setTimeout(() => { if (!api.S.destroyed && b.isConnected) back(); }, 6000);
+  }
 }
 
 // Mission 3: a button that sends eight pupils into the classroom to see if they fit.

@@ -586,7 +586,7 @@ function renderPlay(el, s, r) {
   el.innerHTML = `<div class="play-host"></div>`;
   const host = el.firstElementChild;
   const c = crew();
-  const intro = h(`<div style="display:flex;align-items:center;gap:12px;justify-content:center;text-transform:none;letter-spacing:0;font-size:18px;color:var(--ink-2);font-weight:500"><span class="sp"></span><span><b style="color:var(--ink)">${esc(s.title || 'Build')}</b>${s.intro ? ' &middot; ' + esc(s.intro) : ''}</span></div>`);
+  const intro = h(`<div style="display:flex;align-items:center;gap:12px;justify-content:center;text-transform:none;letter-spacing:0;font-size:18px;color:var(--ink-2);font-weight:500"><span class="sp"></span><span><b style="color:var(--ink);font-size:20px">${esc(s.title || 'Build')}</b></span></div>`);
   const text = sentences(s.title, s.intro);
   const b = speakButton(() => text);
   intro.querySelector('.sp').replaceWith(b);
@@ -617,7 +617,8 @@ function renderPlay(el, s, r) {
   }).catch(err => {
     console.error(err);
     if (token !== stepToken) return;
-    host.innerHTML = `<div class="card" style="max-width:640px;margin:60px auto;text-align:center">This activity couldn't load right now. Tap Next to carry on.</div>`;
+    host.innerHTML = `<div class="card" style="max-width:640px;margin:60px auto;text-align:center;display:flex;flex-direction:column;gap:16px;align-items:center">${emo('🔧')}<span style="font-size:22px">Oops, this part did not load.</span><button class="btn big go retry" type="button">${icon('refresh')} Try again</button></div>`;
+    host.querySelector('.retry').addEventListener('click', () => location.reload());
     setReady(true);
   });
 }

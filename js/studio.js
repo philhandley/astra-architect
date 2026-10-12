@@ -16,7 +16,7 @@ import { emo, emojiFile } from './core/emoji.js';
 import { icon } from './core/icons.js';
 import { formIcon } from './ui/formicons.js';
 import { roofIcon, windowIcon, wallIcon, moreIcon } from './ui/styleicons.js';
-import { styleOf, ROOFS, WINDOWS, WALLS, SIDES, ROOF_NAMES, WINDOW_NAMES, WALL_NAMES, CHARACTER_NAMES, splitParts } from './core/character.js';
+import { styleOf, ROOFS, WINDOWS, WALLS, SIDES, ROOF_NAMES, WINDOW_NAMES, WALL_NAMES, CHARACTER_NAMES, splitParts, liftOf } from './core/character.js';
 import { BOX } from './core/arch.js';
 import { h, esc, say, sayAuto, hush, toast, sfx, clamp, speakButton } from './ui/dom.js';
 
@@ -109,6 +109,7 @@ export async function mountStudio(host, opts = {}) {
     snapshot();
     const cell = { id: S.design.nextId++, form: c.form, room: c.room, x: c.x, z: c.z, level: c.level, rot: c.rot || 0, material: c.material || 'colour', colour: c.colour || null };
     S.design.cells.push(cell);
+    S.lastBuilt = cell.id;
     const idx2 = indexDesign(S.design);
     const grp = roomGroups(idx2).find(gr => gr.forms.has(cell.id));
     const mate = grp && [...grp.forms].map(id => idx2.byId.get(id)).filter(o => o && o.id !== cell.id);
@@ -120,7 +121,7 @@ export async function mountStudio(host, opts = {}) {
     }
     refresh();
     sfx.build(cell.level);
-    dv.bounce(cell.id);
+    if (!dv.bounce(cell.id)) ring(cell);
     puff(cell);
     emit('build', { cell });
     const seenKey = 'seen:' + cell.room;
@@ -151,6 +152,36 @@ export async function mountStudio(host, opts = {}) {
       if (t > 0.55) { for (const sp of parts) { world.groups.fx.remove(sp); sp.material.dispose(); } world.updaters.delete(fn); }
     };
     world.updaters.add(fn);
+  }
+
+  // A soft ring that spreads out over the ground round a new room.
+  function ring(cell, cells = null) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const ps = cells || footprint(cell).filter(p => p.level === cell.level);
+    const xs = ps.map(p => p.x), zs = ps.map(p => p.z);
+    const cx = (Math.min(...xs) + Math.max(...xs) + 1) / 2, cz = (Math.min(...zs) + Math.max(...zs) + 1) / 2;
+    const r = Math.max(Math.max(...xs) - Math.min(...xs) + 1, Math.max(...zs) - Math.min(...zs) + 1) * 0.55;
+    const m = new THREE.Mesh(new THREE.RingGeometry(r * 0.92, r, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.9, depthWrite: false }));
+    m.position.set(cx, cell.level * LEVEL_H + (cell.level === 0 ? Math.max(0, cellGround(cell.x, cell.z)) : 0) + 0.04, cz);
+    world.groups.fx.add(m);
+    let t = 0;
+    const fn = dt => {
+      t += dt;
+      const k = Math.min(1, t / 0.55);
+      m.scale.setScalar(1 + k * 0.9);
+      m.material.opacity = 0.9 * (1 - k);
+      if (k >= 1) { world.groups.fx.remove(m); m.geometry.dispose(); m.material.dispose(); world.updaters.delete(fn); }
+    };
+    world.updaters.add(fn);
+  }
+
+  // A ring that spreads round every room of one kind (used by the coding tiles).
+  function pulseRoom(room) {
+    for (const g of roomGroups(S.idx)) {
+      if (g.room !== room) continue;
+      const c = S.idx.byId.get([...g.forms][0]);
+      if (c) ring(c, g.cells);
+    }
   }
 
   function removeCell(id) {
@@ -190,13 +221,20 @@ export async function mountStudio(host, opts = {}) {
     let rooms = allowedRooms;
     if (allowedRooms.length > 6) {
       const groups = GROUPS.map(g => ({ ...g, rooms: g.rooms.filter(r => allowedRooms.includes(r)) })).filter(g => g.rooms.length);
+      const need = S.tasks && S.tasks.find(t => !t.done)?.room;
       if (S.tool && ROOMS[S.tool]) { const gi = groups.findIndex(g => g.rooms.includes(S.tool)); if (gi >= 0) trayGroup = gi; }
       trayGroup = clamp(trayGroup, 0, groups.length - 1);
       const tabs = h(`<div class="tgroups"></div>`);
       groups.forEach((g, i) => {
         const [pic, short] = GROUP_PIC[g.name] || ['⭐', g.name];
         const b = h(`<button class="tgroup ${i === trayGroup ? 'on' : ''}" type="button" aria-label="${esc(g.name)}">${emo(pic)}<span>${esc(short)}</span></button>`);
-        b.addEventListener('click', () => { trayGroup = i; store.modSave('studio', 'trayGroup', i); sfx.tap(); say(`${g.name}: ${g.rooms.map(r => ROOMS[r].name.toLowerCase()).join(', ')}.`); drawTray(); emit('trayGroup', { group: g.name }); });
+        if (need && g.rooms.includes(need) && i !== trayGroup) b.classList.add('hint');
+        b.addEventListener('click', () => {
+          if (S.tool && S.tool !== 'bin') { S.tool = null; S.form = null; clearGhost(); }
+          trayGroup = i; store.modSave('studio', 'trayGroup', i); sfx.tap();
+          say(`${g.name}: ${g.rooms.map(r => ROOMS[r].name.toLowerCase()).join(', ')}.`);
+          drawTray(); drawShapeStrip(); emit('trayGroup', { group: g.name });
+        });
         tabs.append(b);
       });
       tray.append(tabs);
@@ -208,6 +246,7 @@ export async function mountStudio(host, opts = {}) {
       b.addEventListener('click', () => setTool(S.tool === id ? null : id));
       tray.append(b);
     }
+    tray.append(shapeStrip);
   }
   let trayGroup = +store.modLoad('studio', 'trayGroup') || 0;
   function setTool(id) {
@@ -269,11 +308,11 @@ export async function mountStudio(host, opts = {}) {
   // ---------- Top strip: brief chips and sun ----------
   const top = root.querySelector('.topstrip');
   const chips = h(`<div class="brief-chips"></div>`);
+  const chipsLabel = `<span class="bl">${emo('⭐')}<b>Wishes</b></span>`;
   const sunPill = h(`<div class="pill" style="display:none">${emo('🌅')}<input type="range" min="0" max="1000" aria-label="Move the sun">${emo('🌇')}</div>`);
   if (preset.brief !== false) top.append(chips);
   top.append(sunPill);
   const shapeStrip = h(`<div class="shape-strip" style="display:none"></div>`);
-  top.append(shapeStrip);
   function drawShapeStrip() {
     const R = S.tool && ROOMS[S.tool];
     const turnable = S.form && (NEEDS_TURN.has(S.form) || S.form === 'curve');
@@ -306,7 +345,8 @@ export async function mountStudio(host, opts = {}) {
   function updateBrief(silent) {
     const ids = preset.briefIds || store.state.brief;
     const res = checkBrief(S.idx, ids);
-    chips.innerHTML = '';
+    chips.innerHTML = ids.length ? chipsLabel : '';
+    chips.style.display = ids.length ? '' : 'none';
     for (const id of ids) {
       const W = WISHES[id];
       if (!W) continue;
@@ -461,7 +501,7 @@ export async function mountStudio(host, opts = {}) {
     if (S.view === 'plan') { setTimeout(clearGhost, 320); return; }
     const m = ghostMesh, x0 = m.position.x;
     let t = 0;
-    const fn = dt => { t += dt; m.position.x = x0 + Math.sin(t * 50) * 0.06 * Math.max(0, 1 - t / 0.35); if (t > 0.35) { world.updaters.delete(fn); if (ghostMesh === m) clearGhost(); } };
+    const fn = dt => { t += dt; m.position.x = x0 + Math.sin(t * 50) * 0.06 * Math.max(0, 1 - t / 0.35); if (t > 1.6) { world.updaters.delete(fn); if (ghostMesh === m) clearGhost(); } };
     world.updaters.add(fn);
   }
   // A little face and a word above a block that has just been built or moved.
@@ -562,10 +602,16 @@ export async function mountStudio(host, opts = {}) {
     const c = S.idx.byId.get(id);
     selMesh = new THREE.Mesh(formGeometry(c.form, 'blocks'), new THREE.MeshBasicMaterial({ color: '#2f6fe4', transparent: true, opacity: 0.28, depthWrite: false }));
     selMesh.scale.setScalar(1.06);
-    placeObject(selMesh, c, c.level === 0 ? cellGround(c.x, c.z) : 0);
+    placeObject(selMesh, c, (c.level === 0 ? cellGround(c.x, c.z) : 0) + (S.mode === 'blocks' ? 0 : liftOf(c, S.idx)));
     ghostGroup.add(selMesh);
     showFloatbar('select');
     sfx.tap();
+    if (S.view === 'model' && !matchMedia('(prefers-reduced-motion: reduce)').matches && !dv.bounce(c.id, 0.45)) {
+      const m = selMesh;
+      let t = 0;
+      const fn = dt => { t += dt; const k = Math.min(1, t / 0.32); m.scale.setScalar(1.06 + 0.1 * Math.sin(k * Math.PI)); m.material.opacity = 0.28 + 0.25 * Math.sin(k * Math.PI); if (k >= 1) world.updaters.delete(fn); };
+      world.updaters.add(fn);
+    }
     if (S.view === 'plan') drawPlanView();
     emit('select', { cell: c });
   }
@@ -632,7 +678,12 @@ export async function mountStudio(host, opts = {}) {
   // ---------- Panels: shape and paint ----------
   let panel = null;
   let panelShift = false;
-  function closePanel() { if (panel) { panel.remove(); panel = null; } if (panelShift) { panelShift = false; world.setViewShift(0); } }
+  function closePanel() {
+    if (panel) { panel.remove(); panel = null; }
+    if (panelShift) { panelShift = false; world.setViewShift(0); }
+    const lr = root.querySelector('.rail.left');
+    if (lr && lr.dataset.styleHid) { delete lr.dataset.styleHid; lr.style.display = ''; }
+  }
   function closeAndBack() { closePanel(); if (S.selected) showFloatbar('select'); }
   // Zoom in on a room for the workshop (only the first time the panel opens for it).
   let focused = null;
@@ -643,11 +694,21 @@ export async function mountStudio(host, opts = {}) {
     const cx = ps.reduce((a, p) => a + p.x + 0.5, 0) / ps.length, cz = ps.reduce((a, p) => a + p.z + 0.5, 0) / ps.length;
     const target = new THREE.Vector3(cx, 0.5 + c.level * LEVEL_H, cz);
     if (world.iso) {
-      const zoom = clamp(Math.max(world.ortho.zoom, 3.2), 0.3, 7);
-      const lrail = root.querySelector('.rail.left');
-      const trayW = lrail && lrail.style.display !== 'none' ? 326 : 0;
+      // Fit the room (with its roof and flag) into the clear space left of the Style column and below the chips.
+      const W = viewport.clientWidth || 1280, H = viewport.clientHeight || 800;
+      const vr = viewport.getBoundingClientRect(), tb = top.getBoundingClientRect();
+      const topY = Math.max(70, tb.bottom - vr.top + 10), panelW = panel ? panel.offsetWidth + 112 : 0;
+      const freeW = W - panelW, freeH = H - topY - 20;
+      const xs = ps.map(p => p.x), zs = ps.map(p => p.z);
+      const span = (Math.max(...xs) - Math.min(...xs) + Math.max(...zs) - Math.min(...zs) + 2) * 0.7071;
+      const ppu = Math.min(freeW / (span + 1.6), freeH / (span * 0.62 + 2.4), 150);
+      const zoom = clamp(ppu * 24 / H, 1.2, 4.2);
+      const per = zoom * H / 24;
       const right = new THREE.Vector3().setFromMatrixColumn(world.ortho.matrixWorld, 0).setY(0).normalize();
-      target.addScaledVector(right, -((trayW - 100) / 2) / (zoom * (viewport.clientHeight || 800) / 24));
+      const up = new THREE.Vector3().setFromMatrixColumn(world.ortho.matrixWorld, 1).normalize();
+      target.addScaledVector(right, (panelW / 2) / per);
+      target.addScaledVector(up, (topY / 2) / per);
+      target.y += 0.25;
       animateCam(target, null, 0.6, zoom);
     }
     else animateCam(target, target.clone().add(new THREE.Vector3(2.4, 3, 4)), 0.6);
@@ -660,7 +721,8 @@ export async function mountStudio(host, opts = {}) {
     if (kind === 'style') {
       const first = focused !== c.id;
       drawStylePanel(c);
-      if (!day && S.view === 'model') { world.setViewShift(Math.round(panel.offsetHeight / 2)); panelShift = true; }
+      const lr = root.querySelector('.rail.left');
+      if (lr.style.display !== 'none') { lr.dataset.styleHid = '1'; lr.style.display = 'none'; }
       focusOn(c);
       if (first) say(`This is ${CHARACTER_NAMES[c.room] || 'your room'}! Make it your own.`);
       emit('stylePanel', { cell: c });
@@ -744,7 +806,7 @@ export async function mountStudio(host, opts = {}) {
     const col = c.colour || R.colour;
     const cells = groupCellsOf(c);
     const st = styleOf(cells);
-    const covered = cells.some(o => S.idx.occ.has(key(o.x, o.z, o.level + 1)));
+    const covered = cells.some(o => footprint(o).some(p => p.level === o.level && S.idx.occ.has(key(p.x, p.z, o.level + 1))));
     const cname = CHARACTER_NAMES[c.room] || `the ${R.name.toLowerCase()}`;
     panel = h(`<div class="sheet-panel style-panel"><div class="head"><h3>${emo(R.emoji)} ${esc(cname.replace(/^the /, 'The '))}</h3><span class="muted" style="font-size:16px">Make it your own</span></div><div class="tabs"></div><div class="optrow"></div></div>`);
     const close = h(`<button class="btn ghost round small" type="button" aria-label="Close">${icon('close')}</button>`);
@@ -798,6 +860,7 @@ export async function mountStudio(host, opts = {}) {
     const objs = [...dv.pickables(), ...dv.group.children.filter(o => o.userData.cells), terrain.ground];
     const hits = rc.intersectObjects(objs, true);
     for (const hit of hits) {
+      if (hit.object.isLine || hit.object.isPoints || hit.object.isSprite || !hit.face) continue;
       const p = hit.point;
       let id = hit.object.userData.cellId ?? findCellId(hit.object);
       if (id === undefined) {
@@ -845,6 +908,7 @@ export async function mountStudio(host, opts = {}) {
   }
 
   function handleTap(clientX, clientY) {
+    if (day || opening) return;
     if (S.view === 'section' || S.view === 'walk') {
       if (S.view === 'section') { const t = targetFromRay(world.rayFrom(clientX, clientY)); if (t && t.hitId) select(t.hitId); }
       return;
@@ -879,7 +943,7 @@ export async function mountStudio(host, opts = {}) {
       return;
     }
     if (phase === 'down') return;
-    if (t.hitId) { if (S.selected === t.hitId) select(null); else select(t.hitId); }
+    if (t.hitId) { if (S.selected === t.hitId) select(null); else { select(t.hitId); const c = S.idx.byId.get(t.hitId); if (c && ROOMS[c.room]) say(ROOMS[c.room].name); } }
     else {
       if (S.selected) select(null);
       else {
@@ -922,6 +986,8 @@ export async function mountStudio(host, opts = {}) {
     if (v === S.view && v !== 'model') return;
     const prev = S.view;
     S.view = v;
+    if (v !== 'model' && camAnim) { world.updaters.delete(camAnim); camAnim = null; }
+    if (panel && v !== 'model') { closePanel(); if (S.selected && v === 'plan') showFloatbar('select'); }
     for (const [k, b] of Object.entries(viewBtns)) b.classList.toggle('on', k === v);
     root.classList.toggle('plan', v === 'plan');
     floorGroup.style.display = v === 'plan' ? '' : 'none';
@@ -934,6 +1000,7 @@ export async function mountStudio(host, opts = {}) {
     world.camera = world.cam;
     world.controls.enabled = true;
     world.setIso(v === 'model' && S.iso);
+    terrain.setCalm && terrain.setCalm(v === 'model' && S.iso ? 1 : 0);
     world.hold = v === 'plan';
     if (v === 'plan') {
       world.stop();
@@ -987,7 +1054,16 @@ export async function mountStudio(host, opts = {}) {
     }
     if (S.view === 'section' && section) { section.zoom(f); return; }
     if (S.view !== 'model') return;
-    if (world.iso) { world.ortho.zoom = clamp(world.ortho.zoom / f, 0.3, 7); world.ortho.updateProjectionMatrix(); return; }
+    if (world.iso) {
+      const z = clamp(world.ortho.zoom / f, 0.3, 7);
+      const c = S.idx.byId.get(S.selected) || S.idx.byId.get(S.lastBuilt);
+      if (c && f < 1) {
+        const ps = footprint(c);
+        const tgt = new THREE.Vector3(ps.reduce((a, p) => a + p.x + 0.5, 0) / ps.length, 0.4 + c.level * LEVEL_H, ps.reduce((a, p) => a + p.z + 0.5, 0) / ps.length);
+        animateCam(world.controls.target.clone().lerp(tgt, 0.6), null, 0.3, z);
+      } else { world.ortho.zoom = z; world.ortho.updateProjectionMatrix(); }
+      return;
+    }
     const c = world.controls;
     const off = world.cam.position.clone().sub(c.target);
     const len = clamp(off.length() * f, c.minDistance, c.maxDistance);
@@ -1011,11 +1087,13 @@ export async function mountStudio(host, opts = {}) {
       const span = b ? (b.x1 - b.x0 + b.z1 - b.z0) * 0.7071 + 2.5 : 22;
       let ppu = Math.min(freeW / span, freeH / (span * 0.62));
       if (close) ppu *= 1.4;
-      const zoom = clamp(ppu * 24 / H, 0.3, 3.4);
+      const zoom = clamp(ppu * 24 / H, close ? 0.9 : 0.85, 3.4);
       if (instant) { world.placeIso(target); world.ortho.updateMatrixWorld(); }
       // Slide the picture so the school sits in the middle of the clear space, not under the tray.
       const right = new THREE.Vector3().setFromMatrixColumn(world.ortho.matrixWorld, 0).setY(0).normalize();
       target.addScaledVector(right, -((trayW - 100) / 2) / (zoom * H / 24));
+      const up = new THREE.Vector3().setFromMatrixColumn(world.ortho.matrixWorld, 1).normalize();
+      target.addScaledVector(up, 36 / (zoom * H / 24));
       if (instant) { world.controls.target.copy(target); world.placeIso(target); world.ortho.zoom = zoom; world.ortho.updateProjectionMatrix(); world.controls.update(); }
       else animateCam(target, null, 0.7, zoom);
       return;
@@ -1107,7 +1185,13 @@ export async function mountStudio(host, opts = {}) {
     tasksEl = h(`<div class="tasks" role="button" tabindex="0"><span class="sp"></span><div class="tnow"></div><div class="tdots"></div></div>`);
     const jobText = () => { const t = S.tasks.find(x => !x.done); return t ? (t.say || t.text) : 'All jobs done! Tap Next.'; };
     tasksEl.querySelector('.sp').replaceWith(speakButton(jobText, 'Read the job'));
-    tasksEl.addEventListener('click', () => { sfx.tap(); say(jobText()); });
+    tasksEl.addEventListener('click', e => {
+      if (e.target.closest('.speak-btn')) return;
+      sfx.tap();
+      const t = S.tasks.find(x => !x.done);
+      if (t && t.room && ROOMS[t.room] && (!allowed || allowed.has(t.room)) && S.tool !== t.room && !day) { setTool(t.room); return; }
+      say(jobText());
+    });
     top.prepend(tasksEl);
     drawTasks();
   }
@@ -1118,6 +1202,8 @@ export async function mountStudio(host, opts = {}) {
     tasksEl.classList.toggle('alldone', !t);
     tasksEl.querySelector('.tnow').innerHTML = t ? `${t.emoji ? emo(t.emoji) : ''}<span>${esc(t.text)}</span>` : `${emo('🎉')}<span>All jobs done! Tap Next.</span>`;
     tasksEl.querySelector('.tdots').innerHTML = S.tasks.map((x, k) => `<i class="${x.done ? 'done' : ''} ${k === i ? 'now' : ''}"></i>`).join('');
+    tasksEl.classList.toggle('picks', !!(t && t.room));
+    if (t && t.room) drawTray();
   }
   function checkTasks(ev, data) {
     if (!S.tasks || tasksDone) return;
@@ -1136,15 +1222,27 @@ export async function mountStudio(host, opts = {}) {
     }
   }
   on('*', (ev, data) => checkTasks(ev, data));
+  let lastTouch = Date.now();
+  root.addEventListener('pointerdown', () => { lastTouch = Date.now(); tasksEl && tasksEl.classList.remove('nudge'); }, true);
+  const idleTimer = setInterval(() => {
+    if (S.destroyed) { clearInterval(idleTimer); return; }
+    if (tasksEl && !tasksDone && !day && Date.now() - lastTouch > 14000) tasksEl.classList.add('nudge');
+  }, 1000);
 
   // ---------- Day (pupils) ----------
   let day = null;
+  let opening = null;
   async function openDay(opts2 = {}) {
+    if (opening) return;
     if (day) { day.close(); day = null; return; }
-    clearGhost(); select(null);
+    clearGhost(); select(null); closePanel();
+    if (S.tool || S.moving) { S.tool = null; S.moving = null; S.form = null; drawTray(); drawShapeStrip(); }
     if (S.view !== 'model') setView('model');
-    const m = await import('./sim/daypanel.js');
-    day = await m.openDayPanel(api, world, root, { ...preset.day, ...opts2, onClose: () => { day = null; emit('dayClosed'); } });
+    opening = (async () => {
+      const m = await import('./sim/daypanel.js');
+      day = await m.openDayPanel(api, world, root, { ...preset.day, ...opts2, onClose: () => { day = null; emit('dayClosed'); } });
+    })();
+    try { await opening; } finally { opening = null; }
     emit('dayOpen');
   }
 
@@ -1156,14 +1254,25 @@ export async function mountStudio(host, opts = {}) {
     get root() { return root; },
     get viewport() { return viewport; },
     world, ctx, preset,
-    addCell, removeCell, drawPlanView, say, handleTap,
+    addCell, removeCell, drawPlanView, say, handleTap, pulseRoom,
     setBubbles(on) { S.bubbles = on; drawPlanView(); },
     setCutaway(on) { S.cutaway = on; dv.sync(S.idx, on ? 'cutaway' : S.mode); },
     setTraffic(t) { S.traffic = t; },
+    fixRoom(room, why) {
+      const g = roomGroups(S.idx).filter(gr => gr.room === room).sort((a, b) => a.cells.length - b.cells.length)[0];
+      if (!g) return;
+      const c = S.idx.byId.get([...g.forms][0]);
+      select(c.id);
+      focusOn(c);
+      const glow = why === 'full' ? '.fb.go' : null;
+      setTimeout(() => { const b = glow && floatbar && floatbar.querySelector(glow); if (b) b.classList.add('glow'); }, 300);
+      say(why === 'full' ? `Here is the ${ROOMS[room].name.toLowerCase()}. Tap Bigger to make room for everyone.` : why === 'noway' ? `Here is the ${ROOMS[room].name.toLowerCase()}. How can pupils get in? Try stairs, or move it next to a path.` : `Here is the ${ROOMS[room].name.toLowerCase()}. Can you fix it?`);
+    },
     get day() { return day; },
     destroy() {
       if (S.destroyed) return;
       S.destroyed = true;
+      clearInterval(idleTimer);
       hush();
       if (day) { day.close(); day = null; }
       if (section) section.destroy();
@@ -1172,6 +1281,7 @@ export async function mountStudio(host, opts = {}) {
       if (selMesh) ghostGroup.remove(selMesh);
       CLIP.length = 0;
       world.setIso(false);
+      terrain.setCalm && terrain.setCalm(0);
       world.camera = world.cam;
       world.controls.enabled = true;
       world.sky.visible = true;
@@ -1195,6 +1305,7 @@ export async function mountStudio(host, opts = {}) {
   drawRail();
   refresh({ silent: true });
   world.setIso(S.iso);
+  terrain.setCalm && terrain.setCalm(S.iso ? 1 : 0);
   frameModel(true);
   if (preset.setup) await preset.setup(api);
   if (preset.tasks) setTasks(preset.tasks);

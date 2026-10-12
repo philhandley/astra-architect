@@ -34,6 +34,17 @@ export async function buildTerrain(world) {
   geo.setIndex(idx);
   geo.computeVertexNormals();
   const groundMat = new THREE.MeshLambertMaterial({ map: tex, clippingPlanes: CLIP });
+  // "Calm": less colour, less contrast and a warm cream lift, so the buildings pop (Monument Valley style).
+  const calm = { value: 0 };
+  groundMat.onBeforeCompile = sh => {
+    sh.uniforms.uCalm = calm;
+    sh.fragmentShader = 'uniform float uCalm;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+      float lum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+      vec3 calmC = mix(diffuseColor.rgb, vec3(lum), 0.42);
+      calmC = mix(vec3(lum), calmC, 0.86);
+      calmC = mix(calmC, vec3(0.93, 0.89, 0.80), 0.16);
+      diffuseColor.rgb = mix(diffuseColor.rgb, calmC, uCalm);`);
+  };
   const ground = new THREE.Mesh(geo, groundMat);
   ground.receiveShadow = true;
   ground.name = 'ground';
@@ -88,7 +99,7 @@ export async function buildTerrain(world) {
   g.add(falls);
 
   const trees = await plantTrees(world);
-  built = { ground, water, trees, groundMat };
+  built = { ground, water, trees, groundMat, setCalm(v) { calm.value = v; } };
   return built;
 }
 

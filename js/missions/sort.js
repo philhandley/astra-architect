@@ -1,7 +1,7 @@
 // Mission 2: sort the room cards into hoops (noisy or quiet, wet or dry). Tap a card, then tap a hoop.
 import { ROOMS } from '../core/catalogue.js';
 import { emo } from '../core/emoji.js';
-import { h, esc, say, sayAuto, sfx } from '../ui/dom.js';
+import { h, esc, say, sayAuto, sfx, speakButton } from '../ui/dom.js';
 
 const SETS = {
   noise: {
@@ -33,7 +33,8 @@ export async function mount(host, ctx) {
   function draw() {
     const set = SETS[order[si]];
     root.innerHTML = '';
-    const head = h(`<div class="headrow"><div><div class="eyebrow">Sort the rooms</div><h2>${esc(set.title)}</h2></div><div class="muted" style="font-size:18px">Tap a room, then tap a hoop.</div></div>`);
+    const head = h(`<div class="headrow"><div><div class="eyebrow">Sort the rooms</div><h2>${esc(set.title)}</h2></div><div class="sayline"><span class="sp"></span><span>${picked ? 'Now tap a hoop!' : 'Tap a room, then tap a hoop.'}</span></div></div>`);
+    head.querySelector('.sp').replaceWith(speakButton(() => (picked ? 'Now tap a hoop.' : `${set.title} Tap a room, then tap a hoop.`)));
     const cards = h(`<div class="rcards"></div>`);
     const left = set.rooms.filter(r => !placed[r]);
     for (const r of left) {
@@ -52,6 +53,8 @@ export async function mount(host, ctx) {
       hoops.append(el);
     }
     root.append(head, cards, hoops);
+    // A hand shows the move until Finn has sorted his first card.
+    if (!Object.keys(placed).length && !si) root.append(h(`<div class="hand-hint ${picked ? 'two' : ''}">${emo('👆')}</div>`));
   }
 
   function drop(hoop) {

@@ -8,6 +8,7 @@ export const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 100);
 
 export const ISO_DIR = new THREE.Vector3(1, 1.05, 1).normalize();
 const ISO_FOG = new THREE.Fog('#f4e9dc', 92, 150);
+export const NO_FOG = new THREE.Fog('#ffffff', 1e5, 2e5);   // 'no fog' that keeps the same shaders
 let GRAD = null;
 function gradientTexture() {
   if (GRAD) return GRAD;
@@ -37,6 +38,7 @@ class World {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.autoUpdate = false;
     renderer.localClippingEnabled = true;
     this.renderer = renderer;
     this.canvas = canvas;
@@ -92,6 +94,8 @@ class World {
       scene.add(this.groups[g]);
     }
     this.updaters = new Set();
+    this.noFog = NO_FOG;
+    scene.fog = NO_FOG;
     this.host = null;
     this.running = false;
     this.clock = new THREE.Clock();
@@ -198,7 +202,7 @@ class World {
       c.object = this.cam;
       c.update();
       if (this.scene.background && this.scene.background.isTexture) this.scene.background = null;
-      if (this.scene.fog === ISO_FOG) this.scene.fog = null;
+      if (this.scene.fog === ISO_FOG || !this.scene.fog) this.scene.fog = NO_FOG;
       this.sky.visible = true;
     }
   }
@@ -244,7 +248,9 @@ class World {
     console.info('Astra Architect: lowered quality to level', q.level);
   }
 
+  markShadows() { this.shadowDirty = true; }
   render() {
+    if (this.shadowDirty || !(this.time - (this.shadowAt ?? -9) < 1)) { this.renderer.shadowMap.needsUpdate = true; this.shadowDirty = false; this.shadowAt = this.time; }
     this.renderer.render(this.scene, this.camera);
     this.labels.render(this.scene, this.camera);
   }
@@ -262,6 +268,7 @@ class World {
   // Sun from morning in the east (t = 0) through noon in the south (0.5) to evening in the west (1).
   setSun(t) {
     this.sunT = t;
+    this.shadowDirty = true;
     const az = Math.PI * t;
     const el = THREE.MathUtils.degToRad(8 + 52 * Math.sin(Math.PI * t));
     const dir = new THREE.Vector3(Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el));

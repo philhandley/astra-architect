@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { key, roomGroups } from '../core/design.js';
 import { computeDoors, buildGraph, findPath, gateKey } from '../core/arch.js';
+import { NO_FOG } from '../core/scene.js';
 import { ROOMS, LEVEL_H } from '../core/catalogue.js';
 import { site } from '../core/site.js';
 import { h, esc, say, sfx, toast } from '../ui/dom.js';
@@ -201,7 +202,7 @@ export function startWalk(api, world, root) {
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKey);
-      world.scene.fog = null;
+      world.scene.fog = NO_FOG;
       world.baseFov = saved.fov; cam.near = saved.near; world.applyShift();
       cam.position.copy(saved.pos);
       world.controls.target.copy(saved.target);

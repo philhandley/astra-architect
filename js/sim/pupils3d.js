@@ -7,7 +7,7 @@ import { ACTIVITIES, ROOMS } from '../core/catalogue.js';
 import { emo } from '../core/emoji.js';
 import { esc } from '../ui/dom.js';
 
-const HEIGHT = 0.4;
+const HEIGHT = 0.44;
 // Only gentle clips are ever used.
 const CLIP = { idle: 'idle', walk: 'walk', sprint: 'sprint', sit: 'sit', jump: 'jump', emote: 'emote-yes', interact: 'interact-right', pick: 'pick-up', climb: 'idle', slide: 'sit', swim: 'walk' };
 

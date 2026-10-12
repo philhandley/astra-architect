@@ -5,7 +5,8 @@ import { icon } from '../core/icons.js';
 import { emo } from '../core/emoji.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-export const h = html => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
+// Elements are imported into the page's document straight away (template content belongs to an inert document).
+export const h = html => { const t = document.createElement('template'); t.innerHTML = html.trim(); return document.importNode(t.content, true).firstElementChild; };
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 let speakingBtn = null;

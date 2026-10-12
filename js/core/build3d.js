@@ -13,17 +13,17 @@ const UP = new THREE.Vector3(0, 1, 0);
 
 // ---------- Emoji stickers ----------
 const stickerTex = new Map();
-function emojiTexture(ch) {
-  if (stickerTex.has(ch)) return stickerTex.get(ch);
+function emojiTexture(ch, plain = false) {
+  const k = ch + (plain ? ':plain' : '');
+  if (stickerTex.has(k)) return stickerTex.get(k);
   const c = document.createElement('canvas');
   c.width = c.height = 128;
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   const x = c.getContext('2d');
-  x.fillStyle = 'rgba(255,255,255,0.92)';
-  x.beginPath(); x.arc(64, 64, 60, 0, Math.PI * 2); x.fill();
-  emojiImage(ch).then(img => { if (img) { x.drawImage(img, 22, 22, 84, 84); t.needsUpdate = true; } });
-  stickerTex.set(ch, t);
+  if (!plain) { x.fillStyle = 'rgba(255,255,255,0.92)'; x.beginPath(); x.arc(64, 64, 60, 0, Math.PI * 2); x.fill(); }
+  emojiImage(ch).then(img => { if (img) { if (plain) x.drawImage(img, 4, 4, 120, 120); else x.drawImage(img, 22, 22, 84, 84); t.needsUpdate = true; } });
+  stickerTex.set(k, t);
   return t;
 }
 const stickerGeo = new THREE.CircleGeometry(0.26, 24).rotateX(-Math.PI / 2);
@@ -32,7 +32,7 @@ function stickerMat(ch) {
   if (!stickerMats.has(ch)) stickerMats.set(ch, new THREE.MeshBasicMaterial({ map: emojiTexture(ch), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, clippingPlanes: CLIP }));
   return stickerMats.get(ch);
 }
-export function fishTexture(ch) { return emojiTexture(ch); }
+export function fishTexture(ch) { return emojiTexture(ch, true); }
 
 // Top surface height of a form, relative to its base.
 function topOf(form) {
@@ -291,7 +291,7 @@ export class DesignView {
       const fishes = ['🐠', '🐟', '🐡', '🐠', '🦀', '🐙'];
       for (let i = 0; i < n; i++) {
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: fishTexture(fishes[i % fishes.length]), transparent: true, depthWrite: false }));
-        sp.scale.setScalar(0.17 + (i % 3) * 0.04);
+        sp.scale.setScalar(0.12 + (i % 3) * 0.03);
         sp.renderOrder = 5;
         g.add(sp);
         this.fish.push({ sp, c, bw, bd, ph: i * 1.7, r: 0.25 + (i % 4) * 0.12, h: 0.18 + ((i * 7) % 5) * 0.11, sp2: 0.4 + (i % 3) * 0.2 });

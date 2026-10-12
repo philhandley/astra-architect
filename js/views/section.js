@@ -33,10 +33,24 @@ export function startSection(api, world, root) {
 
   world.sky.visible = false;
   world.scene.background = new THREE.Color('#eef2f4');
+  const backPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
   CLIP.length = 0;
-  CLIP.push(clipPlane);
+  CLIP.push(clipPlane, backPlane);
   world.camera = world.ortho;
   world.controls.enabled = false;
+  // Section drawings leave out the trees and shade the cut ground solid.
+  const trees = world.groups.terrain.children.filter(o => o.isInstancedMesh);
+  trees.forEach(t => { t.visible = false; });
+  const earth = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#8a6a4a', side: THREE.BackSide, clippingPlanes: CLIP }));
+  world.groups.fx.add(earth);
+  // One finger drags the view sideways along the school.
+  let pan = 0, drag = null;
+  const onDown = e => { drag = { x: e.clientX, pan }; };
+  const onMove = e => { if (!drag) return; const v = world.orthoView; const perPx = (2 * v.halfH * (world.w / world.h)) / world.w; pan = drag.pan - (e.clientX - drag.x) * perPx; frame(); };
+  const onUp = () => { drag = null; };
+  world.canvas.addEventListener('pointerdown', onDown);
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
 
   let range = { min: 0, max: 1 };
   function frame() {
@@ -50,7 +64,7 @@ export function startSection(api, world, root) {
     const aspect = (world.w || 1280) / (world.h || 800);
     const halfH = Math.max(height * 0.9 + 0.6, (width / 2 + 1.5) / aspect) * zoomF;
     const cy = Math.max(halfH * 0.55, height / 2) - 0.25;
-    const c = new THREE.Vector3(b.cx, cy, b.cz);
+    const c = new THREE.Vector3(b.cx + (dz !== 0 ? pan * (dz > 0 ? 1 : -1) : 0), cy, b.cz + (dx !== 0 ? pan * (dx > 0 ? -1 : 1) : 0));
     world.ortho.position.set(c.x + dx * 80, cy, c.z + dz * 80);
     world.ortho.up.set(0, 1, 0);
     world.ortho.lookAt(c);
@@ -64,6 +78,14 @@ export function startSection(api, world, root) {
     const cut = range.min + (range.max - range.min + 0.6) * t;
     clipPlane.normal.set(-dx, 0, -dz);
     clipPlane.constant = cut;
+    // Keep only a slice behind the cut, so the forest behind does not hide the school.
+    backPlane.normal.set(dx, 0, dz);
+    backPlane.constant = -(range.min - 2.5);
+    // Solid earth filling the slice from the back up to the cut.
+    const back = range.min - 2.4, front = Math.min(cut, range.max + 0.6) - 0.02;
+    const depthD = Math.max(0.1, front - back), mid = (front + back) / 2;
+    if (dx === 0) { earth.scale.set(60, 1.3, depthD); earth.position.set(30, -0.66, mid * dz); }
+    else { earth.scale.set(depthD, 1.3, 42); earth.position.set(mid * dx, -0.66, 21); }
     lbl.textContent = t > 0.98 ? 'Outside view' : 'Cut through';
   }
   input.addEventListener('input', () => { applyCut(); api.emit('section', { t: input.value / 1000 }); });
@@ -74,6 +96,11 @@ export function startSection(api, world, root) {
     zoom(f) { zoomF = Math.max(0.35, Math.min(2.5, zoomF * f)); frame(); },
     destroy() {
       ui.remove();
+      trees.forEach(t => { t.visible = true; });
+      world.groups.fx.remove(earth);
+      world.canvas.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
       CLIP.length = 0;
       world.scene.background = null;
       world.sky.visible = true;

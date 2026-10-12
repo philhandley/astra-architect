@@ -37,6 +37,9 @@ export function startWalk(api, world, root) {
     <div class="walk-act"></div>
   </div>`);
   root.appendChild(ui);
+  // Walking needs the space: hide the room tray and the undo/zoom row while we walk.
+  const hideEls = [root.querySelector('.rail.left'), root.querySelector('.topright')].filter(Boolean);
+  hideEls.forEach(e => { e.dataset.prevDisplay = e.style.display; e.style.display = 'none'; });
   const pad = ui.querySelector('.walk-pad');
   const dest = ui.querySelector('.walk-dest');
   const act = ui.querySelector('.walk-act');
@@ -190,6 +193,7 @@ export function startWalk(api, world, root) {
     destroy() {
       world.updaters.delete(update);
       ui.remove();
+      hideEls.forEach(e => { e.style.display = e.dataset.prevDisplay || ''; });
       nipple && nipple.destroy();
       world.canvas.removeEventListener('pointerdown', onDown);
       window.removeEventListener('pointermove', onMove);

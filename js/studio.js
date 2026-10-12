@@ -189,10 +189,14 @@ export async function mountStudio(host, opts = {}) {
     floorGroup.append(rb('up', 'Up', () => setFloor(S.floor + 1)), h(`<div class="rbtn floor-n" style="min-height:40px;font-size:15px">Ground</div>`), rb('down', 'Down', () => setFloor(S.floor - 1)));
     rail.append(floorGroup);
     rail.append(h(`<div class="rspacer"></div>`));
-    if (tools.includes('day')) rail.append(rb('bell', 'Day', () => openDay()));
-    if (tools.includes('zoom')) { const g = h(`<div class="rgroup"></div>`); g.append(rb('zoomIn', 'Closer', () => zoom(0.75)), rb('zoomOut', 'Further', () => zoom(1.33))); rail.append(g); }
-    if (tools.includes('undo')) rail.append(rb('undo', 'Undo', undo));
+    if (tools.includes('day')) rail.append(rb('bell', 'Day', () => openDay(), 'day-btn'));
+    // Undo and zoom sit in a row at the top right, so the rail fits on a tablet.
+    topRight.innerHTML = '';
+    if (tools.includes('undo')) topRight.append(rb('undo', 'Undo', undo));
+    if (tools.includes('zoom')) topRight.append(rb('zoomIn', 'Closer', () => zoom(0.75)), rb('zoomOut', 'Further', () => zoom(1.33)));
   }
+  const topRight = h(`<div class="topright"></div>`);
+  root.appendChild(topRight);
 
   // ---------- Top strip: brief chips and sun ----------
   const top = root.querySelector('.topstrip');
@@ -241,7 +245,7 @@ export async function mountStudio(host, opts = {}) {
     if (on) say('Every room has a face. Tap a face to find out how it feels.');
     emit('faces', { on });
   }
-  function clearFaceObjs() { for (const o of faceObjs) { o.parent && o.parent.remove(o); o.element.remove(); } faceObjs.length = 0; }
+  function clearFaceObjs() { for (const o of faceObjs) dropLabel(o); faceObjs.length = 0; }
   function updateFaces() {
     clearFaceObjs();
     if (!S.faces || S.view === 'plan' || S.view === 'walk') { if (S.view === 'plan') drawPlanView(); return; }
@@ -272,11 +276,16 @@ export async function mountStudio(host, opts = {}) {
   // ---------- Ghost (placement preview) ----------
   const ghostGroup = world.groups.ghost;
   let ghostMesh = null, ghostTag = null, floatbar = null;
+  function dropLabel(o) {
+    if (!o) return;
+    o.element.remove();
+    try { o.parent && o.parent.remove(o); } catch (e) { /* label never drawn */ }
+  }
   function clearGhost() {
     S.ghost = null;
-    if (ghostMesh) { ghostGroup.remove(ghostMesh); ghostMesh = null; }
-    if (ghostTag) { ghostTag.parent && ghostTag.parent.remove(ghostTag); ghostTag.element.remove(); ghostTag = null; }
     hideFloatbar();
+    if (ghostMesh) { ghostGroup.remove(ghostMesh); ghostMesh = null; }
+    dropLabel(ghostTag); ghostTag = null;
     if (S.view === 'plan') drawPlanView();
   }
   function bestRot(form, x, z, level) {
@@ -316,7 +325,7 @@ export async function mountStudio(host, opts = {}) {
     } else {
       tagHtml = `<div class="ghost-tag" style="color:#c62828">${emo('🚫')}<span>${esc(shortWhy(chk.why))}</span></div>`;
     }
-    if (ghostTag) { ghostTag.parent && ghostTag.parent.remove(ghostTag); ghostTag.element.remove(); }
+    dropLabel(ghostTag);
     const el = h(`<div class="label3d">${tagHtml}</div>`);
     ghostTag = new CSS2DObject(el);
     const hgt = FORMS[form].levels * LEVEL_H;
@@ -795,7 +804,7 @@ export async function mountStudio(host, opts = {}) {
       world.canvas.removeEventListener('pointerdown', onDown);
       world.canvas.removeEventListener('pointermove', onMove);
       world.canvas.removeEventListener('pointerup', onUp);
-      for (const o of [...world.groups.lab.children]) { world.groups.lab.remove(o); o.element && o.element.remove(); }
+      for (const o of [...world.groups.lab.children]) dropLabel(o);
       world.detach();
       store.flush();
       root.remove();

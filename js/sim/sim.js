@@ -248,6 +248,7 @@ export class Day {
   }
 
   start() {
+    this.started = true;
     if (this.mode === 'try') {
       for (const p of this.pupils) if (p.active && p.coded) this.next(p);
       return;
@@ -258,7 +259,7 @@ export class Day {
 
   // ---------- Time ----------
   step(dt) {
-    if (this.over) return;
+    if (this.over || !this.started) return;
     this.t += dt;
     if (this.mode === 'day') {
       const b = Math.floor(this.t / PERIOD);
@@ -267,7 +268,7 @@ export class Day {
       if (this.t > PERIOD * BELLS + 14) this.finish();
     } else {
       const busy = this.pupils.some(p => p.active && p.coded && !p.codeDone);
-      if (!busy || this.t > 60) this.finish();
+      if (!busy || this.t > 120) this.finish();
     }
     for (const p of this.pupils) if (p.active) this.stepPupil(p, dt);
   }
@@ -337,7 +338,10 @@ export function report(day) {
   const stuck = P.flatMap(p => p.stuckAt.map(s => ({ ...s, p })));
   if (day.mode === 'try') {
     for (const p of P.filter(q => q.coded)) {
-      const did = Object.entries(p.did).map(([a, n]) => `${actName(a)}${n > 1 ? ` ${numberWord(n)} times` : ''}`);
+      const times = n => (n === 1 ? '' : n === 2 ? ' twice' : ` ${numberWord(n)} times`);
+      const verb = { slide: 'going down the slide', climb: 'climbing the wall', look: 'looking at the fish', eat: 'having lunch', learn: 'learning', read: 'reading', swim: 'swimming', run: 'running', play: 'playing', yoga: 'doing yoga', grow: 'gardening', art: 'painting', music: 'singing' };
+      const list = Object.entries(p.did).map(([a, n]) => `${verb[a] || actName(a)}${times(n)}`);
+      const did = list.length > 1 ? [list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1]] : list;
       const s = p.stuckAt[0];
       if (s) lines.push({ kind: 'fix', emoji: '🤔', text: `${p.name} got stuck: ${stuckWhy(s)}` });
       if (p.ended) lines.push({ kind: s ? 'info' : 'good', emoji: s ? '📍' : '🎉', text: `${p.name} ended up ${p.ended === 'outside' ? 'outside' : `at the ${roomName(p.ended)}`}${did.length ? `, after ${did.join(', ')}` : ''}.` });

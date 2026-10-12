@@ -198,10 +198,11 @@ export function wallMaterial(roomId, matId, colour = null, double = false) {
   });
 }
 
-export function interiorMaterial(roomId) {
+export function interiorMaterial(roomId, side = 'front') {
   // A little glow so inside walls and ceilings are not gloomy where the sun cannot reach.
   const col = mix(ROOMS[roomId]?.colour || '#dddddd', '#ffffff', 0.72);
-  return cached('i' + roomId, () => new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.32, clippingPlanes: CLIP, side: THREE.FrontSide }));
+  const s = side === 'double' ? THREE.DoubleSide : side === 'back' ? THREE.BackSide : THREE.FrontSide;
+  return cached('i' + roomId + side, () => new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.38, clippingPlanes: CLIP, side: s }));
 }
 export function floorMaterial(roomId, double = false) {
   return cached('f' + roomId + double, () => new THREE.MeshLambertMaterial({ color: mix(ROOMS[roomId]?.colour || '#dddddd', '#ffffff', 0.45), side: double ? THREE.DoubleSide : THREE.FrontSide, clippingPlanes: CLIP }));

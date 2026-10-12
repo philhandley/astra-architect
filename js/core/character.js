@@ -164,7 +164,7 @@ export function layoutGroup(group, idx, doors, style, { cut = false } = {}) {
   const bbox = { x0: Math.min(...xs), z0: Math.min(...zs), x1: Math.max(...xs) + 1, z1: Math.max(...zs) + 1 };
   const rect = cells.length === (bbox.x1 - bbox.x0) * (bbox.z1 - bbox.z0) && !holes.length;
   const covered = cells.some(c => idx.occ.has(key(c.x, c.z, group.level + 1)));
-  const lift = !cut && style.legs && group.level === 0 ? LIFT : 0;
+  const lift = style.legs && group.level === 0 ? LIFT : 0;
   const tall = covered || cut ? 0 : (style.tall || 0);
   const height = cut ? 0.26 : LEVEL_H * (1 + 0.45 * tall);
   // Wall segments (outer and courtyards), with outward normals.
@@ -247,6 +247,27 @@ export function bodyGeometry(L, y0) {
   g.rotateX(-Math.PI / 2);
   g.translate(0, y0 + L.lift, 0);
   return g;
+}
+
+// The doll's-house version for the school day: low walls with no lid, and a floor.
+export function openBody(L, y0, h = 0.26) {
+  const pos = [], nor = [];
+  const quad = (a, b, n, ya, yb) => {
+    const v = [[a[0], ya, a[1]], [b[0], ya, b[1]], [b[0], yb, b[1]], [a[0], yb, a[1]]];
+    for (const i of [0, 1, 2, 0, 2, 3]) { pos.push(...v[i]); nor.push(n[0], 0, n[1]); }
+  };
+  const yb = y0 + L.lift;
+  for (const sgm of L.segs) quad(sgm.a, sgm.b, sgm.n, yb, yb + h);
+  const walls = new THREE.BufferGeometry();
+  walls.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  walls.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  const toV = p => new THREE.Vector2(p[0], -p[1]);
+  const shape = new THREE.Shape(L.outer.map(toV));
+  for (const hl of L.holes) shape.holes.push(new THREE.Path(hl.map(toV)));
+  const floor = new THREE.ShapeGeometry(shape);
+  floor.rotateX(-Math.PI / 2);
+  floor.translate(0, yb + 0.006, 0);
+  return { walls, floor };
 }
 
 // A roof of the given type over a rectangle (cells x0..x1, z0..z1), sitting at height y.

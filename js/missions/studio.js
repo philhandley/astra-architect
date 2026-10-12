@@ -71,6 +71,20 @@ export const PRESETS = {
     ],
     formFor: {},
   },
+  style: {
+    tools: ['views', 'mode', 'undo', 'zoom'],
+    views: ['model', 'plan', 'walk'],
+    briefIds: [],
+    rooms: ['classroom', 'hall', 'library', 'art', 'music', 'lunch'],
+    tasks: [
+      { text: 'Build a room, then tap it', emoji: '👆', say: 'Build a room. Then choose Pick and tap the room.', check: (a, ev) => ev === 'select' },
+      { text: 'Tap Style', emoji: '✨', say: 'Tap the colourful Style button.', check: (a, ev) => ev === 'stylePanel' || ev === 'style' || ev === 'push' },
+      { text: 'Give it a new roof', emoji: '🎩', say: 'Tap Roof and choose a new one. A witch hat? A zigzag?', check: (a, ev, d) => (ev === 'style' && d.patch && d.patch.roof) },
+      { text: 'Make the walls curvy or wavy', emoji: '〰️', say: 'Tap Walls and try Curvy or Wavy.', check: (a, ev, d) => ev === 'style' && d.patch && (d.patch.walls === 'curvy' || d.patch.walls === 'wave' || d.patch.walls === 'round') },
+      { text: 'Push it, pull it or put it on legs', emoji: '🦵', say: 'Tap Push and pull. Make it taller, pull out a bay window, or put it on legs.', check: (a, ev) => ev === 'push' },
+      { text: 'Add a flag, a chimney or a beak', emoji: '🚩', check: (a, ev, d) => ev === 'style' && d.patch && (d.patch.flag || d.patch.chimney || d.patch.beak) },
+    ],
+  },
   drawings: {
     tools: ['views', 'mode', 'sun', 'undo', 'zoom'],
     views: ['model', 'plan', 'section'],

@@ -9,7 +9,7 @@ import { formGeometry, placeObject, materialFor, wallMaterial, interiorMaterial,
 import { emojiImage } from './emoji.js';
 import { CLIP } from './scene.js';
 import { staticParts } from './models.js';
-import { styleOf, layoutGroup, bodyGeometry, roofObject, slabFollowing, glassMat, setClip, shade, DOOR_ACCENT, liftOf, LIFT } from './character.js';
+import { styleOf, layoutGroup, bodyGeometry, openBody, roofObject, slabFollowing, glassMat, setClip, shade, DOOR_ACCENT, liftOf, LIFT } from './character.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 let PATH_GEO = null;
@@ -200,14 +200,25 @@ export class DesignView {
       const y0 = g.level * LEVEL_H + (g.level === 0 ? cellGround(box[0].x, box[0].z) : 0) + 0.004;
       const yb = y0 + L.lift;                 // where the room's floor is
       const yTop = yb + L.height;
-      // Body
+      // Body: a solid character, or in the school day an open doll's house.
+      if (cut) {
+        const ob = openBody(L, y0);
+        const wm = new THREE.Mesh(ob.walls, wallMaterial(g.room, c0.material, c0.colour, true));
+        const fm = new THREE.Mesh(ob.floor, g.level > 0 ? seeThrough(floorMaterial(g.room, true)) : floorMaterial(g.room, true));
+        wm.receiveShadow = fm.receiveShadow = true;
+        this.group.add(wm, fm);
+        if (L.lift) for (const q2 of perimeterPoints(L.outer, 0.62, 0.1)) P.legs.push({ x: q2[0], y: y0, z: q2[1] });
+        continue;
+      }
       const geo = bodyGeometry(L, y0);
-      const capMat = cut && g.level > 0 ? seeThrough(floorMaterial(g.room)) : floorMaterial(g.room, true);
-      const body = new THREE.Mesh(geo, [capMat, wallMaterial(g.room, c0.material, c0.colour, true)]);
-      body.castShadow = !cut; body.receiveShadow = true;
+      const body = new THREE.Mesh(geo, [interiorMaterial(g.room, 'double'), wallMaterial(g.room, c0.material, c0.colour, c0.material === 'glass')]);
+      body.castShadow = true; body.receiveShadow = true;
       this.group.add(body);
-      if (!cut) this.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), LINE_MAT));
-      if (cut) continue;
+      // The inside of the walls: a light colour, seen only from inside (Walk and Section views).
+      const inner = new THREE.Mesh(openBody(L, y0, L.height).walls, interiorMaterial(g.room, 'front'));
+      inner.receiveShadow = true;
+      this.group.add(inner);
+      this.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), LINE_MAT));
       // Roof
       if (!L.covered) {
         if (style.roof === 'flat') this.group.add(slabFollowing(L, yTop, style.roofColour));

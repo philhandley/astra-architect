@@ -585,7 +585,7 @@ export async function mountStudio(host, opts = {}) {
     closePanel();
     const c = S.idx.byId.get(S.selected);
     if (!c) return;
-    if (kind === 'style') { drawStylePanel(c); focusOn(c); return; }
+    if (kind === 'style') { drawStylePanel(c); focusOn(c); emit('stylePanel', { cell: c }); return; }
     const R = ROOMS[c.room];
     const title = kind === 'shape' ? `Shape for the ${R.name.toLowerCase()}` : `Colour for the ${R.name.toLowerCase()}`;
     panel = h(`<div class="sheet-panel"><div class="head"><h3>${esc(title)}</h3></div><div class="optrow"></div></div>`);

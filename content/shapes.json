@@ -6,11 +6,15 @@
   "emoji": "🔺",
   "accent": "teal",
   "minutes": 10,
-  "patch": { "name": "Arch Builder", "icon": "arch" },
+  "patch": {
+    "name": "Arch Builder",
+    "icon": "arch"
+  },
   "grownUp": [
     "This mission is about form: why some shapes stand up and others do not. The arch is the star of the show. In the game, pulling out the keystone makes the arch fall, and that is the point.",
     "Ask what the stones are doing in the arch, and let the Architect guess before you talk about pushing. The at-home human arch shows the same push with hands.",
-    "The Big Question has no right answer. Architects choose tunnels, domes and towers for different reasons, so let the Architect explain their choice."
+    "The Big Question has no right answer. Architects choose tunnels, domes and towers for different reasons, so let the Architect explain their choice.",
+    "The Style step is about form and character: there is no right look. Ask Finn why he chose each roof and wall."
   ],
   "steps": [
     {
@@ -33,9 +37,18 @@
       "title": "Why does an arch stand up?",
       "prompt": "Why does an arch stay up without falling down?",
       "choices": [
-        { "label": "It has glue inside", "emoji": "🧴" },
-        { "label": "The stones push against each other", "emoji": "🧱" },
-        { "label": "It is hollow", "emoji": "🕳️" }
+        {
+          "label": "It has glue inside",
+          "emoji": "🧴"
+        },
+        {
+          "label": "The stones push against each other",
+          "emoji": "🧱"
+        },
+        {
+          "label": "It is hollow",
+          "emoji": "🕳️"
+        }
       ],
       "answer": 1,
       "reveal": "The weight on top pushes the stones against each other, and the stones push back. No glue is needed, which is why an arch is so strong.",
@@ -54,16 +67,47 @@
       "module": "studio",
       "title": "Build the fish tunnel",
       "intro": "Build the aquarium with an arch or a ring of curves, so the fish swim all round you.",
-      "data": { "preset": "aquarium" }
+      "data": {
+        "preset": "aquarium"
+      }
+    },
+    {
+      "type": "story",
+      "title": "Buildings with character",
+      "emoji": "🎩🦵🏰",
+      "text": "The architect John Hejduk drew buildings like characters. Some had pointy hats, some stood on legs, and some had curvy walls and round windows.",
+      "wow": "A building can have a personality!",
+      "ask": "If your classroom was a character, what would it look like?"
+    },
+    {
+      "type": "play",
+      "module": "studio",
+      "title": "Give a room character",
+      "intro": "Tap a room, tap Style, then change its roof, its walls and more.",
+      "data": {
+        "preset": "style"
+      }
     },
     {
       "type": "question",
       "title": "Tunnel, dome or tower?",
       "scenario": "Should the aquarium be a tunnel you walk through, a dome over the fish, or a tall tower?",
       "options": [
-        { "label": "A tunnel", "emoji": "🚇", "detail": "You walk right through the water, with fish above, beside and below you." },
-        { "label": "A dome", "emoji": "🫧", "detail": "A round roof with no pillars inside lets the fish swim in one big bowl." },
-        { "label": "A tower", "emoji": "🗼", "detail": "A tall shape lets you look down through the layers of water as you climb." }
+        {
+          "label": "A tunnel",
+          "emoji": "🚇",
+          "detail": "You walk right through the water, with fish above, beside and below you."
+        },
+        {
+          "label": "A dome",
+          "emoji": "🫧",
+          "detail": "A round roof with no pillars inside lets the fish swim in one big bowl."
+        },
+        {
+          "label": "A tower",
+          "emoji": "🗼",
+          "detail": "A tall shape lets you look down through the layers of water as you climb."
+        }
       ],
       "reveal": "Architects think about how people move, how the fish live and how the building looks from outside. Aquariums around the world come in many different shapes.",
       "followUp": "If you could visit any shape of fish house, which would you choose, and why?"
@@ -71,7 +115,11 @@
     {
       "type": "athome",
       "title": "Make a human arch",
-      "need": ["Two grown-ups", "A safe, flat, clear space", "A soft toy to be the keystone"],
+      "need": [
+        "Two grown-ups",
+        "A safe, flat, clear space",
+        "A soft toy to be the keystone"
+      ],
       "steps": [
         "The two grown-ups stand a little apart, to be the sides of the arch, and lean in gently until their hands meet at the top.",
         "Keep the pushing gentle. Feel how the hands push against each other, and how they hold the shape.",

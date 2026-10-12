@@ -197,7 +197,9 @@ export function wallMaterial(roomId, matId) {
 }
 
 export function interiorMaterial(roomId) {
-  return cached('i' + roomId, () => new THREE.MeshLambertMaterial({ color: mix(ROOMS[roomId]?.colour || '#dddddd', '#ffffff', 0.72), clippingPlanes: CLIP, side: THREE.FrontSide }));
+  // A little glow so inside walls and ceilings are not gloomy where the sun cannot reach.
+  const col = mix(ROOMS[roomId]?.colour || '#dddddd', '#ffffff', 0.72);
+  return cached('i' + roomId, () => new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.32, clippingPlanes: CLIP, side: THREE.FrontSide }));
 }
 export function floorMaterial(roomId) {
   return cached('f' + roomId, () => new THREE.MeshLambertMaterial({ color: mix(ROOMS[roomId]?.colour || '#dddddd', '#ffffff', 0.45), clippingPlanes: CLIP }));

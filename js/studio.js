@@ -71,9 +71,10 @@ export async function mountStudio(host, opts = {}) {
     S.idx = indexDesign(S.design);
     S.doors = computeDoors(S.idx);
     dv.sync(S.idx, S.cutaway ? 'cutaway' : S.mode);
-    const occ = [];
-    for (const c of S.design.cells) for (const p of footprint(c)) if (p.level === 0) occ.push(`${p.x},${p.z}`);
-    terrain.trees.sync(occ);
+    // Trees hop aside from buildings and the cells around them, like a cleared plot.
+    const occ = new Set();
+    for (const c of S.design.cells) for (const p of footprint(c)) if (p.level === 0) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) occ.add(`${p.x + dx},${p.z + dz}`);
+    terrain.trees.sync([...occ]);
     const b = bounds(S.design);
     if (b) world.focusShadows(b.cx, b.cz, Math.max(b.x1 - b.x0, b.z1 - b.z0) / 2 + 6);
     store.set({ design: S.design });
@@ -610,7 +611,10 @@ export async function mountStudio(host, opts = {}) {
     world.controls.enabled = true;
     if (v === 'plan') {
       world.stop();
-      planView = planView || fitView(S.design, viewport.clientWidth, viewport.clientHeight);
+      // Fit the school into the clear area between the tray and the right-hand buttons.
+      const W = viewport.clientWidth, H = viewport.clientHeight;
+      planView = fitView(S.design, Math.max(200, W - 400), Math.max(200, H - 140));
+      planView.x0 -= 290 / planView.s; planView.z0 -= 76 / planView.s;
       drawPlanView();
       say('This is the plan. It shows the school from above, like a map, with the walls, doors and windows.');
     } else {
@@ -737,7 +741,8 @@ export async function mountStudio(host, opts = {}) {
     S.tasks = list.map(t => ({ ...t, done: false }));
     tasksDone = false;
     if (tasksEl) tasksEl.remove();
-    tasksEl = h(`<div class="tasks"><div class="tt">Your jobs</div></div>`);
+    tasksEl = h(`<div class="tasks"><div class="tt" role="button" tabindex="0">Your jobs <span class="fold">${icon('down')}</span></div></div>`);
+    tasksEl.querySelector('.tt').addEventListener('click', () => { tasksEl.classList.toggle('folded'); sfx.tap(); });
     root.appendChild(tasksEl);
     drawTasks();
   }
@@ -763,7 +768,7 @@ export async function mountStudio(host, opts = {}) {
     if (changed) {
       drawTasks();
       const next = S.tasks.find(t => !t.done);
-      if (!next) { tasksDone = true; sfx.tada(); toast('All jobs done!', '🎉'); ctx.complete && ctx.complete(); emit('tasksDone'); }
+      if (!next) { tasksDone = true; sfx.tada(); toast('All jobs done!', '🎉'); ctx.complete && ctx.complete(); emit('tasksDone'); setTimeout(() => tasksEl && tasksEl.classList.add('folded'), 3500); }
       else setTimeout(() => sayAuto(next.say || next.text), 1800);
     }
   }
@@ -827,5 +832,6 @@ export async function mountStudio(host, opts = {}) {
   if (preset.setup) await preset.setup(api);
   if (preset.tasks) setTasks(preset.tasks);
   emit('ready');
+  window.__studio = api;   // testing aid
   return api;
 }

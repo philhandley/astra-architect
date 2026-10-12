@@ -8,7 +8,7 @@ import { h, esc, say, sfx, toast } from '../ui/dom.js';
 import { emo } from '../core/emoji.js';
 import { icon } from '../core/icons.js';
 
-const EYE = 0.27;
+const EYE = 0.37;
 const SPEED = 1.5;
 
 export function startWalk(api, world, root) {

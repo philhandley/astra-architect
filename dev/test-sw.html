@@ -1,19 +1,24 @@
 <!doctype html><meta charset="utf-8"><title>sw test</title>
+<pre id="out"></pre>
+<img src="../hold?s=40" alt="" width="1" height="1">
 <script type="module">
-const log = (...a) => console.log('SWTEST', ...a);
+// Registers the service worker and reports what it cached. Run with tools/swtest.sh.
+const out = document.getElementById('out');
+const log = (...a) => { console.log('SWTEST', ...a); out.textContent += 'SWTEST ' + a.join(' ') + '\n'; };
 try {
   const reg = await navigator.serviceWorker.register('../sw.js', { scope: '../' });
   log('registered', reg.scope);
   const sw = reg.installing || reg.waiting || reg.active;
-  await new Promise(res => { if (sw.state === 'activated') return res(); sw.addEventListener('statechange', () => { log('state', sw.state); if (sw.state === 'activated') res(); }); });
+  await new Promise(res => { if (sw.state === 'activated') return res(); sw.addEventListener('statechange', () => { if (sw.state === 'activated') res(); }); });
   const keys = (await caches.keys()).filter(k => k.startsWith('astraarch-'));
   const c = await caches.open(keys[0]);
   const n = (await c.keys()).length;
   const has = async u => !!(await c.match(new URL(u, location.href).href));
-  log('cache', keys.join(','), 'entries', n,
-    'shell', await has('../'), 'app', await has('../js/app.js'), 'studio', await has('../js/studio.js'),
+  log('cache', keys.join(','), 'entries', n);
+  log('shell', await has('../'), 'app', await has('../js/app.js'), 'studio', await has('../js/studio.js'),
     'map', await has('../assets/site/map.jpg'), 'pupil', await has('../assets/models/characters/character-male-b.glb'),
     'three', await has('https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js'),
-    'nipple', await has('https://cdn.jsdelivr.net/npm/nipplejs@1.0.4/+esm'));
+    'nipple', await has('https://cdn.jsdelivr.net/npm/nipplejs@1.0.4/+esm'),
+    'font', await has('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap'));
 } catch (e) { log('ERROR', e.message); }
 </script>

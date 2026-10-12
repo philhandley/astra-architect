@@ -79,4 +79,5 @@ export const store = {
   modSave(mod, k, v) { (state.mod[mod] ||= {})[k] = v; write(); },
   modLoad(mod, k) { return state.mod?.[mod]?.[k] ?? null; },
   reset() { const crew = state.crew; state = DEFAULTS(); state.crew = crew; flush(); },
+  wipe() { state = DEFAULTS(); flush(); },
 };

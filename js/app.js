@@ -634,6 +634,7 @@ async function boot() {
   app.innerHTML = `<div style="height:100%;display:grid;place-items:center;color:var(--ink-3);font-weight:700;letter-spacing:.2em">LOADING</div>`;
   await Promise.all([loadAll(), loadSite()]);
   const p = new URLSearchParams(location.search);
+  if (p.has('reset')) store.wipe();
   if (p.has('devcrew') && !store.state.crew) store.set({ crew: { commander: 'Finn', engineer: 'Grown-up' } });
   if (p.has('devdesign')) {
     const { SAMPLE } = await import('./core/sample.js');

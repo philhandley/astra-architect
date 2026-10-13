@@ -14,8 +14,18 @@ export async function loadSite(pad) {
   makeSite(pad);
   return S;
 }
-// Build the site data, with new flat land round the edges. The first new square eases from the edge of the
-// map (a mountain, or the sea bed) to flat lawn, so there are no sudden cliffs.
+// Build the site data, with new land round the edges that carries on what is at each edge: the mountains and
+// forest keep going, the sea stays sea, the meadow and beach go on. It is the edge of Finn's map reflected
+// outwards, with a little gentle variation on the hills so it never looks like a mirror.
+const reflectV = (o, n) => (o < 0 ? Math.min(n - 1, -o) : o >= n ? Math.max(0, 2 * (n - 1) - o) : o);      // vertices
+const reflectC = (o, n) => (o < 0 ? Math.min(n - 1, -o - 1) : o >= n ? Math.max(0, 2 * n - o - 1) : o);  // cells
+function wobble(x, z) {
+  // Smooth value noise, about one square across.
+  const h = (a, b) => { let t = Math.imul(a * 374761393 + b * 668265263, 1274126177) >>> 0; t = (t ^ (t >>> 13)) >>> 0; return (Math.imul(t, 1103515245) >>> 0) / 4294967296; };
+  const X = x / 6, Z = z / 6, xi = Math.floor(X), zi = Math.floor(Z), fx = X - xi, fz = Z - zi, sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
+  const a = h(xi, zi), b = h(xi + 1, zi), c = h(xi, zi + 1), d = h(xi + 1, zi + 1);
+  return (a + (b - a) * sx) * (1 - sz) + (c + (d - c) * sx) * sz - 0.5;
+}
 export function makeSite(pad = { w: 0, e: 0, n: 0, s: 0 }) {
   const s0 = RAW, k = GRID.k, res = s0.res;
   const pw = pad.w * k, pe = pad.e * k, pn = pad.n * k, ps = pad.s * k, W = s0.w + pw + pe, D = s0.d + pn + ps;
@@ -23,20 +33,17 @@ export function makeSite(pad = { w: 0, e: 0, n: 0, s: 0 }) {
   const hw0 = s0.w * res + 1, hd0 = s0.d * res + 1, hw = W * res + 1, hd = D * res + 1;
   const heights = new Float32Array(hw * hd), band = k * res;
   for (let j = 0; j < hd; j++) for (let i = 0; i < hw; i++) {
-    const oi = i - pw * res, oj = j - pn * res, ci = Math.min(Math.max(oi, 0), hw0 - 1), cj = Math.min(Math.max(oj, 0), hd0 - 1);
-    const edge = s0.heights[cj * hw0 + ci] / 100, d = Math.max(Math.abs(oi - ci), Math.abs(oj - cj));
-    const t = Math.min(1, d / band);
-    heights[j * hw + i] = edge * (1 - t * t * (3 - 2 * t));
+    const oi = i - pw * res, oj = j - pn * res, ri = reflectV(oi, hw0), rj = reflectV(oj, hd0);
+    let hgt = s0.heights[rj * hw0 + ri] / 100;
+    const d = Math.max(oi < 0 ? -oi : oi >= hw0 ? oi - hw0 + 1 : 0, oj < 0 ? -oj : oj >= hd0 ? oj - hd0 + 1 : 0);
+    // Hills and mountains vary a little as they go on (the flat meadow and the sea stay flat).
+    if (d > 0 && hgt > 0.06) hgt = Math.max(0.06, hgt + wobble(i, j) * Math.min(1, d / band) * Math.min(0.6, hgt * 0.5));
+    heights[j * hw + i] = hgt;
   }
-  const sea = s0.seaLevel * EXAG / k, zones = [];
+  const zones = [], sea = s0.seaLevel * EXAG / k;
   for (let z = 0; z < D; z++) {
     const row = [];
-    for (let x = 0; x < W; x++) {
-      const ox = x - pw, oz = z - pn;
-      if (ox >= 0 && oz >= 0 && ox < s0.w && oz < s0.d) { row.push(s0.zones[oz][ox]); continue; }
-      const hh = heights[Math.min(hd - 1, z * res + 1) * hw + Math.min(hw - 1, x * res + 1)] * EXAG / k;
-      row.push(hh < sea + 0.015 ? 'w' : hh < sea + 0.07 ? 'b' : 'm');
-    }
+    for (let x = 0; x < W; x++) row.push(s0.zones[reflectC(z - pn, s0.d)][reflectC(x - pw, s0.w)]);
     zones.push(row);
   }
   const s = { ...s0, w: W, d: D, zones };

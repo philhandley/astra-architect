@@ -54,10 +54,10 @@ async function boot() {
   app.appendChild(shell);
   const worldHost = shell.querySelector('.world'), overlay = shell.querySelector('.overlay'), roomsHost = shell.querySelector('.rooms-host');
 
-  await loadSite();
+  const model = new Model();
+  await loadSite(model.pad);
   const world = new World(worldHost);
   const siteView = buildSite(world);
-  const model = new Model();
   const thumbs = trayThumbs(model);
   const site = mountSite(overlay, world, model, siteView, thumbs);
   const rooms = mountRooms(roomsHost, model, { thumbs, onBuild: id => { location.hash = '#site'; setTimeout(() => site.setTool(id), 50); } });
@@ -89,7 +89,7 @@ async function boot() {
     if (a === 'photo') { if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => site.photo(), 400); } else site.photo(); }
     if (a === 'finn') {
       if (model.boxes.length && !confirm('Put Finn\'s wooden-block model on the site? (Undo brings back what is there now.)')) return;
-      model.snapshot(); model.boxes = FINNS_MODEL.map((b, i) => ({ ...b, id: i + 1 })); model.nextId = FINNS_MODEL.length + 1; model.changed({ loaded: true });
+      model.snapshot(); model.boxes = FINNS_MODEL.map((b, i) => ({ ...b, id: i + 1, x: b.x + model.pad.w, z: b.z + model.pad.n })); model.nextId = FINNS_MODEL.length + 1; model.changed({ loaded: true });
       location.hash = '#site'; site.select(null); site.frameSite(); sfx.whoosh(); say('Here is your model from the table, on the site. Tap a block to change it.');
     }
     if (a === 'clear') { if (!model.boxes.length || confirm('Start with an empty site? (Undo brings it back.)')) { model.clear(); site.select(null); sfx.whoosh(); } }

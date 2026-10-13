@@ -71,6 +71,13 @@ export class Trails {
     this.dirty++;
   }
   clear() { this.g.clearRect(0, 0, this.c.width, this.c.height); this.dirty++; }
+  // The site grew: a fresh layer the new size.
+  resize() {
+    this.c.width = GRID.w * 50; this.c.height = GRID.d * 50; this.tex.dispose();
+    this.tex = new THREE.CanvasTexture(this.c); this.tex.colorSpace = THREE.SRGBColorSpace; this.mesh.material.map = this.tex; this.mesh.material.needsUpdate = true;
+    this.mesh.geometry.dispose(); this.mesh.geometry = new THREE.PlaneGeometry(GRID.w, GRID.d).rotateX(-Math.PI / 2);
+    this.mesh.position.set(GRID.w / 2, 0.024, GRID.d / 2);
+  }
 }
 
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);

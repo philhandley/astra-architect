@@ -11,7 +11,8 @@ export class Model {
     this.boxes = [];
     this.nextId = 1;
     this.styles = {};            // programme -> { shape, colour } chosen in the Rooms area
-    this.grown = [];             // extra squares of land added with the green arrows, [x, z]
+    this.grown = [];             // forest cleared into land in an earlier version, [x, z]
+    this.pad = { w: 0, e: 0, n: 0, s: 0 };   // squares of new land added round the site with the green arrows
     this.history = [];
     this.listeners = new Set();
     this.load();
@@ -22,10 +23,10 @@ export class Model {
   load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY) || 'null');
-      if (s) { this.boxes = s.boxes || []; this.nextId = s.nextId || 1; this.styles = s.styles || {}; this.grown = s.grown || []; }
+      if (s) { this.boxes = s.boxes || []; this.nextId = s.nextId || 1; this.styles = s.styles || {}; this.grown = s.grown || []; this.pad = { w: 0, e: 0, n: 0, s: 0, ...(s.pad || {}) }; }
     } catch (e) { /* a fresh start */ }
   }
-  save() { try { localStorage.setItem(KEY, JSON.stringify({ boxes: this.boxes, nextId: this.nextId, styles: this.styles, grown: this.grown })); } catch (e) { /* storage full or blocked */ } }
+  save() { try { localStorage.setItem(KEY, JSON.stringify({ boxes: this.boxes, nextId: this.nextId, styles: this.styles, grown: this.grown, pad: this.pad })); } catch (e) { /* storage full or blocked */ } }
   onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
   changed(what = {}) { this.reindex(); this.save(); for (const fn of this.listeners) fn(what); }
   snapshot() { this.history.push(JSON.stringify(this.boxes)); if (this.history.length > 80) this.history.shift(); }

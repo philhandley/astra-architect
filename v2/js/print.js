@@ -81,7 +81,7 @@ function renderAxo(world, siteView, design, handles, mode = 'white') {
   scene.background = new THREE.Color('#ffffff');
   const W = 2400, H = 1600;
   r.setPixelRatio(1); r.setSize(W, H, false);
-  const half = 7.6, a = W / H;
+  const half = 7.6 * Math.max(GRID.w / 20, GRID.d / 14), a = W / H;
   cam.left = -half * a; cam.right = half * a; cam.top = half; cam.bottom = -half; cam.zoom = 1;
   const off = saved.pos.clone().sub(saved.target);
   const tgt = new THREE.Vector3(GRID.w / 2 - 0.6, 0, GRID.d / 2 + 0.6);

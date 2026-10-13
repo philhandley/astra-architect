@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PROGRAMMES, SHAPES, PALETTE, SURFACES, NO_SURFACE, WINDOWS, LEVEL, MAX_SIZE, MAX_LEVELS, TRAY, colourHex } from './catalogue.js';
 import { WINDOWED, winStyle } from './plan.js';
-import { GRID, square, canGrow, growSquares, resetGrowth } from './site.js';
+import { GRID, MAX_PAD, square, makeSite, buildSite, growSquares } from './site.js';
 import { buildPiece, disposePiece, ghostMaterial, addInk, INK } from './shapes.js';
 import { cutRoom, outline, CUTTABLE, storeyFloor, SINGLE_SPACE } from './inside.js';
 import { SchoolDay, Trails, PERIODS } from './day.js';
@@ -511,19 +511,13 @@ export function mountSite(root, world, model, siteView, thumbs) {
   const growbar = ui.querySelector('.growbar'), siteArrows = new THREE.Group(); world.scene.add(siteArrows); siteArrows.visible = false;
   const GDIR = { px: [1, 0], nx: [-1, 0], pz: [0, 1], nz: [0, -1] }, GA = {};
   for (const k of Object.keys(GDIR)) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: growTex, depthTest: false, transparent: true })); sp.renderOrder = 20; sp.userData.dir = k; GA[k] = sp; siteArrows.add(sp); }
-  // The squares one step further out, all along one edge of the land (each row or column grows at its own end).
-  function edgeSquares(dir) {
-    const [dx, dz] = GDIR[dir], out = [];
-    if (dz) for (let x = 0; x < GRID.w; x++) { let e = null; for (let z = 0; z < GRID.d; z++) if (square(x, z)?.build) e = e === null ? z : dz > 0 ? Math.max(e, z) : Math.min(e, z); if (e !== null && canGrow(x, e + dz)) out.push([x, e + dz]); }
-    else for (let z = 0; z < GRID.d; z++) { let e = null; for (let x = 0; x < GRID.w; x++) if (square(x, z)?.build) e = e === null ? x : dx > 0 ? Math.max(e, x) : Math.min(e, x); if (e !== null && canGrow(e + dx, z)) out.push([e + dx, z]); }
-    return out;
-  }
+  // Each green arrow adds a row of new land on its side of the site (up to MAX_PAD rows a side).
+  const SIDE = { px: 'e', nx: 'w', pz: 's', nz: 'n' };
   function placeSiteArrows() {
-    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-    for (let z = 0; z < GRID.d; z++) for (let x = 0; x < GRID.w; x++) if (square(x, z)?.build) { x0 = Math.min(x0, x); x1 = Math.max(x1, x + 1); z0 = Math.min(z0, z); z1 = Math.max(z1, z + 1); }
-    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, y = 0.45;
-    GA.px.position.set(x1 + 0.5, y, cz); GA.nx.position.set(x0 - 0.5, y, cz); GA.pz.position.set(cx, y, z1 + 0.5); GA.nz.position.set(cx, y, z0 - 0.5);
-    for (const k of Object.keys(GA)) GA[k].visible = edgeSquares(k).length > 0;
+    const y = 0.5;
+    GA.px.position.set(GRID.w + 0.7, y, GRID.d / 2); GA.nx.position.set(-0.7, y, GRID.d / 2);
+    GA.pz.position.set(GRID.w / 2, y, GRID.d + 0.7); GA.nz.position.set(GRID.w / 2, y, -0.7);
+    for (const k of Object.keys(GA)) GA[k].visible = model.pad[SIDE[k]] < MAX_PAD;
   }
   world.updaters.add(() => {
     if (!siteArrows.visible) return;
@@ -540,25 +534,41 @@ export function mountSite(root, world, model, siteView, thumbs) {
     S.siteEdit = true; siteView.setGridStrong(true); placeSiteArrows(); siteArrows.visible = true;
     growbar.hidden = false; sideEl.querySelector('.sbtn.grow').classList.add('on');
     frameSite();
-    say('Tap a green arrow to make the land bigger. The trees are cleared and the ground is made flat.');
-    setHint('Tap a green arrow to make the land bigger.');
+    say('Tap a green arrow to add more land to that side of the site.');
+    setHint('Tap a green arrow to add more land.');
   }
   function stopGrow() {
     S.siteEdit = false; siteArrows.visible = false; growbar.hidden = true; siteView.setGridStrong(false);
     sideEl.querySelector('.sbtn.grow').classList.remove('on'); defaultHint();
   }
+  // Make the site again at its new size. Land added to the west or north moves everything along, so the
+  // buildings stay where they are on the land.
+  function resize(dx, dz) {
+    for (const b of model.boxes) { b.x += dx; b.z += dz; }
+    model.grown = model.grown.map(([x, z]) => [x + dx, z + dz]);
+    makeSite(model.pad);
+    buildSite(world, siteView);
+    if (model.grown.length) growSquares(model.grown);
+    siteView.regrow(); trails.resize();
+    model.changed({ resized: true });
+    siteView.setGridStrong(S.siteEdit); placeSiteArrows(); frameSite();
+  }
   function growDir(dir) {
-    const add = edgeSquares(dir);
-    if (!add.length) { sfx.no(); toast('The land cannot grow that way.'); return; }
-    growSquares(add); model.grown.push(...add); model.save();
-    siteView.regrow(); redraw(); placeSiteArrows();
-    sfx.grow(); say('More land!');
+    const side = SIDE[dir];
+    if (model.pad[side] >= MAX_PAD) { sfx.no(); toast('That side is as big as it can be.'); return; }
+    model.pad[side]++;
+    resize(side === 'w' ? 1 : 0, side === 'n' ? 1 : 0);
+    sfx.grow(); say(model.pad[side] >= MAX_PAD ? 'More land! That side is as big as it can be now.' : 'More land!');
   }
   growbar.querySelector('.done').addEventListener('click', () => { sfx.tap(); stopGrow(); });
   growbar.querySelector('.reset').addEventListener('click', () => {
     sfx.tap();
-    if (model.boxes.some(b => b.level === 0 && model.squares(b).some(([x, z]) => model.grown.some(([gx, gz]) => gx === x && gz === z)))) { sfx.no(); toast('Move the rooms off the new land first.'); return; }
-    resetGrowth(); model.grown = []; model.save(); siteView.regrow(); redraw(); placeSiteArrows(); say('The site is back to how it was.');
+    const p = model.pad, inOld = (x, z) => x >= p.w && z >= p.n && x < GRID.w - p.e && z < GRID.d - p.s;
+    if (model.boxes.some(b => model.squares(b).some(([x, z]) => !inOld(x, z)))) { sfx.no(); toast('Move the rooms off the new land first.'); say('Move the rooms off the new land first.'); return; }
+    const dx = -p.w, dz = -p.n;
+    model.pad = { w: 0, e: 0, n: 0, s: 0 };
+    resize(dx, dz);
+    say('The site is back to how it was.');
   });
   // Land added in an earlier visit comes back.
   if (model.grown.length) { growSquares(model.grown); siteView.regrow(); }
@@ -783,7 +793,8 @@ export function mountSite(root, world, model, siteView, thumbs) {
     const t = world.controls.target;
     world.frame(b && f > 1 ? (t.x + b.x + b.w / 2) / 2 : t.x, b && f > 1 ? (t.z + b.z + b.d / 2) / 2 : t.z, clamp(world.camera.zoom * f, 0.6, 6));
   }
-  function frameSite(instant = false) { world.frame(7.4, 8.6, 1.05, instant); }
+  // The whole site in view (it may have grown).
+  function frameSite(instant = false) { world.frame(GRID.w / 2 - 2.6, GRID.d / 2 + 1.6, 1.05 * Math.min(20 / GRID.w, 14 / GRID.d), instant); }
 
   drawTray();
   redraw();

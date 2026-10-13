@@ -4,16 +4,43 @@
 import * as THREE from 'three';
 
 export const GRID = { w: 20, d: 14, k: 3 };
+export const MAX_PAD = 5;               // squares of new land Finn can add on each side
 const EXAG = 2.0;                       // hills a little taller than life, so the site reads as a model
-let S = null;
+let S = null, RAW = null;
 
-export async function loadSite() {
-  if (S) return S;
-  const s = await (await fetch('../assets/site/site.json')).json();
-  const hw = s.w * s.res + 1, hd = s.d * s.res + 1;
-  const heights = new Float32Array(s.heights.length);
-  for (let i = 0; i < heights.length; i++) heights[i] = s.heights[i] / 100;
-  S = { raw: s, hw, hd, heights, sea: s.seaLevel * EXAG / GRID.k, waterfall: [s.waterfall[0] / GRID.k, s.waterfall[1] / GRID.k], gate: [Math.floor(s.gate[0] / GRID.k), Math.floor(s.gate[1] / GRID.k)] };
+// pad: squares of new land added round Finn's map, { w, e, n, s } (west, east, north, south).
+export async function loadSite(pad) {
+  if (!RAW) RAW = await (await fetch('../assets/site/site.json')).json();
+  makeSite(pad);
+  return S;
+}
+// Build the site data, with new flat land round the edges. The first new square eases from the edge of the
+// map (a mountain, or the sea bed) to flat lawn, so there are no sudden cliffs.
+export function makeSite(pad = { w: 0, e: 0, n: 0, s: 0 }) {
+  const s0 = RAW, k = GRID.k, res = s0.res;
+  const pw = pad.w * k, pe = pad.e * k, pn = pad.n * k, ps = pad.s * k, W = s0.w + pw + pe, D = s0.d + pn + ps;
+  GRID.w = W / k; GRID.d = D / k;
+  const hw0 = s0.w * res + 1, hd0 = s0.d * res + 1, hw = W * res + 1, hd = D * res + 1;
+  const heights = new Float32Array(hw * hd), band = k * res;
+  for (let j = 0; j < hd; j++) for (let i = 0; i < hw; i++) {
+    const oi = i - pw * res, oj = j - pn * res, ci = Math.min(Math.max(oi, 0), hw0 - 1), cj = Math.min(Math.max(oj, 0), hd0 - 1);
+    const edge = s0.heights[cj * hw0 + ci] / 100, d = Math.max(Math.abs(oi - ci), Math.abs(oj - cj));
+    const t = Math.min(1, d / band);
+    heights[j * hw + i] = edge * (1 - t * t * (3 - 2 * t));
+  }
+  const sea = s0.seaLevel * EXAG / k, zones = [];
+  for (let z = 0; z < D; z++) {
+    const row = [];
+    for (let x = 0; x < W; x++) {
+      const ox = x - pw, oz = z - pn;
+      if (ox >= 0 && oz >= 0 && ox < s0.w && oz < s0.d) { row.push(s0.zones[oz][ox]); continue; }
+      const hh = heights[Math.min(hd - 1, z * res + 1) * hw + Math.min(hw - 1, x * res + 1)] * EXAG / k;
+      row.push(hh < sea + 0.015 ? 'w' : hh < sea + 0.07 ? 'b' : 'm');
+    }
+    zones.push(row);
+  }
+  const s = { ...s0, w: W, d: D, zones };
+  S = { raw: s, pad: { ...pad }, hw, hd, heights, sea, waterfall: [s0.waterfall[0] / k + pad.w, s0.waterfall[1] / k + pad.n], gate: [Math.floor(s0.gate[0] / k) + pad.w, Math.floor(s0.gate[1] / k) + pad.n] };
   // Each square: what it mostly is, whether you can build on it, and the height a building would stand at.
   S.squares = [];
   for (let sz = 0; sz < GRID.d; sz++) {
@@ -45,7 +72,7 @@ export async function loadSite() {
   }
   for (const [sx, sz] of grow) S.squares[sz][sx] = { zone: 'meadow', build: true, base: 0, lo: 0, grown: true };
   // Level the ground under the grown squares (and ease it back up at their edges).
-  const k = GRID.k, res = s.res, flat = (x, z) => S.squares[z]?.[x]?.grown;
+  const flat = (x, z) => S.squares[z]?.[x]?.grown;
   for (let j = 0; j < hd; j++) for (let i = 0; i < hw; i++) {
     const wx = i / res / k, wz = j / res / k, sx = Math.floor(wx), sz = Math.floor(wz);
     const fx = wx - sx, fz = wz - sz, n = heights[j * hw + i];
@@ -55,13 +82,9 @@ export async function loadSite() {
   }
   S.grown = new Set(grow.map(([x, z]) => `${x},${z}`));
   S.heights0 = heights.slice();          // the ground before any building levels it
-  // The site as first made, so extra land can be put back.
-  S.squaresBase = S.squares.map(row => row.map(q => ({ ...q })));
-  S.grownBase = new Set(S.grown);
-  S.heightsBase = S.heights0.slice();
   return S;
 }
-// Land Finn can add with the green arrows: forest or rocks (never the sea).
+// Forest cleared into land (an earlier version of Bigger site saved these squares): forest or rocks only.
 export const canGrow = (x, z) => { const q = square(x, z); return !!q && !q.build && (q.zone === 'forest' || q.zone === 'rocks'); };
 // Clear and level squares of forest into lawn you can build on (easing back up at their edges).
 export function growSquares(list) {
@@ -77,12 +100,6 @@ export function growSquares(list) {
     if (w > 0) heights0[n] *= 1 - w;
   }
   return add.length;
-}
-// Back to the site as it first was.
-export function resetGrowth() {
-  S.squares = S.squaresBase.map(row => row.map(q => ({ ...q })));
-  S.grown = new Set(S.grownBase);
-  S.heights0.set(S.heightsBase);
 }
 // Level the ground under buildings: pads maps a square (x * 100 + z) to the height a building stands at.
 // Inside a pad the ground is cut or filled flat; just outside it eases back to the natural slope.
@@ -117,9 +134,19 @@ export function groundAt(wx, wz) {
 
 const ZONE_COL = { m: '#cfe39c', b: '#f0e2c0', f: '#a8cc83', c: '#d4d0c6', w: '#93cbd9', p: '#93cbd9', r: '#93cbd9' };
 
-export function buildSite(world) {
+export function buildSite(world, view = {}) {
+  // Building again (the site grew): clear away the old one first.
+  if (view.group) {
+    world.scene.remove(view.group);
+    view.group.traverse(o => { o.geometry?.dispose(); for (const m of [].concat(o.material || [])) { m.map?.dispose(); m.dispose(); } });
+    world.updaters.delete(view._falls);
+  }
   const s = S.raw, group = new THREE.Group();
   group.name = 'site';
+  // Sunlight and shadows cover the whole site.
+  world.setSunFocus(GRID.w / 2, GRID.d / 2);
+  const sc = world.sun.shadow.camera, R = Math.max(14, Math.hypot(GRID.w, GRID.d) * 0.56);
+  sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.updateProjectionMatrix();
 
   // Ground colours, softly blended, painted onto a canvas (again whenever the land grows).
   const px = 16, cv = document.createElement('canvas');
@@ -170,7 +197,8 @@ export function buildSite(world) {
   // The waterfall: water running down the cliff, foam and ripples.
   const falls = waterfall();
   group.add(falls);
-  world.updaters.add(dt => falls.userData.update(dt));
+  const fallsFn = dt => falls.userData.update(dt);
+  world.updaters.add(fallsFn);
 
   // Round trees on the forest, each a ball on a stick.
   const trees = forestTrees();
@@ -194,7 +222,7 @@ export function buildSite(world) {
   group.add(grid);
 
   world.scene.add(group);
-  return { group, ground, water, grid, trees,
+  return Object.assign(view, { group, ground, water, grid, trees, _falls: fallsFn, _pads: null,
     setGridStrong(on) { grid.material.opacity = on ? 0.85 : 0.0; grid.visible = on; },
     // Trees step out of the way of buildings, and sit on the ground where it has been levelled.
     clearTrees(occupied) {
@@ -225,7 +253,7 @@ export function buildSite(world) {
       grid.geometry.dispose(); grid.geometry = gridGeometry();
       this._pads = null;
     },
-  };
+  });
 }
 
 function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }

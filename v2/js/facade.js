@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat } from './shapes.js';
-import { GAP, WINDOWED, rows, wallRuns, openings, runAt, bandGeometry, roundedRect, ringThickness } from './plan.js';
+import { GAP, WINDOWED, rows, wallRuns, openings, runAt, bandGeometry, roundedRect, ringThickness, turnAngle } from './plan.js';
 
 const ROOF = 0.4;
 const FRAME = '#fbfaf6';
@@ -36,10 +36,20 @@ function rectWindow(L, run, o, yb) {
     L.frame.push(bandGeometry(run, o.s0, o.s1, yb + o.y0 + h * 0.64 - 0.006, yb + o.y0 + h * 0.64 + 0.006, 0.004, 0.024));
   }
 }
+// A flat shape (in the wall's plane) pushed out from the wall face.
+function plate(list, p, y, shape, d, out) {
+  list.push(new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: false, curveSegments: 20 }).translate(0, 0, out - d / 2).rotateY(Math.atan2(p.nx, p.nz)).translate(p.x, y, p.z));
+}
+const circle = r => { const s = new THREE.Path(); s.absarc(0, 0, r, 0, Math.PI * 2, true); return s; };
 function roundWindow(L, run, o, yb) {
   const p = runAt(run, (o.s0 + o.s1) / 2), r = (o.s1 - o.s0) / 2, y = yb + (o.y0 + o.y1) / 2;
-  disc(o.frame ? L.of(o.frame) : L.frame, p, y, r + 0.022, 0.016, 0.008);
-  disc(L.glass, p, y, r, 0.012, 0.016);
+  const ring = new THREE.Shape(); ring.absarc(0, 0, r + 0.022, 0, Math.PI * 2, false); ring.holes.push(circle(r));
+  plate(o.frame ? L.of(o.frame) : L.frame, p, y, ring, 0.016, 0.013);
+  if (L.walk) {
+    // Walking through: the wall has a square hole here; a plate in the wall colour makes it look round.
+    const sq = new THREE.Shape(); sq.moveTo(-r - 0.004, -r - 0.004); sq.lineTo(r + 0.004, -r - 0.004); sq.lineTo(r + 0.004, r + 0.004); sq.lineTo(-r - 0.004, r + 0.004); sq.closePath(); sq.holes.push(circle(r));
+    plate(L.body, p, y, sq, 0.006, 0.004);
+  } else disc(L.glass, p, y, r, 0.012, 0.016);
 }
 // The front door: a bright door with a little window, a white canopy over it and a step.
 function frontDoor(L, run, o, yb) {
@@ -70,18 +80,24 @@ function gableWindows(L, box, H) {
   }
 }
 
-export function addFacade(g, box, H) {
+export function addFacade(g, box, H, opts = {}) {
   if (!WINDOWED.has(box.shape) || box.surface === 'glass') return;
   const byColour = new Map(), of = hex => { if (!byColour.has(hex)) byColour.set(hex, []); return byColour.get(hex); };
   const L = { of, glass: [], frame: of(FRAME), pop: of(popColour(box.hex)), step: of('#e6e1d6') };
   for (const row of rows(box)) {
     const runs = wallRuns(box, row.k);
+    // (When walking through this storey, the walls inside have the glass, and the doorway stays open.)
+    const walked = opts.walkK === row.k, LL = walked ? { ...L, glass: [], walk: true, body: L.of(box.hex) } : L;
     for (const o of openings(box, row.k, runs)) {
       const run = runs[o.run];
-      if (o.door) frontDoor(L, run, o, row.y0); else if (o.round) roundWindow(L, run, o, row.y0); else rectWindow(L, run, o, row.y0);
+      if (o.door) { if (walked && !o.glassDoor) { const p = runAt(run, (o.s0 + o.s1) / 2), w = o.s1 - o.s0; panel(L.frame, p.x, row.y0 + 0.345, p.z, p.nx, p.nz, w + 0.12, 0.016, 0.1, 0.05); panel(L.step, p.x, row.y0 + 0.008, p.z, p.nx, p.nz, w + 0.08, 0.016, 0.07, 0.035); } else frontDoor(LL, run, o, row.y0); }
+      else if (o.round) roundWindow(LL, run, o, row.y0); else rectWindow(LL, run, o, row.y0);
     }
   }
+  // Gable windows are worked out on the unturned piece, then turned with it.
+  const ang = turnAngle(box), before = new Map([...byColour].map(([k, v]) => [k, v.length])), g0 = L.glass.length;
   gableWindows(L, box, H);
+  if (ang) { for (const [k, v] of byColour) for (let i = before.get(k) || 0; i < v.length; i++) v[i].rotateY(-ang); for (let i = g0; i < L.glass.length; i++) L.glass[i].rotateY(-ang); }
   // (Window frames, doors and glass carry no outlines: the lines stay on the buildings themselves.)
   const merge = list => mergeGeometries(list.map(x => { const y = x.index ? x.toNonIndexed() : x; if (y.attributes.uv) y.deleteAttribute('uv'); return y; }));
   if (L.glass.length) { const m = new THREE.Mesh(merge(L.glass), mat('#a9d8ec', { emissive: '#6cb6d6', emissiveIntensity: 0.22 })); m.userData.glass = true; m.userData.noInk = true; m.receiveShadow = true; g.add(m); }

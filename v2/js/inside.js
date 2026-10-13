@@ -15,25 +15,20 @@ export const SINGLE = TALL;
 
 const lighten = (hex, f) => '#' + new THREE.Color(hex).lerp(new THREE.Color('#ffffff'), f).getHexString();
 
-function shapesOf(o) {
-  if (o.kind === 'rr') { const f = roundedRect(o.W, o.D, o.r); const w = roundedRect(o.W, o.D, o.r); w.holes.push(roundedRect(o.W - 2 * WALL, o.D - 2 * WALL, o.r - WALL)); return { floor: [f], walls: [w] }; }
+// The floor of a room. With e, it is tucked just inside the walls, so its edge never flickers against the wall face.
+function floorShapes(o, e = 0) {
+  if (o.kind === 'rr') return [roundedRect(o.W - 2 * e, o.D - 2 * e, Math.max(0.001, o.r - e))];
   if (o.kind === 'ring') {
     // (The floor runs out under the colonnade too.)
-    const f = roundedRect(o.W, o.D, o.r); f.holes.push(roundedRect(o.fWi, o.fDi, o.fri));
-    const w1 = roundedRect(o.W, o.D, o.r); w1.holes.push(roundedRect(o.W - 2 * WALL, o.D - 2 * WALL, o.r - WALL));
-    const w2 = roundedRect(o.Wi + 2 * WALL, o.Di + 2 * WALL, o.ri + WALL); w2.holes.push(roundedRect(o.Wi, o.Di, o.ri));
-    return { floor: [f], walls: [w1, w2] };
+    const f = roundedRect(o.W - 2 * e, o.D - 2 * e, o.r - e); f.holes.push(roundedRect(o.fWi + 2 * e, o.fDi + 2 * e, o.fri + e));
+    return [f];
   }
-  // A quarter band, drawn as a polygon (a quarter of a pie when the inside radius is 0).
-  const band = (a, b2) => { const s = new THREE.Shape(), n = 24; for (let i = 0; i <= n; i++) { const t = (i / n) * Math.PI / 2; const p = [o.cx + Math.cos(t) * b2, -(o.cz + Math.sin(t) * b2)]; i ? s.lineTo(...p) : s.moveTo(...p); } if (a < 0.01) { s.lineTo(o.cx, -o.cz); return s; } for (let i = n; i >= 0; i--) { const t = (i / n) * Math.PI / 2; s.lineTo(o.cx + Math.cos(t) * a, -(o.cz + Math.sin(t) * a)); } return s; };
-  const ends = [];
-  for (const t of [0, Math.PI / 2]) {
-    const s = new THREE.Shape(), c = Math.cos(t), sn = Math.sin(t), nx = -sn, nz = c, k = t ? -1 : 1;
-    const p = (r, o2) => [o.cx + c * r + nx * o2 * k, -(o.cz + sn * r + nz * o2 * k)];
-    s.moveTo(...p(o.R0, 0)); s.lineTo(...p(o.R1, 0)); s.lineTo(...p(o.R1, WALL)); s.lineTo(...p(o.R0, WALL));
-    ends.push(s);
-  }
-  return { floor: [band(o.R0, o.R1)], walls: [band(o.R1 - WALL, o.R1), band(o.R0, o.R0 + WALL), ...ends] };
+  // A quarter band (a quarter of a pie when the inside radius is 0), round a corner nudged in by e.
+  const cx = o.cx + e, cz = o.cz + e, a = o.R0 > 0.01 ? o.R0 + e : 0, b2 = o.R1 - 2 * e, s = new THREE.Shape(), n = 24;
+  for (let i = 0; i <= n; i++) { const t = (i / n) * Math.PI / 2; const p = [cx + Math.cos(t) * b2, -(cz + Math.sin(t) * b2)]; i ? s.lineTo(...p) : s.moveTo(...p); }
+  if (a < 0.01) s.lineTo(cx, -cz);
+  else for (let i = n; i >= 0; i--) { const t = (i / n) * Math.PI / 2; s.lineTo(cx + Math.cos(t) * a, -(cz + Math.sin(t) * a)); }
+  return [s];
 }
 function slab(shapes, h) {
   const g = new THREE.ExtrudeGeometry(shapes, { depth: h, bevelEnabled: false, curveSegments: 24 });
@@ -48,7 +43,7 @@ function slab(shapes, h) {
 // clean and the outline only shows the real edges. Each strip: outside face, inside face, top, ends.
 class Strips {
   // Positions and normals for the sides (wall colour) and tops (white on a cut), and the cut outline.
-  constructor() { this.side = { p: [], n: [] }; this.top = { p: [], n: [] }; this.lines = []; }
+  constructor() { this.side = { p: [], n: [] }; this.top = { p: [], n: [] }; this.inner = { p: [], n: [] }; this.lines = []; }
   // A quad with a normal at each corner (so curved walls shade smoothly); wound to face `face`.
   quad(L, a, b, c, d, na, nb, nc, nd, face) {
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
@@ -63,7 +58,7 @@ class Strips {
     for (let i = 0; i < pts.length - 1; i++) {
       const j = i + 1, [ox0, oz0] = O[i], [ox1, oz1] = O[j], [ix0, iz0] = I[i], [ix1, iz1] = I[j], f = [(ns[i][0] + ns[j][0]) / 2, 0, (ns[i][1] + ns[j][1]) / 2];
       this.quad(S, [ox0, y0, oz0], [ox1, y0, oz1], [ox1, y1, oz1], [ox0, y1, oz0], out(i), out(j), out(j), out(i), f);
-      this.quad(S, [ix0, y0, iz0], [ix1, y0, iz1], [ix1, y1, iz1], [ix0, y1, iz0], inn(i), inn(j), inn(j), inn(i), [-f[0], 0, -f[2]]);
+      this.quad(this.inner, [ix0, y0, iz0], [ix1, y0, iz1], [ix1, y1, iz1], [ix0, y1, iz0], inn(i), inn(j), inn(j), inn(i), [-f[0], 0, -f[2]]);
       this.quad(top, [ox0, y1, oz0], [ox1, y1, oz1], [ix1, y1, iz1], [ix0, y1, iz0], up, up, up, up, up);
       this.quad(S, [ox0, y0, oz0], [ox1, y0, oz1], [ix1, y0, iz1], [ix0, y0, iz0], down, down, down, down, down);
       if (white) this.lines.push(ox0, y1, oz0, ox1, y1, oz1, ix0, y1, iz0, ix1, y1, iz1);
@@ -73,9 +68,10 @@ class Strips {
   }
   geometry() {
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute([...this.side.p, ...this.top.p], 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute([...this.side.n, ...this.top.n], 3));
-    g.addGroup(0, this.side.p.length / 3, 0); g.addGroup(this.side.p.length / 3, this.top.p.length / 3, 1);
+    g.setAttribute('position', new THREE.Float32BufferAttribute([...this.side.p, ...this.top.p, ...this.inner.p], 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute([...this.side.n, ...this.top.n, ...this.inner.n], 3));
+    const a = this.side.p.length / 3, b = this.top.p.length / 3;
+    g.addGroup(0, a, 0); g.addGroup(a, b, 1); g.addGroup(a + b, this.inner.p.length / 3, 2);
     return g;
   }
 }
@@ -113,9 +109,9 @@ function buildWalls(b, k, hex, floorY, top, cut) {
       if (!o || !o.door) eachPiece(run, u0, u1, p => { const cx = p.x - p.nx * T / 2, cz = p.z - p.nz * T / 2; segments.push([cx - p.dx * p.len / 2, cz - p.dz * p.len / 2, cx + p.dx * p.len / 2, cz + p.dz * p.len / 2]); });
     }
   });
-  const g = new THREE.Group(), body = cut ? mat(hex) : mat(hex, { emissive: hex, emissiveIntensity: 0.28 });
+  const g = new THREE.Group(), body = mat(hex), bright = cut ? body : mat(hex, { emissive: hex, emissiveIntensity: 0.28 });
   // (On a cut, the outline is drawn only round the white cut tops, like an architect's section; not at every window edge.)
-  if (walls.side.p.length) { const m = new THREE.Mesh(walls.geometry(), [body, cut ? mat('#ffffff') : body]); m.castShadow = true; m.receiveShadow = true; m.userData.noInk = cut; g.add(m); }
+  if (walls.side.p.length) { const m = new THREE.Mesh(walls.geometry(), [body, cut ? mat('#ffffff') : body, bright]); m.castShadow = true; m.receiveShadow = true; m.userData.noInk = true; g.add(m); }
   if (cut && walls.lines.length) { const ln = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(walls.lines, 3)), INK); ln.raycast = () => {}; g.add(ln); }
   if (glass.side.p.length) g.add(new THREE.Mesh(glass.geometry(), mat('#bfe4f3', { transparent: true, opacity: 0.4, depthWrite: false })));
   return { group: g, segments };
@@ -242,21 +238,20 @@ class Bag {
 // Build the cut room. Coordinates are local to the piece (centred, y = 0 at the piece's base).
 // floorY: where this storey's floor is, inside the piece. Returns { group, seats, walk, inside }.
 export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
-  const k = TALL.has(b.type) ? 0 : Math.round(floorY / LEVEL), o = outline(b, k), g = new THREE.Group(), sh = shapesOf(o);
+  const k = TALL.has(b.type) ? 0 : Math.round(floorY / LEVEL), o = outline(b, k), g = new THREE.Group(), inner = floorShapes(o, 0.012);
   // Everything below this floor stays solid; the floor and cut walls sit on top.
-  if (floorY > 0.001) { const base = new THREE.Mesh(slab(sh.floor, floorY), mat(hex)); base.castShadow = base.receiveShadow = true; if (o.rot) base.rotation.y = -o.rot * Math.PI / 2; g.add(base); }
+  // (In walk mode the real building stands above and below the storey being walked, so it is left out here.)
+  if (floorY > 0.001 && !opts.walk) { const base = new THREE.Mesh(slab(floorShapes(o), floorY), mat(hex)); base.castShadow = base.receiveShadow = true; if (o.rot) base.rotation.y = -o.rot * Math.PI / 2; g.add(base); }
   const shell = new THREE.Group(); if (o.rot) shell.rotation.y = -o.rot * Math.PI / 2; g.add(shell);
-  const floor = new THREE.Mesh(slab(sh.floor, 0.02), mat(lighten(hex, 0.8)));
+  const floor = new THREE.Mesh(slab(inner, 0.02), mat(lighten(hex, 0.8)));
   floor.position.y = floorY; floor.receiveShadow = true; shell.add(floor);
   let segments = [];
   if (opts.walk) {
     // Walls right up to the ceiling, with real window openings and one doorway, and a ceiling over the room.
     const w = buildWalls(b, k, hex, floorY, opts.top, false);
     g.add(w.group); segments = w.segments;
-    const ceil = new THREE.Mesh(slab(sh.floor, 0.02), mat('#fbfaf6', { emissive: '#f3ede2', emissiveIntensity: 0.75 }));
+    const ceil = new THREE.Mesh(slab(inner, 0.02), mat('#fbfaf6', { emissive: '#f3ede2', emissiveIntensity: 0.75 }));
     ceil.position.y = floorY + opts.top - 0.02; shell.add(ceil);       // no shadow from the ceiling, so the room stays sunny
-    const above = opts.boxH - (floorY + opts.top);
-    if (above > 0.02) { const top = new THREE.Mesh(slab(sh.floor, above), mat(hex)); top.position.y = floorY + opts.top; shell.add(top); }
   } else {
     g.add(buildWalls(b, k, hex, floorY, cutH, true).group);
   }
@@ -264,7 +259,7 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
   if (o.kind === 'ring') {
     const ringFrame = new THREE.Group();
     if (o.col) colonnade(ringFrame, o.fWi + 0.08, o.fDi + 0.08, opts.walk ? opts.top : cutH);
-    if (!(b.level > 0) && b.w >= 3 && b.d >= 3) courtyard(ringFrame, o.fWi, o.fDi, b.id);
+    if (!(b.level > 0) && b.w >= 3 && b.d >= 3 && !opts.walk) courtyard(ringFrame, o.fWi, o.fDi, b.id);
     g.add(ringFrame);
   }
   // Furniture: playful pieces placed loosely round the room (not in rows), so it feels like a happy place.

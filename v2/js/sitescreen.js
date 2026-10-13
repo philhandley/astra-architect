@@ -100,15 +100,27 @@ export function mountSite(root, world, model, siteView, thumbs) {
   // In the inside view: rooms on this floor are cut open; rooms above are hidden; rooms below stay solid.
   function makeInside(b) {
     const L = S.floor;
-    if (b.level > L) return S.day ? { g: makeGroup(b, ghostUp) } : null;
+    if (b.level > L) return S.day ? { g: makeGroup(b, ghostUp) } : S.walkMode ? { g: makeGroup(b) } : null;
     const spans = b.level <= L && L < b.level + b.h;
     if (!spans || !CUTTABLE.has(b.shape)) { const g = makeGroup(b); return { g }; }
     const floorY = storeyFloor(b, L);
     const top = S.walkMode ? (SINGLE_SPACE.has(b.type) ? b.h * LEVEL : LEVEL) : 0;
     const room = cutRoom(b, colourHex(b.colour), floorY, S.cutH, S.walkMode ? { walk: true, top, boxH: b.h * LEVEL } : {});
     if (S.walkMode) for (const [ax, az, bx, bz] of room.segments) walls.push([ax + b.x + b.w / 2, az + b.z + b.d / 2, bx + b.x + b.w / 2, bz + b.z + b.d / 2]);
-    const g = room.group;
-    addInk(g);
+    let g = room.group;
+    if (S.walkMode) {
+      // The real building (roof, upper floors, window frames, canopies), with the storey being walked cut away,
+      // where the room with its real window openings stands instead.
+      const y0 = yOf(b), k = SINGLE_SPACE.has(b.type) ? 0 : L - b.level;
+      const real = buildPiece({ ...b, hex: colourHex(b.colour) }, { open: model.open(b), walkK: k, ink: false });
+      const planes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -(y0 + floorY + top)), new THREE.Plane(new THREE.Vector3(0, -1, 0), y0 + floorY)];
+      real.traverse(o => {
+        if (!o.isMesh || o.userData.noInk || o.userData.keep) return;
+        const cl = m => { const c = m.clone(); c.clippingPlanes = planes; c.clipIntersection = true; c.clipShadows = true; c.side = THREE.DoubleSide; return c; };
+        o.material = Array.isArray(o.material) ? o.material.map(cl) : cl(o.material);
+      });
+      const both = new THREE.Group(); both.add(real, g); g = both;
+    } else addInk(g);
     g.position.set(b.x + b.w / 2, yOf(b), b.z + b.d / 2);
     g.traverse(o => { o.userData.boxId = b.id; });
     return { g, room };
@@ -208,7 +220,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     world.updaters.add(fn);
   }
   // Outlines are crisp close up and softer when the whole site is in view.
-  world.updaters.add(() => { const c = world.camera; INK.opacity = c.isPerspectiveCamera ? 0.5 : Math.min(0.85, Math.max(0.35, 0.2 + c.zoom * 0.3)); });
+  world.updaters.add(() => { const c = world.camera; INK.visible = !c.isPerspectiveCamera; INK.opacity = Math.min(0.85, Math.max(0.35, 0.2 + c.zoom * 0.3)); });
   // Wind turbines turn; children whizz down helter-skelters.
   world.updaters.add(dt => {
     const t = performance.now() / 1000;
@@ -305,10 +317,21 @@ export function mountSite(root, world, model, siteView, thumbs) {
     g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(64, 26); g.lineTo(94, 60); g.lineTo(76, 60); g.lineTo(76, 98); g.lineTo(52, 98); g.lineTo(52, 60); g.lineTo(34, 60); g.closePath(); g.fill();
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
+  // The turn badge: a round arrow.
+  const turnTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    g.fillStyle = 'rgba(20,30,60,0.25)'; g.beginPath(); g.arc(64, 68, 56, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(64, 64, 56, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#f28b30'; g.beginPath(); g.arc(64, 64, 47, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#ffffff'; g.lineWidth = 11; g.lineCap = 'round'; g.beginPath(); g.arc(64, 66, 24, Math.PI * 0.95, Math.PI * 2.35); g.stroke();
+    const a = Math.PI * 2.35, tx = 64 + Math.cos(a) * 24, ty = 66 + Math.sin(a) * 24;
+    g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(tx + 15, ty - 13); g.lineTo(tx + 6, ty + 16); g.lineTo(tx - 16, ty - 4); g.closePath(); g.fill();
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
   const DIRS = { px: new THREE.Vector3(1, 0, 0), nx: new THREE.Vector3(-1, 0, 0), pz: new THREE.Vector3(0, 0, 1), nz: new THREE.Vector3(0, 0, -1), up: new THREE.Vector3(0, 1, 0) };
   const H = {};
-  for (const k of Object.keys(DIRS)) {
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: badgeTex, depthTest: false, transparent: true }));
+  for (const k of [...Object.keys(DIRS), 'turn']) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: k === 'turn' ? turnTex : badgeTex, depthTest: false, transparent: true }));
     sp.renderOrder = 20; sp.userData.handle = k; H[k] = sp; handles.add(sp);
   }
   handles.visible = false;
@@ -319,6 +342,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     H.px.position.set(b.x + b.w + 0.28, mid, cz); H.nx.position.set(b.x - 0.28, mid, cz);
     H.pz.position.set(cx, mid, b.z + b.d + 0.28); H.nz.position.set(cx, mid, b.z - 0.28);
     H.up.position.set(cx, y0 + hh + 0.55, cz);
+    H.turn.position.set(b.x + b.w + 0.2, y0 + hh + 0.3, b.z + b.d + 0.2);
     const fixedSize = ['turbine', 'tree'].includes(b.shape);
     for (const k of ['px', 'nx', 'pz', 'nz']) H[k].visible = !fixedSize && !['stairs', 'spiral'].includes(b.shape);
     H.up.visible = !['turbine', 'tree', 'pool', 'track', 'garden'].includes(b.shape);
@@ -330,6 +354,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     const s = Math.min(1.1, Math.max(0.3, 0.62 / world.camera.zoom));
     for (const [k, sp] of Object.entries(H)) {
       sp.scale.set(s, s, 1);
+      if (!DIRS[k]) continue;
       const a = world.toScreen(sp.position), b2 = world.toScreen(sp.position.clone().add(DIRS[k]));
       sp.material.rotation = Math.atan2(-(b2.y - a.y), b2.x - a.x) - Math.PI / 2;
     }
@@ -358,7 +383,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     btn('colour', 'Colour', x => swatches(b, x));
     if (WINDOWED.has(b.shape) && b.surface !== 'glass') btn('windows', 'Windows', x => windowsPick(b, x));
     if (!NO_SURFACE.has(b.shape)) btn('surface', 'Walls', x => surfaces(b, x));
-    if (b.w !== b.d || b.shape === 'arc') btn('turn', 'Turn', () => turnBox(b));
+    btn('turn', 'Turn', () => turnBox(b));
     btn('copy', 'Copy', () => copyBox(b));
     btn('bin', 'Bin', () => { const fell = model.remove(b.id); sfx.bin(); if (fell) toast('The rooms on top came down too. Undo brings them back.'); select(null); }, 'no');
     btn('done', 'Done', () => select(null), 'ok');
@@ -419,10 +444,12 @@ export function mountSite(root, world, model, siteView, thumbs) {
     sfx.whoosh(); setTimeout(() => sfx.whoosh(), 800); setTimeout(() => sfx.whoosh(), 1300);
   }
   function turnBox(b) {
-    // A square curve turns to face the next corner.
-    if (b.shape === 'arc' && b.w === b.d) { model.update(b.id, { rot: ((b.rot || 0) + 1) % 4 }); sfx.whoosh(); select(b.id, { quiet: true }); return; }
+    // A square piece turns a quarter where it stands (its door and windows turn with it);
+    // a long piece swings round (and on every second turn faces the other way).
+    const rot = ((b.rot || 0) + 1) % 4;
+    if (b.w === b.d) { model.update(b.id, { rot }); sfx.whoosh(); say('Turn!'); select(b.id, { quiet: true }); return; }
     const cx = b.x + b.w / 2, cz = b.z + b.d / 2;
-    const n = { w: b.d, d: b.w, x: Math.round(cx - b.d / 2), z: Math.round(cz - b.w / 2) };
+    const n = { w: b.d, d: b.w, x: Math.round(cx - b.d / 2), z: Math.round(cz - b.w / 2), rot };
     const r = model.update(b.id, n);
     if (!r.ok) { sfx.no(); toast(WHY[r.why] || 'There is no room to turn it here.'); return; }
     sfx.whoosh(); select(b.id, { quiet: true });
@@ -474,6 +501,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
       const ray = world.rayFrom(e.clientX, e.clientY);
       let best = null, bd = 44;
       for (const sp of handles.children) { if (!sp.visible) continue; const p = world.toScreen(sp.position); const dd = Math.hypot(p.x - e.clientX, p.y - e.clientY); if (dd < bd) { bd = dd; best = sp; } }
+      if (best && best.userData.handle === 'turn') { S.drag = { mode: 'turn', start, moved: false }; return; }
       if (best) {
         const b = model.byId.get(S.selected), k = best.userData.handle;
         S.drag = { mode: 'resize', handle: k, start, orig: { ...b }, moved: false, plane: new THREE.Plane(), last: { ...b } };
@@ -555,6 +583,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     world.controls.enabled = true;
     if (!d || e.pointerId !== d.start.id) return;
     clearGhost();
+    if (d.mode === 'turn') { const b = model.byId.get(S.selected); if (b) turnBox(b); return; }
     if (d.mode === 'resize') {
       if (!d.moved) {
         const o = model.byId.get(S.selected), k = d.handle;

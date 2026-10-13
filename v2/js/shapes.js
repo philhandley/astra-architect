@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LEVEL } from './catalogue.js';
 import { TREE_GREENS } from './site.js';
 import { addFacade, addTerrace, contactShadow } from './facade.js';
-import { REC, SOFFIT, hasColonnade, ringThickness } from './plan.js';
+import { REC, SOFFIT, hasColonnade, ringThickness, turnAngle } from './plan.js';
 
 const GAP = 0.035;                   // a hair of space round every piece, so each reads as its own block
 const ROOF = 0.4;
@@ -750,11 +750,11 @@ export function colonnade(g, Wc, Dc, hgt = SOFFIT) {
 export function courtyard(g, Wi, Di, id = 1) {
   const r = Math.min(Wi, Di) / 2; if (r < 0.2) return;
   const lawn = new THREE.ExtrudeGeometry(roundedRect(Wi - 0.08, Di - 0.08, r - 0.04), { depth: 0.02, bevelEnabled: false, curveSegments: 32 }).rotateX(-Math.PI / 2);
-  g.add(mesh(lawn, mat('#9bd06a'), false));
-  const tr = roundTree(Math.min(0.42, r * 0.5), TREE_GREENS[2]); tr.position.y = 0.02; g.add(tr);
-  const br = Math.min(0.3, r * 0.42); g.add(mesh(new THREE.TorusGeometry(br, 0.028, 8, 36).rotateX(Math.PI / 2).translate(0, 0.05, 0), mat(WHITE)));
+  const lawnM = mesh(lawn, mat('#9bd06a'), false); lawnM.userData.keep = true; g.add(lawnM);
+  const tr = roundTree(Math.min(0.42, r * 0.5), TREE_GREENS[2]); tr.position.y = 0.02; tr.traverse(o => { o.userData.keep = true; }); g.add(tr);
+  const br = Math.min(0.3, r * 0.42), bench = mesh(new THREE.TorusGeometry(br, 0.028, 8, 36).rotateX(Math.PI / 2).translate(0, 0.05, 0), mat(WHITE)); bench.userData.keep = true; g.add(bench);
   const rr = seeded(id * 5 + 11), flowers = ['#f5a3c7', '#f7c22e', '#ffffff', '#e2457d'];
-  for (let i = 0; i < Math.round(r * 30); i++) { const a = rr() * Math.PI * 2, d = br + 0.08 + rr() * (r - br - 0.16); const f = mesh(new THREE.SphereGeometry(0.022, 6, 4), mat(flowers[i % 4]), false); f.position.set(Math.cos(a) * d * (Wi / (2 * r)), 0.04, Math.sin(a) * d * (Di / (2 * r))); f.raycast = () => {}; g.add(f); }
+  for (let i = 0; i < Math.round(r * 30); i++) { const a = rr() * Math.PI * 2, d = br + 0.08 + rr() * (r - br - 0.16); const f = mesh(new THREE.SphereGeometry(0.022, 6, 4), mat(flowers[i % 4]), false); f.position.set(Math.cos(a) * d * (Wi / (2 * r)), 0.04, Math.sin(a) * d * (Di / (2 * r))); f.raycast = () => {}; f.userData.keep = true; g.add(f); }
 }
 // The centre line of a rounded-rectangle loop (a circle when square), as points.
 function loopPath(W, D, r) {
@@ -842,12 +842,13 @@ export function buildPiece(box, opts = {}) {
   const H = box.h * LEVEL;
   const make = BUILD[box.shape] || BUILD.box;
   const g = make(box.w, box.d, H, box.hex, { ...opts, id: box.id || 1, box });
-  if (box.shape === 'arc' && box.rot && box.w === box.d) { const inner = new THREE.Group(); while (g.children.length) inner.add(g.children[0]); inner.rotation.y = -box.rot * Math.PI / 2; g.add(inner); }
+  const ang = turnAngle(box);
+  if (ang) { const inner = new THREE.Group(); while (g.children.length) inner.add(g.children[0]); inner.rotation.y = -ang; g.add(inner); }
   if (box.surface && box.surface !== 'plain' && !opts.ghost) applySurface(g, box);
   if (!opts.ghost) {
-    addFacade(g, box, H);
+    addFacade(g, box, H, { walkK: opts.walkK });
     if (opts.open && ['box', 'drum', 'ring'].includes(box.shape)) addTerrace(g, box, H);
-    addInk(g);
+    if (opts.ink !== false) addInk(g);
     if ((box.level || 0) === 0 && !['tree', 'turbine', 'weather', 'circle', 'track', 'garden', 'pool', 'bridge', 'canopy'].includes(box.shape)) g.add(contactShadow(box));
   }
   if (opts.ghost) g.traverse(o => { if (o.isMesh) { o.material = opts.ghost; o.castShadow = false; } });

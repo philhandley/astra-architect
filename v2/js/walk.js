@@ -141,5 +141,5 @@ export function startWalk({ world, model, root, yOf, walls = () => [], setFloor,
     window.removeEventListener('pointerup', onUp);
     ui.remove();
   }
-  return { stop };
+  return { stop, me };          // (me: where the walker is, for tests)
 }

@@ -48,12 +48,12 @@ for (const type of TRAY) {
     let [w, d, h] = P.size;
     if (shape === 'ringhouse' || shape === 'ring') { w = Math.max(w, 3); d = Math.max(d, 3); }
     if (q.get('size')) [w, d, h] = q.get('size').split(',').map(Number);
-    items.push({ type, shape, w, d, h });
+    if (q.get('rots')) for (let rot = 0; rot < 4; rot++) items.push({ type, shape, w, d, h, rot }); else items.push({ type, shape, w, d, h });
   }
 }
 let id = 1;
 function cell(it) {
-  const box = { id: id++, type: it.type, shape: it.shape, colour: PROGRAMMES[it.type].colour, w: it.w, d: it.d, h: it.h, x: 0, z: 0, level: 0, win: WIN || undefined };
+  const box = { id: id++, type: it.type, shape: it.shape, colour: PROGRAMMES[it.type].colour, w: it.w, d: it.d, h: it.h, x: 0, z: 0, level: 0, win: WIN || undefined, rot: it.rot || 0 };
   const hex = colourHex(box.colour);
   let g;
   if (VIEW === 'in') {
@@ -77,7 +77,7 @@ for (let s = 0; s * per < items.length; s++) {
     const cx = (i % COLS) * CW, cy = Math.floor(i / COLS) * CH;
     x.drawImage(renderer.domElement, cx, cy, CW, CH);
     x.fillStyle = 'rgba(255,255,255,0.85)'; x.fillRect(cx, cy, CW, 26);
-    x.fillStyle = '#222'; x.font = '600 15px system-ui'; x.fillText(`${PROGRAMMES[it.type].name} · ${it.shape} · ${it.w}×${it.d}×${it.h}`, cx + 8, cy + 18);
+    x.fillStyle = '#222'; x.font = '600 15px system-ui'; x.fillText(`${PROGRAMMES[it.type].name} · ${it.shape} · ${it.w}×${it.d}×${it.h}${it.rot ? ' · turn ' + it.rot : ''}`, cx + 8, cy + 18);
     x.strokeStyle = '#fff'; x.lineWidth = 3; x.strokeRect(cx, cy, CW, CH);
   });
   document.body.append(cv); sheets.push(cv);

@@ -47,6 +47,13 @@ export function ringThickness(b) {
   return b.w >= 3 && b.d >= 3 ? 0.95 : Math.min(W, D) * 0.3;
 }
 
+// How far a piece is turned: square pieces in quarter turns; long ones flip end to end on their second turn
+// (their first turn swaps width and depth instead).
+export function turnAngle(b) {
+  const r = (b.rot || 0) % 4;
+  return r ? (b.w === b.d ? r : r >= 2 ? 2 : 0) * Math.PI / 2 : 0;
+}
+
 // ---------- the outline ----------
 // The plan outline of a room at storey k (its outside face), with an "inside" test for furniture and people.
 export function outline(b, k = 0) {
@@ -63,7 +70,7 @@ export function outline(b, k = 0) {
     const pie = Math.min(b.w, b.d) < 2, cx = -b.w / 2 + GAP, cz = -b.d / 2 + GAP;
     let R0, R1;
     if (pie) { R0 = 0; R1 = 1 - 2 * GAP - 0.005; } else { const R = Math.min(b.w, b.d) - GAP - 0.45; R0 = R - 0.425; R1 = R + 0.425; }
-    const rot = b.w === b.d ? (b.rot || 0) : 0, ph = rot * Math.PI / 2, co = Math.cos(ph), si = Math.sin(ph);
+    const rot = Math.round(turnAngle(b) / (Math.PI / 2)), ph = rot * Math.PI / 2, co = Math.cos(ph), si = Math.sin(ph);
     const un = (x, z) => [x * co + z * si, -x * si + z * co];      // back to the unturned frame
     const inside0 = (u, v, m) => { const dd = Math.hypot(u - cx, v - cz); return dd > R0 + m && dd < R1 - m && u > cx + m && v > cz + m; };     // before turning
     return { kind: 'arc', pie, cx, cz, R0, R1, rot, inside0, inside: (x, z, m) => inside0(...un(x, z), m) };
@@ -135,11 +142,14 @@ export function wallRuns(b, k = 0) {
       runs.push(makeRun(arcPts(cx, cz, R0, Math.PI / 2, 0), false, true, solid));
       runs.push(makeRun([[cx + R0, cz], [cx + R1, cz]], false, true, solid));
     }
-    if (o.rot) {
-      const ph = o.rot * Math.PI / 2, co = Math.cos(ph), si = Math.sin(ph), turn = ([x, z]) => [x * co - z * si, x * si + z * co];
-      for (const r of runs) { r.pts = r.pts.map(turn); r.n = r.n.map(turn); }
-    }
   }
+  // A turned piece: everything is worked out unturned, then turned (so the door and windows turn with it).
+  const ang = turnAngle(b);
+  if (ang) {
+    const co = Math.cos(ang), si = Math.sin(ang), turn = ([x, z]) => [x * co - z * si, x * si + z * co];
+    for (const r of runs) { r.pts = r.pts.map(turn); r.n = r.n.map(turn); }
+  }
+  runs.ang = ang;
   return runs;
 }
 
@@ -187,8 +197,10 @@ function findDoor(runs) {
   let best = null;
   runs.forEach((r, ri) => {
     if (!r.outer || r.len < 0.26) return;
+    const co = Math.cos(-(runs.ang || 0)), si = Math.sin(-(runs.ang || 0));
     for (let s = 0.12; s <= r.len - 0.12; s += 0.02) {
-      const p = runAt(r, s), score = p.nz * 2 + p.z * 0.2 - Math.abs(s - r.len / 2) * (r.closed ? 0 : 0.02);
+      const q = runAt(r, s), p = { z: q.x * si + q.z * co, nz: q.nx * si + q.nz * co };
+      const score = p.nz * 2 + p.z * 0.2 - Math.abs(s - r.len / 2) * (r.closed ? 0 : 0.02);
       if (!best || score > best.score + 1e-6) best = { score, run: ri, s };
     }
   });

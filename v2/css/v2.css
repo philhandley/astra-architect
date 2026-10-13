@@ -150,7 +150,7 @@ svg.ic.big { width: 34px; height: 34px; }
 
 /* School day */
 .daybar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 14px; display: flex; gap: 6px; align-items: center; background: rgba(255,255,255,.97); border-radius: 26px; box-shadow: var(--shadow); padding: 8px; pointer-events: auto; }
-.period { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 84px; padding: 6px 4px; border-radius: 16px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.period { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 74px; padding: 6px 4px; border-radius: 16px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
 .period img { width: 30px; height: 30px; }
 .period.now { background: #fff6d6; box-shadow: 0 0 0 3px #f7c22e inset; color: var(--ink); }
 .period.past { opacity: .45; }
@@ -175,3 +175,9 @@ svg.ic.big { width: 34px; height: 34px; }
 .wins .surf { padding: 6px 2px; font-size: 11px; }
 .wins .sf { width: 100%; max-width: 64px; height: auto; aspect-ratio: 64 / 44; }
 .detail .build { position: sticky; bottom: 0; flex: none; box-shadow: 0 -8px 16px #fff; }
+
+.bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.bubble { position: absolute; transform: translate(-50%, calc(-100% - 10px)); display: flex; align-items: center; gap: 5px; background: #fff; color: var(--ink); border-radius: 14px; padding: 5px 10px 5px 7px; font-size: 14px; font-weight: 700; white-space: nowrap; box-shadow: 0 3px 10px rgba(30, 40, 60, .18); animation: bubble-in .2s ease-out; }
+.bubble::after { content: ''; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); border: 7px solid transparent; border-bottom: 0; border-top-color: #fff; }
+.bubble .emo { width: 20px; height: 20px; }
+@keyframes bubble-in { from { opacity: 0; transform: translate(-50%, calc(-100% - 2px)) scale(.7); } to { opacity: 1; transform: translate(-50%, calc(-100% - 10px)) scale(1); } }

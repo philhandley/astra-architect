@@ -31,6 +31,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
       <button class="sbtn" data-a="print" aria-label="Print drawings">${icon('print')}<span>Print</span></button>
     </div>
     <div class="floors" hidden></div>
+    <div class="bubbles"></div>
     <div class="daybar" hidden></div>
     <div class="selbar" hidden></div>
     <div class="hint"></div>
@@ -113,8 +114,9 @@ export function mountSite(root, world, model, siteView, thumbs) {
     return { g, room };
   }
   const walls = [];          // wall lines on the floor being walked (for bumping into)
+  const seatsById = new Map();
   function redraw() {
-    walls.length = 0;
+    walls.length = 0; seatsById.clear();
     for (const g of pieces.values()) { design.remove(g); disposePiece(g); }
     pieces.clear();
     const zones = [];
@@ -124,6 +126,10 @@ export function mountSite(root, world, model, siteView, thumbs) {
       else g = makeGroup(b);
       design.add(g); pieces.set(b.id, g);
       zones.push(...peopleFor(b, g, room));
+      // Where people can sit, in the world: room seats, or the benches and steps of a piece.
+      const cx = b.x + b.w / 2, cz = b.z + b.d / 2, y0 = yOf(b);
+      let st = room?.seats; if (!st) g.traverse(o => { if (o.userData.seats) st = o.userData.seats; });
+      seatsById.set(b.id, (st || []).map(([x, y, z]) => [cx + x, y0 + y, cz + z]));
     }
     zones.push(...strollers());
     levelGround();
@@ -165,7 +171,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     if (room) {
       const area = model.squares(b).length;
       const sw = room.swim;
-      out.push({ boxId: b.id, ox: cx, oy: y0 + room.floorY, oz: cz, w: b.w, d: b.d, inside: sw ? (x, z, m) => room.inside(x, z, m) && !(Math.abs(x) < sw.w / 2 + 0.1 && Math.abs(z) < sw.d / 2 + 0.1) : room.inside, margin: 0.12, seats: room.seats, fill: 0.65,
+      out.push({ boxId: b.id, ox: cx, oy: y0 + room.floorY, oz: cz, w: b.w, d: b.d, inside: sw ? (x, z, m) => room.inside(x, z, m) && !(Math.abs(x) < sw.w / 2 + 0.1 && Math.abs(z) < sw.d / 2 + 0.1) : room.inside, margin: 0.12, seats: room.seats.map(([x, y, z]) => [x, y - room.floorY, z]), fill: 0.65,
         walkers: sw ? 2 : Math.max(1, Math.round((DENSITY[b.type] ?? 1) * area)), adults: true, kind: b.type === 'hall' ? 'run' : 'walk', speed: b.type === 'hall' ? 0.6 : 0.28 });
       if (sw) out.push({ boxId: b.id, ox: cx, oy: y0 + sw.y, oz: cz, w: sw.w, d: sw.d, inside: (x, z) => Math.abs(x) < sw.w / 2 && Math.abs(z) < sw.d / 2, margin: 0, walkers: Math.max(2, Math.round(area * 1.5)), kind: 'swim', speed: 0.25 });
       return out;
@@ -595,7 +601,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
   }
 
   // ---------- the school day ----------
-  const day = new SchoolDay({ world, model, crowd, yOf, onPeriod: (i, P) => drawDaybar(i, P), onEnd: () => endDay() });
+  const day = new SchoolDay({ world, model, crowd, yOf, seatsOf: id => seatsById.get(id), layer: ui.querySelector('.bubbles'), onPeriod: (i, P) => drawDaybar(i, P), onEnd: () => endDay() });
   function startDay() {
     if (!model.boxes.some(b => ['classroom', 'ringhouse', 'treehouse'].includes(b.type))) { sfx.no(); toast('Build a classroom first!'); say('Build a classroom first, so the children have somewhere to learn.'); return; }
     if (S.walking) return;
@@ -613,8 +619,8 @@ export function mountSite(root, world, model, siteView, thumbs) {
     daybar.innerHTML = PERIODS.map((p, k) => `<div class="period ${k === i ? 'now' : k < i ? 'past' : ''}">${emo(p.emoji)}<span>${esc(p.name)}</span></div>`).join('') + `<button class="fbtn close" type="button">${icon('close')}<span>Stop</span></button>`;
     daybar.querySelector('.close').addEventListener('click', () => { stopDay(); });
     sfx.bell();
-    say(i === 0 ? 'Good morning! The children are arriving for lessons.' : i === PERIODS.length - 1 ? 'Home time! Watch the paths they made across the grass.' : `Bell! Time for ${P.name.toLowerCase()}.`);
-    setHint(`${emo(P.emoji)} ${esc(P.name)}. Watch the children walk, and the paths they wear in the grass.`);
+    say(i === 0 ? 'Good morning! The classes are walking in.' : i === PERIODS.length - 1 ? 'Home time! Watch the paths they made across the grass.' : `Bell! Time for ${P.name.toLowerCase()}.`);
+    setHint(`${emo(P.emoji)} ${esc(P.name)}. Tap a child to hear what they say.`);
   }
   function stopDay() { if (day.running) day.stop(true); endDay(); }
   function endDay() {
@@ -638,6 +644,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
   }
 
   function handleTap(x, y) {
+    if (S.day && day.tap(x, y)) return;
     if (S.inside) { const b = boxAt(x, y); if (b) { say(PROGRAMMES[b.type].name); cheer(b); } return; }
     if (S.tool) { const t = target(x, y); if (t) place(t); return; }
     const b = boxAt(x, y);

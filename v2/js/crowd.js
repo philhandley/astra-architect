@@ -127,7 +127,8 @@ export class Crowd {
     let steps = 0;
     this.people.forEach((p, i) => {
       let moving = false;
-      if (p.kind === 'path') {
+      if (p.kind === 'agent') moving = !!p.moving;
+      else if (p.kind === 'path') {
         if (p.wait > 0) p.wait -= dt;
         else {
           const tgt = p.path[p.pi];
@@ -148,7 +149,7 @@ export class Crowd {
           else { const st = Math.min(dd, p.speed * dt); p.x += dx / dd * st; p.z += dz / dd * st; p.yaw = Math.atan2(dx, dz); moving = true; }
         }
       }
-      if (moving) p.walk = (p.walk || 0) + dt * (p.kind === 'run' ? 16 : 10);
+      if (moving) p.walk = (p.walk || 0) + dt * ((p.kind === 'agent' ? p.pose : p.kind) === 'run' ? 16 : 10);
       if (moving && p.kind === 'path' && this.onStep && p.y < 0.06 && (p.trail = (p.trail || 0) + dt) > 0.06 && steps++ < 160) { p.trail = 0; this.onStep(p.x, p.z); }
       this.pose(i, p, moving, t, dt);
     });
@@ -156,12 +157,12 @@ export class Crowd {
   }
   // Put one person's body parts in place for this moment.
   pose(i, p, moving, t, dt) {
-    const { base, part, rot, q, v, s, up, e } = this.tmp, M = this.meshes;
+    const { base, part, rot, q, v, s, up, e } = this.tmp, M = this.meshes, kind = p.kind === 'agent' ? p.pose : p.kind;
     let legL = 0, legR = 0, armL = 0, armR = 0, outL = -0.12, outR = 0.12, y = p.y, lean = 0;
     const swing = Math.sin(p.walk || 0);
-    if (p.kind === 'sit') { legL = legR = -1.45; armL = armR = -0.55; y -= 0.033; }
-    else if (p.kind === 'swim') { y -= 0.125; const w = t * 4 + p.ph; armL = Math.sin(w) * 2.6; armR = Math.sin(w + Math.PI) * 2.6; lean = 0.3; }
-    else if (moving) { const a = p.kind === 'run' ? 0.9 : 0.55; legL = swing * a; legR = -swing * a; armL = -swing * a * 0.9; armR = swing * a * 0.9; y += Math.abs(Math.cos(p.walk || 0)) * (p.kind === 'run' ? 0.012 : 0.006); lean = p.kind === 'run' ? 0.18 : 0.04; }
+    if (kind === 'sit') { legL = legR = -1.45; armL = armR = -0.55; y -= 0.033; }
+    else if (kind === 'swim') { y -= 0.125; const w = t * 4 + p.ph; armL = Math.sin(w) * 2.6; armR = Math.sin(w + Math.PI) * 2.6; lean = 0.3; }
+    else if (moving) { const a = kind === 'run' ? 0.9 : 0.55; legL = swing * a; legR = -swing * a; armL = -swing * a * 0.9; armR = swing * a * 0.9; y += Math.abs(Math.cos(p.walk || 0)) * (kind === 'run' ? 0.012 : 0.006); lean = kind === 'run' ? 0.18 : 0.04; }
     else { armL = Math.sin(t * 1.5 + p.ph) * 0.05; armR = -armL; }
     if (p.jumpT > 0) { p.jumpT -= dt; y += Math.abs(Math.sin(t * 9 + p.ph)) * 0.07; const wave = 2.7 + Math.sin(t * 14 + p.ph) * 0.25; outL = -wave; outR = wave; armL = armR = 0; }
     const nr = this.near, hide = nr && Math.abs(p.y - nr.y) < 0.2 && Math.hypot(p.x - nr.x, p.z - nr.z) < nr.r;

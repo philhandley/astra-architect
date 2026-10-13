@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LEVEL } from './catalogue.js';
-import { mat, colonnade, courtyard } from './shapes.js';
+import { mat, colonnade, courtyard, INK } from './shapes.js';
 import { outline, roundedRect, wallRuns, openings, eachPiece, runAt, TALL, WALL_T } from './plan.js';
 export { outline } from './plan.js';
 
@@ -47,29 +47,35 @@ function slab(shapes, h) {
 // Walls are built as smooth strips that follow the wall (not lots of little boxes), so curved walls stay
 // clean and the outline only shows the real edges. Each strip: outside face, inside face, top, ends.
 class Strips {
-  constructor() { this.side = []; this.top = []; }
-  quad(list, a, b, c, d, n) {
+  // Positions and normals for the sides (wall colour) and tops (white on a cut), and the cut outline.
+  constructor() { this.side = { p: [], n: [] }; this.top = { p: [], n: [] }; this.lines = []; }
+  // A quad with a normal at each corner (so curved walls shade smoothly); wound to face `face`.
+  quad(L, a, b, c, d, na, nb, nc, nd, face) {
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
-    const flip = (uy * vz - uz * vy) * n[0] + (uz * vx - ux * vz) * n[1] + (ux * vy - uy * vx) * n[2] < 0;
-    if (flip) list.push(...a, ...c, ...b, ...a, ...d, ...c); else list.push(...a, ...b, ...c, ...a, ...c, ...d);
+    const flip = (uy * vz - uz * vy) * face[0] + (uz * vx - ux * vz) * face[1] + (ux * vy - uy * vx) * face[2] < 0;
+    const P = flip ? [a, c, b, a, d, c] : [a, b, c, a, c, d], N = flip ? [na, nc, nb, na, nd, nc] : [na, nb, nc, na, nc, nd];
+    for (let i = 0; i < 6; i++) { L.p.push(...P[i]); L.n.push(...N[i]); }
   }
   // pts/ns: the outside face line and its way out; the strip is T thick inwards, from y0 to y1.
   add(pts, ns, T, y0, y1, white) {
     const O = pts, I = pts.map(([x, z], i) => [x - ns[i][0] * T, z - ns[i][1] * T]), top = white ? this.top : this.side, S = this.side;
+    const up = [0, 1, 0], down = [0, -1, 0], out = i => [ns[i][0], 0, ns[i][1]], inn = i => [-ns[i][0], 0, -ns[i][1]];
     for (let i = 0; i < pts.length - 1; i++) {
-      const [ox0, oz0] = O[i], [ox1, oz1] = O[i + 1], [ix0, iz0] = I[i], [ix1, iz1] = I[i + 1], n = [(ns[i][0] + ns[i + 1][0]) / 2, 0, (ns[i][1] + ns[i + 1][1]) / 2];
-      this.quad(S, [ox0, y0, oz0], [ox1, y0, oz1], [ox1, y1, oz1], [ox0, y1, oz0], n);
-      this.quad(S, [ix0, y0, iz0], [ix1, y0, iz1], [ix1, y1, iz1], [ix0, y1, iz0], [-n[0], 0, -n[2]]);
-      this.quad(top, [ox0, y1, oz0], [ox1, y1, oz1], [ix1, y1, iz1], [ix0, y1, iz0], [0, 1, 0]);
-      this.quad(S, [ox0, y0, oz0], [ox1, y0, oz1], [ix1, y0, iz1], [ix0, y0, iz0], [0, -1, 0]);
+      const j = i + 1, [ox0, oz0] = O[i], [ox1, oz1] = O[j], [ix0, iz0] = I[i], [ix1, iz1] = I[j], f = [(ns[i][0] + ns[j][0]) / 2, 0, (ns[i][1] + ns[j][1]) / 2];
+      this.quad(S, [ox0, y0, oz0], [ox1, y0, oz1], [ox1, y1, oz1], [ox0, y1, oz0], out(i), out(j), out(j), out(i), f);
+      this.quad(S, [ix0, y0, iz0], [ix1, y0, iz1], [ix1, y1, iz1], [ix0, y1, iz0], inn(i), inn(j), inn(j), inn(i), [-f[0], 0, -f[2]]);
+      this.quad(top, [ox0, y1, oz0], [ox1, y1, oz1], [ix1, y1, iz1], [ix0, y1, iz0], up, up, up, up, up);
+      this.quad(S, [ox0, y0, oz0], [ox1, y0, oz1], [ix1, y0, iz1], [ix0, y0, iz0], down, down, down, down, down);
+      if (white) this.lines.push(ox0, y1, oz0, ox1, y1, oz1, ix0, y1, iz0, ix1, y1, iz1);
     }
-    const end = (i, j) => { const d = [O[i][0] - O[j][0], 0, O[i][1] - O[j][1]]; this.quad(S, [O[i][0], y0, O[i][1]], [I[i][0], y0, I[i][1]], [I[i][0], y1, I[i][1]], [O[i][0], y1, O[i][1]], d); };
+    const end = (i, j) => { const d = [O[i][0] - O[j][0], 0, O[i][1] - O[j][1]], l = Math.hypot(d[0], d[2]) || 1, n = [d[0] / l, 0, d[2] / l]; this.quad(S, [O[i][0], y0, O[i][1]], [I[i][0], y0, I[i][1]], [I[i][0], y1, I[i][1]], [O[i][0], y1, O[i][1]], n, n, n, n, d); if (white) this.lines.push(O[i][0], y1, O[i][1], I[i][0], y1, I[i][1]); };
     end(0, 1); end(pts.length - 1, pts.length - 2);
   }
   geometry() {
-    const g = new THREE.BufferGeometry(), all = [...this.side, ...this.top];
-    g.setAttribute('position', new THREE.Float32BufferAttribute(all, 3)); g.computeVertexNormals();
-    g.addGroup(0, this.side.length / 3, 0); g.addGroup(this.side.length / 3, this.top.length / 3, 1);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([...this.side.p, ...this.top.p], 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute([...this.side.n, ...this.top.n], 3));
+    g.addGroup(0, this.side.p.length / 3, 0); g.addGroup(this.side.p.length / 3, this.top.p.length / 3, 1);
     return g;
   }
 }
@@ -108,8 +114,10 @@ function buildWalls(b, k, hex, floorY, top, cut) {
     }
   });
   const g = new THREE.Group(), body = cut ? mat(hex) : mat(hex, { emissive: hex, emissiveIntensity: 0.28 });
-  if (walls.side.length) { const m = new THREE.Mesh(walls.geometry(), [body, cut ? mat('#ffffff') : body]); m.castShadow = true; m.receiveShadow = true; g.add(m); }
-  if (glass.side.length) g.add(new THREE.Mesh(glass.geometry(), mat('#bfe4f3', { transparent: true, opacity: 0.4, depthWrite: false })));
+  // (On a cut, the outline is drawn only round the white cut tops, like an architect's section; not at every window edge.)
+  if (walls.side.p.length) { const m = new THREE.Mesh(walls.geometry(), [body, cut ? mat('#ffffff') : body]); m.castShadow = true; m.receiveShadow = true; m.userData.noInk = cut; g.add(m); }
+  if (cut && walls.lines.length) { const ln = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(walls.lines, 3)), INK); ln.raycast = () => {}; g.add(ln); }
+  if (glass.side.p.length) g.add(new THREE.Mesh(glass.geometry(), mat('#bfe4f3', { transparent: true, opacity: 0.4, depthWrite: false })));
   return { group: g, segments };
 }
 // ---------- playful furniture ----------

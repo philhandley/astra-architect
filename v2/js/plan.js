@@ -104,8 +104,8 @@ export function eachPiece(run, s0, s1, fn) {
     fn({ x: P[0] + dx * um, z: P[1] + dz * um, nx: run.n[i][0], nz: run.n[i][1], dx, dz, len: u1 - u0, u0, u1 });
   }
 }
-const loopPts = (W, D, r) => { const sh = roundedRect(W, D, r), n = Math.max(24, Math.round(sh.getLength() / 0.05)); return sh.getSpacedPoints(n).slice(0, -1).map(p => [p.x, -p.y]); };
-const arcPts = (cx, cz, R, a0, a1, n = 24) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + (a1 - a0) * i / n; return [cx + Math.cos(a) * R, cz + Math.sin(a) * R]; });
+const loopPts = (W, D, r) => { const sh = roundedRect(W, D, r), n = Math.max(32, Math.round(sh.getLength() / 0.035)); return sh.getSpacedPoints(n).slice(0, -1).map(p => [p.x, -p.y]); };
+const arcPts = (cx, cz, R, a0, a1, n = Math.max(24, Math.round(Math.abs(a1 - a0) * R / 0.035))) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + (a1 - a0) * i / n; return [cx + Math.cos(a) * R, cz + Math.sin(a) * R]; });
 
 // The runs of wall round a building at storey k.
 export function wallRuns(b, k = 0) {

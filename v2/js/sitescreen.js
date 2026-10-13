@@ -686,12 +686,14 @@ export function mountSite(root, world, model, siteView, thumbs) {
   function cheer(b) {
     crowd.cheer(b.id);
     sfx.cheer();
-    const top = new THREE.Vector3(b.x + b.w / 2, yOf(b) + b.h * LEVEL + 0.1, b.z + b.d / 2);
+    confetti(new THREE.Vector3(b.x + b.w / 2, yOf(b) + b.h * LEVEL + 0.1, b.z + b.d / 2));
+  }
+  function confetti(top, n = 46, spread = 1.6) {
     const cols = ['#f7c22e', '#e2457d', '#22b2bf', '#a3d140', '#7c46a8', '#f28b30', '#3d8de0'], bits = [];
     const geo = new THREE.PlaneGeometry(0.05, 0.03);
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; i < n; i++) {
       const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: cols[i % cols.length], side: THREE.DoubleSide, transparent: true }));
-      m.position.copy(top); m.userData.v = new THREE.Vector3((Math.random() - 0.5) * 1.6, 1.4 + Math.random() * 1.4, (Math.random() - 0.5) * 1.6); m.userData.s = new THREE.Vector3(Math.random() * 9, Math.random() * 9, 0);
+      m.position.copy(top); m.userData.v = new THREE.Vector3((Math.random() - 0.5) * spread, 1.4 + Math.random() * 1.4, (Math.random() - 0.5) * spread); m.userData.s = new THREE.Vector3(Math.random() * 9, Math.random() * 9, 0);
       world.scene.add(m); bits.push(m);
     }
     let t = 0;
@@ -784,6 +786,26 @@ export function mountSite(root, world, model, siteView, thumbs) {
   setTool(null);
   return {
     S, select, setTool, redraw, frameSite, setInside, tap: handleTap, crowd,
+    // Everyone cheers and confetti flies (a wish has come true).
+    celebrate() {
+      for (const b of model.boxes) crowd.cheer(b.id);
+      sfx.cheer(); setTimeout(() => sfx.cheer(), 450);
+      const t = world.controls.target;
+      for (let i = 0; i < 3; i++) setTimeout(() => confetti(new THREE.Vector3(t.x + (i - 1) * 1.2, 0.8, t.z + (i - 1) * 0.6), 60, 2.4), i * 220);
+    },
+    // A picture of the school as it is on screen, saved to the tablet (for showing at school).
+    photo() {
+      const hv = handles.visible, gv = siteArrows.visible; handles.visible = false; siteArrows.visible = false;
+      world.renderer.render(world.scene, world.camera);
+      world.renderer.domElement.toBlob(blob => {
+        handles.visible = hv; siteArrows.visible = gv;
+        if (!blob) return;
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Finns-dream-school-${new Date().toISOString().slice(0, 10)}.png`;
+        document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      }, 'image/png');
+      const flash = h('<div class="flash"></div>'); ui.append(flash); setTimeout(() => flash.remove(), 600);
+      sfx.whoosh(); say('Snap! A photo of your school.');
+    },
     screenOf(x, z, y = 0) { return world.toScreen(new THREE.Vector3(x + 0.5, y, z + 0.5)); },
     show(on) { ui.hidden = !on; design.visible = on; crowd.mesh.visible = on; handles.visible = on && !!S.selected && !S.inside; },
     refreshTray: drawTray,

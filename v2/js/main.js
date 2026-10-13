@@ -7,6 +7,7 @@ import { mountSite } from './sitescreen.js';
 import { mountRooms, trayThumbs } from './rooms.js';
 import { h, emo, say, hush, sfx, toast, speechOn, setSpeech, soundOn, setSound } from './ui.js';
 import { icon, MARK } from './icons.js';
+import { mountWishes } from './wishes.js';
 
 // Finn's wooden-block model from the photos: green classrooms along the beach, orange bars round the meadow,
 // a blue pool in the middle, a ring of green curves and an orange drum by the waterfall.
@@ -39,6 +40,8 @@ async function boot() {
       <div class="brand">${MARK}<div><small>Astra Architect</small><b>Finn's Dream School</b></div></div>
       <nav class="tabs"><button data-go="rooms" type="button">${icon('rooms')} Rooms</button><button data-go="site" type="button">${icon('site')} Site</button></nav>
       <div class="acts">
+        <button class="ab wishbtn" data-a="wishes" type="button"></button>
+        <button class="ab" data-a="photo" type="button">${icon('camera')} Photo</button>
         <button class="ab" data-a="finn" type="button">${icon('blocks')} Finn's model</button>
         <button class="ab" data-a="clear" type="button">${icon('leaf')} Empty site</button>
         <button class="ab round" data-a="speech" type="button" aria-label="Read aloud">${icon('speaker')}</button>
@@ -58,6 +61,7 @@ async function boot() {
   const site = mountSite(overlay, world, model, siteView, thumbs);
   const rooms = mountRooms(roomsHost, model, { thumbs, onBuild: id => { location.hash = '#site'; setTimeout(() => site.setTool(id), 50); } });
   model.onChange(w => { if (w.style) site.refreshTray(); });
+  mountWishes(shell.querySelector('.stage'), model, { button: shell.querySelector('.wishbtn'), celebrate: () => { if (location.hash !== '#rooms') site.celebrate(); } });
 
   function route() {
     const r = location.hash === '#rooms' ? 'rooms' : 'site';
@@ -78,6 +82,7 @@ async function boot() {
     const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
     if (a === 'speech') { setSpeech(!speechOn); paint(); toast(speechOn ? 'Read-aloud on' : 'Read-aloud off'); }
     if (a === 'sound') { setSound(!soundOn); paint(); sfx.tap(); }
+    if (a === 'photo') { if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => site.photo(), 400); } else site.photo(); }
     if (a === 'finn') {
       if (model.boxes.length && !confirm('Put Finn\'s wooden-block model on the site? (Undo brings back what is there now.)')) return;
       model.snapshot(); model.boxes = FINNS_MODEL.map((b, i) => ({ ...b, id: i + 1 })); model.nextId = FINNS_MODEL.length + 1; model.changed({ loaded: true });

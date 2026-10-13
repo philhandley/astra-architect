@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Character passes</title>
+<style>
+  html, body { margin: 0; background: #efe9de; font-family: system-ui, sans-serif; }
+  #out { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="out"></canvas>
+<script type="module">
+// Dev page: character designs side by side. Each row: a close-up line-up (as when walking) and the same children
+// tiny round a table (as in the bird's-eye inside view). ?styles=current,soft,...  __shot(name) saves the sheet.
+import * as THREE from 'three';
+import { STYLES, figure, look, triangles } from './characters.js';
+import { miniKid } from '../v2/js/kid.js';
+
+const q = new URLSearchParams(location.search);
+const ROWS = (q.get('styles') || 'current,soft,model,street,geo').split(','), OFF = +(q.get('off') || 0);
+const PW = 720, PH = 340;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1.5); renderer.setSize(PW, PH);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const out = document.getElementById('out'), ctx = out.getContext('2d');
+out.width = PW * 2; out.height = PH * ROWS.length;
+
+function stage(bg) {
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(bg);
+  scene.add(new THREE.HemisphereLight('#ffffff', '#e6dfd0', 1.55));
+  const sun = new THREE.DirectionalLight('#fff4e2', 1.9); sun.position.set(-2, 5, 3); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -1.5, right: 1.5, top: 1.5, bottom: -1.5 }); sun.shadow.bias = -0.0004; scene.add(sun);
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(6, 0.02, 6).translate(0, -0.01, 0), new THREE.MeshLambertMaterial({ color: '#f3ede3' })); floor.receiveShadow = true; scene.add(floor);
+  return scene;
+}
+const STY = { current: ['bob', 'quiff', 'puff', 'cap', 'bunches', 'pony'] };
+function kid(style, n, pose, swing) {
+  if (style === 'current') { const k = miniKid(pose === 'sit' ? 'sit' : 'stand'); return k; }
+  const S = STYLES[style], L = look(n, S.hairs); L.hatRoll = (n * 0.61) % 1;
+  return figure(style, L, pose === 'sit' ? [-1.45, -0.5, 0.1] : [0, 0, 0.1], swing || 0);
+}
+function closeUp(style) {
+  const scene = stage('#e9f1f2');
+  for (let i = 0; i < 5; i++) { const k = kid(style, i * 5 + 2 + OFF, 'stand', i === 3 ? 0.5 : 0); k.position.set(-0.29 + i * 0.145, 0, (i % 2) * 0.03); k.rotation.y = i === 4 ? Math.PI * 0.85 : 0.4 - i * 0.12; scene.add(k); }
+  const V = 0.175, cam = new THREE.OrthographicCamera(-V * PW / PH, V * PW / PH, V, -V, -10, 20);
+  cam.position.set(0.9, 0.8, 3.4); cam.lookAt(0, 0.12, 0);
+  renderer.render(scene, cam);
+}
+function group(style) {
+  const scene = stage('#f3ede3');
+  for (let i = 0; i < 12; i++) { const k = kid(style, 200 + i * 11 + OFF, 'stand', i % 3 ? (i % 2 ? 0.4 : -0.4) : 0); k.position.set(-0.55 + (i % 6) * 0.2 + (i > 5 ? 0.1 : 0), 0, i > 5 ? 0.18 : -0.05); k.rotation.y = 0.6 - i * 0.55; scene.add(k); }
+  const V = 0.3, cam = new THREE.OrthographicCamera(-V * PW / PH, V * PW / PH, V, -V, -10, 20);
+  cam.position.set(1.5, 1.6, 3.2); cam.lookAt(0, 0.1, 0.05);
+  renderer.render(scene, cam);
+}
+function tiny(style) {
+  const scene = stage('#f3ede3');
+  const table = new THREE.Group(), m = new THREE.MeshLambertMaterial({ color: '#fbfaf6' });
+  table.add(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.012, 20).translate(0, 0.075, 0), m), new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.07, 8).translate(0, 0.035, 0), m));
+  table.traverse(o => { o.castShadow = o.receiveShadow = true; });
+  for (const [tx, tz] of [[-0.45, 0], [0.35, -0.2]]) {
+    const t = table.clone(); t.position.set(tx, 0, tz); scene.add(t);
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + 0.3, k = kid(style, i * 3 + (tx > 0 ? 40 : 1), 'sit'); k.position.set(tx + Math.cos(a) * 0.115, style === 'current' ? 0 : 0.045 - (STYLES[style].HIP - 0.058) - 0.012, tz + Math.sin(a) * 0.115); k.rotation.y = -a - Math.PI / 2; scene.add(k); }
+  }
+  for (let i = 0; i < 7; i++) { const k = kid(style, 90 + i * 7, 'stand', i % 2 ? 0.45 : -0.45); k.position.set(-0.7 + i * 0.25, 0, 0.35 + (i % 3) * 0.1); k.rotation.y = i * 0.9; scene.add(k); }
+  const V = 0.62, cam = new THREE.OrthographicCamera(-V * PW / PH, V * PW / PH, V, -V, -10, 20);
+  cam.position.set(3, 3.2, 3.6); cam.lookAt(0, 0.05, 0.05);
+  renderer.render(scene, cam);
+}
+ROWS.forEach((style, r) => {
+  closeUp(style); ctx.drawImage(renderer.domElement, 0, r * PH, PW, PH);
+  (q.get('group') ? group : tiny)(style); ctx.drawImage(renderer.domElement, PW, r * PH, PW, PH);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(0, r * PH, PW * 2, 26);
+  ctx.fillStyle = '#222'; ctx.font = '600 16px system-ui';
+  ctx.fillText(style === 'current' ? 'Now: picture-book toys' : `${STYLES[style].name} (~${triangles(style)} triangles each)`, 10, r * PH + 18);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeRect(0, r * PH, PW * 2, PH);
+});
+window.__shot = async name => { const blob = await new Promise(r => out.toBlob(r, 'image/jpeg', 0.9)); return (await fetch('/__shot/' + name, { method: 'PUT', body: blob })).status; };
+window.__done = true;
+</script>
+</body>
+</html>

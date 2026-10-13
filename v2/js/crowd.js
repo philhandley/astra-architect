@@ -6,7 +6,7 @@
 // ink line shares the matrices of its part. Each hairstyle (and the bag) lists only the children who have it, so
 // nobody draws hair they aren't wearing.
 import * as THREE from 'three';
-import { HIP, SHOULDER, LEG_X, ARM_X, kidParts, kidLook, HAIR_PART, toon, KID_LINE, inkOf } from './kid.js';
+import { HIP, SHOULDER, LEG_X, ARM_X, SIT_DROP, SWIM_DROP, kidParts, kidLook, HAIR_PART, HATS, EXTRAS, INKED, toon, KID_LINE, inkOf } from './kid.js';
 
 const MAX = 800;
 export function seeded(seed) {
@@ -23,17 +23,19 @@ export class Crowd {
     const P = kidParts();
     const tinted = toon('#ffffff');
     this.all = [];
-    // name: [geometry, colour (null = each child's own), shares matrices with, casts a shadow, ink line]
+    // name: [geometry, colour (null = each child's own), shares matrices with, casts a shadow]; the ink line goes on
+    // the parts in INKED (kid.js). Each hairstyle and each extra (hood, skirt, headphones, bag) has its own list.
     const SPEC = {
-      torso: [P.torso, null, null, true, true], head: [P.head, null, 'torso', true, true], eyes: [P.eyes, '#23252b', 'torso'],
-      bob: [P.bob, null, null, false, true], quiff: [P.quiff, null, null, false, true], puff: [P.puff, null, null, false, true],
-      capHair: [P.capHair, null, null, false, true], hat: [P.hat, null, 'capHair', false, true], bunches: [P.bunches, null, null, false, true], pony: [P.pony, null, null, false, true],
-      bag: [P.bag, null, null, false, true],
-      legL: [P.leg, null, null, false, true], legR: [P.leg, null, null, false, true], shoeL: [P.shoe, null, 'legL', false, true], shoeR: [P.shoe, null, 'legR', false, true],
-      armL: [P.arm, null, null, false, true], armR: [P.arm, null, null, false, true], handL: [P.hand, null, 'armL', false, true], handR: [P.hand, null, 'armR', false, true],
+      torso: [P.torso, null, null, true], band: [P.band, null, 'torso'], head: [P.head, null, 'torso', true], eyes: [P.eyes, '#23252b', 'torso'],
+      ...Object.fromEntries(HAIR_PART.map(h => [h, [P[h], null, null]])),
+      ...Object.fromEntries(EXTRAS.map(x => [x, [P[x], null, null]])),
+      legL: [P.leg, null, null], legR: [P.leg, null, null], shoeL: [P.shoe, null, 'legL'], shoeR: [P.shoe, null, 'legR'], soleL: [P.sole, '#fbfaf6', 'legL'], soleR: [P.sole, '#fbfaf6', 'legR'],
+      armL: [P.arm, null, null], armR: [P.arm, null, null], handL: [P.hand, null, 'armL'], handR: [P.hand, null, 'armR'],
     };
+    const inked = name => INKED.has(name.replace(/[LR]$/, ''));
     this.meshes = {}; this.inks = {};
-    for (const [name, [geo, colour, share, shadow, ink]] of Object.entries(SPEC)) {
+    for (const [name, [geo, colour, share, shadow]] of Object.entries(SPEC)) {
+      const ink = inked(name);
       const m = new THREE.InstancedMesh(geo, colour ? toon(colour) : tinted, MAX);
       if (share) m.instanceMatrix = this.meshes[share].instanceMatrix;
       m.castShadow = !!shadow; m.count = 0; m.frustumCulled = false; m.userData.people = true; m.raycast = () => {};
@@ -45,8 +47,8 @@ export class Crowd {
       }
     }
     // Which colour each instanced part takes from the child's look.
-    this.colourOf = { torso: 'top', armL: 'top', armR: 'top', legL: 'shorts', legR: 'shorts', shoeL: 'shoes', shoeR: 'shoes', head: 'skin', handL: 'skin', handR: 'skin',
-      bob: 'hair', quiff: 'hair', puff: 'hair', capHair: 'hair', bunches: 'hair', pony: 'hair', hat: 'hat', bag: 'bag' };
+    this.colourOf = { torso: 'top', band: 'accent', hood: 'top', skirt: 'skirt', armL: 'sleeve', armR: 'sleeve', legL: 'shorts', legR: 'shorts', shoeL: 'shoes', shoeR: 'shoes',
+      head: 'skin', handL: 'skin', handR: 'skin', phones: 'hat', bag: 'bag', ...Object.fromEntries(HAIR_PART.map(h => [h, HATS.has(h) ? 'hat' : 'hair'])) };
     this.people = [];
     this.near = null;                 // in walk mode: hide anyone right next to the camera
     this.onStep = null;               // called with (x, z) as people walk between rooms (to wear paths)
@@ -56,19 +58,18 @@ export class Crowd {
     world.updaters.add(dt => this.update(dt));
   }
   setCount(n) {
-    const c = new THREE.Color(), counts = Object.fromEntries(HAIR_PART.map(h => [h, 0]));
-    let bags = 0;
-    // Each child's place in its hairstyle's list (p.hi) and, if it has one, in the list of bags (p.bi).
+    const c = new THREE.Color(), counts = Object.fromEntries([...HAIR_PART, ...EXTRAS].map(h => [h, 0]));
+    // Each child's place in its hairstyle's list (p.hi) and in the list of each extra it has (p.xi[extra], or -1).
     for (const p of this.people) {
-      p.look = { ...LOOK_DEFAULTS, ...(p.look || look(p)) };
-      p.hair = HAIR_PART[p.look.style | 0] || HAIR_PART[0]; p.hi = counts[p.hair]++;
-      p.bi = p.look.bag ? bags++ : -1;
+      const L = p.look = { ...LOOK_DEFAULTS, ...(p.look || look(p)) };
+      L.sleeve = L.sleeve || L.top; L.accent = L.accent || L.top;
+      p.hair = HAIR_PART[L.style | 0] || HAIR_PART[0]; p.hi = counts[p.hair]++;
+      p.xi = {}; for (const x of EXTRAS) p.xi[x] = L[x] ? counts[x]++ : -1;
     }
-    const countOf = name => (name in counts ? counts[name] : name === 'hat' ? counts.capHair : name === 'bag' ? bags : n);
-    for (const [name, m] of Object.entries(this.meshes)) { m.count = countOf(name); if (this.inks[name]) this.inks[name].count = m.count; }
+    for (const [name, m] of Object.entries(this.meshes)) { m.count = name in counts ? counts[name] : n; if (this.inks[name]) this.inks[name].count = m.count; }
     this.people.forEach((p, i) => {
       for (const [name, key] of Object.entries(this.colourOf)) {
-        const j = name in counts ? (name === p.hair ? p.hi : -1) : name === 'hat' ? (p.hair === 'capHair' ? p.hi : -1) : name === 'bag' ? p.bi : i;
+        const j = HAIR_PART.includes(name) ? (name === p.hair ? p.hi : -1) : EXTRAS.includes(name) ? p.xi[name] : i;
         if (j >= 0) this.meshes[name].setColorAt(j, c.set(p.look[key] || '#ffffff'));
       }
     });
@@ -147,8 +148,8 @@ export class Crowd {
     const { base, part, rot, q, v, s, up, e } = this.tmp, M = this.meshes, kind = p.kind === 'agent' ? p.pose : p.kind;
     let legL = 0, legR = 0, armL = 0, armR = 0, outL = -0.12, outR = 0.12, y = p.y, lean = 0;
     const swing = Math.sin(p.walk || 0);
-    if (kind === 'sit') { legL = legR = -1.45; armL = armR = -0.55; y -= 0.037; }
-    else if (kind === 'swim') { y -= 0.125; const w = t * 4 + p.ph; armL = Math.sin(w) * 2.6; armR = Math.sin(w + Math.PI) * 2.6; lean = 0.3; }
+    if (kind === 'sit') { legL = legR = -1.45; armL = armR = -0.55; y -= SIT_DROP; }
+    else if (kind === 'swim') { y -= SWIM_DROP; const w = t * 4 + p.ph; armL = Math.sin(w) * 2.6; armR = Math.sin(w + Math.PI) * 2.6; lean = 0.3; }
     else if (moving) { const a = kind === 'run' ? 0.9 : 0.55; legL = swing * a; legR = -swing * a; armL = -swing * a * 0.9; armR = swing * a * 0.9; y += Math.abs(Math.cos(p.walk || 0)) * (kind === 'run' ? 0.012 : 0.006); lean = kind === 'run' ? 0.18 : 0.04; }
     else { armL = Math.sin(t * 1.5 + p.ph) * 0.05; armR = -armL; }
     if (p.jumpT > 0) { p.jumpT -= dt; y += Math.abs(Math.sin(t * 9 + p.ph)) * 0.07; const wave = 2.7 + Math.sin(t * 14 + p.ph) * 0.25; outL = -wave; outR = wave; armL = armR = 0; }
@@ -157,8 +158,8 @@ export class Crowd {
     base.compose(v, q, s);
     if (lean) base.multiply(rot.makeRotationX(lean));
     M.torso.setMatrixAt(i, base);         // also the head and face
-    if (p.hair) M[p.hair].setMatrixAt(p.hi, base);      // (the hat goes with the cap)
-    if (p.bi >= 0) M.bag.setMatrixAt(p.bi, base);
+    if (p.hair) M[p.hair].setMatrixAt(p.hi, base);
+    if (p.xi) for (const x of EXTRAS) if (p.xi[x] >= 0) M[x].setMatrixAt(p.xi[x], base);
     const limb = (mesh, x, yy, rx, rz) => { part.makeTranslation(x, yy, 0).multiply(rot.makeRotationFromEuler(e.set(rx, 0, rz))); mesh.setMatrixAt(i, part.premultiply(base)); };
     limb(M.legL, -LEG_X, HIP, legL, 0);
     limb(M.legR, LEG_X, HIP, legR, 0);

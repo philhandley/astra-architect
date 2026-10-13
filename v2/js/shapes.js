@@ -7,7 +7,7 @@ import { LEVEL } from './catalogue.js';
 import { TREE_GREENS } from './site.js';
 import { addFacade, addTerrace, contactShadow } from './facade.js';
 import { REC, SOFFIT, hasColonnade, ringThickness, turnAngle, rows, wallRuns, openings } from './plan.js';
-import { miniKid, SEAT } from './kid.js';
+import { miniKid, SEAT, REACH } from './kid.js';
 
 const GAP = 0.035;                   // a hair of space round every piece, so each reads as its own block
 const ROOF = 0.4;
@@ -318,7 +318,7 @@ const BUILD = {
     g.add(mesh(tube, mat(WHITE, { map: stripes(c) })));
     // A child: whizzes down sitting, climbs out at the bottom, walks round to the door and goes in to climb up again.
     const rider = new THREE.Group(), sit = miniKid('sit'), walker = miniKid('stand');
-    sit.scale.setScalar(0.75); walker.scale.setScalar(0.75); rider.add(sit, walker);
+    sit.scale.setScalar(0.75); walker.scale.setScalar(0.75); sit.position.y = -(SEAT - 0.058) * 0.75; rider.add(sit, walker);      // (sits at the bottom of the tube)
     const legs = [], arms = []; walker.traverse(o => { if (o.userData.limb === 'leg') legs.push(o); if (o.userData.limb === 'arm') arms.push(o); });
     const path = [new THREE.Vector3(L / 2 + 0.06, 0, 0), new THREE.Vector3(x0 + 0.8, 0, 0.6), new THREE.Vector3(x0, 0, 0.4)];
     const lens = [0]; for (let i = 1; i < path.length; i++) lens.push(lens[i - 1] + path[i].distanceTo(path[i - 1]));
@@ -714,7 +714,7 @@ Object.assign(BUILD, {
     const rider = new THREE.Group();
     rider.add(mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.15, 4).translate(0, -0.075, 0), mat('#3d405b'), false));
     rider.add(mesh(new THREE.BoxGeometry(0.012, 0.012, 0.1).translate(0, -0.155, 0), mat('#3d405b'), false));
-    const hang = miniKid('hang'); hang.position.set(0, -0.295, 0); hang.scale.setScalar(0.75); hang.rotation.y = Math.PI / 2; rider.add(hang);
+    const hang = miniKid('hang'); hang.position.set(0, -0.162 - REACH * 0.75, 0);      // (hands on the bar) hang.scale.setScalar(0.75); hang.rotation.y = Math.PI / 2; rider.add(hang);
     const walker = miniKid('stand'); walker.scale.setScalar(0.75); walker.visible = false;
     const legs = [], arms = []; walker.traverse(o => { if (o.userData.limb === 'leg') legs.push(o); if (o.userData.limb === 'arm') arms.push(o); });
     const path = [new THREE.Vector3(x1 - 0.2, 0, 0.1), new THREE.Vector3(x1 - 0.3, 0, 0.3), new THREE.Vector3(x0 + 0.6, 0, 0.3), new THREE.Vector3(x0 + 0.55, 0, 0)];

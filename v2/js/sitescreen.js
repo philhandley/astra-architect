@@ -101,10 +101,47 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     siteView.regrade(pads);
   }
   function makeGroup(b, ghost = null) {
-    const g = buildPiece({ ...b, hex: colourHex(b.colour) }, { open: model.open(b), ghost });
+    const g = buildPiece({ ...b, hex: colourHex(b.colour), links: model.links(b), exits: model.exits(b) }, { open: model.open(b), ghost });
+    if (!ghost) addTrusses(g, b);
     g.position.set(b.x + b.w / 2, yOf(b), b.z + b.d / 2);
     g.traverse(o => { o.userData.boxId = b.id; });
     return g;
+  }
+  // White V-trusses under a cantilever of two squares or more: a V under each overhanging square, its arms up to
+  // the underside and its foot on whatever is below (a roof, or the ground). Added in the piece's own frame.
+  const TRUSS = new THREE.MeshLambertMaterial({ color: '#fbfaf6' });
+  function addTrusses(g, b) {
+    if (!(b.level > 0)) return;
+    const sq = model.squares(b), has = (x, z) => sq.some(([a, c]) => a === x && c === z), held = (x, z) => !!model.at(x, z, b.level - 1);
+    const un = sq.filter(([x, z]) => !held(x, z));
+    if (un.length < 2 || un.length === sq.length) return;
+    const cx = b.x + b.w / 2, cz = b.z + b.d / 2, y0 = yOf(b), parts = [], up = new THREE.Vector3(0, 1, 0);
+    for (const [x, z] of un) {
+      // Which way the cantilever runs: towards the nearest held square of the same room.
+      let bx = Infinity, bz = Infinity;
+      for (const [a, c] of sq) if (held(a, c)) { if (c === z) bx = Math.min(bx, Math.abs(a - x)); if (a === x) bz = Math.min(bz, Math.abs(c - z)); }
+      const alongX = bx <= bz;
+      let yb = null; for (let l = b.level - 1; l >= 0 && yb === null; l--) { const c = model.at(x, z, l); if (c) yb = yOf(c) + c.h * LEVEL; }
+      if (yb === null) yb = Math.max(0, square(x, z)?.base || 0);
+      const lx = x + 0.5 - cx, lz = z + 0.5 - cz, foot = yb - y0, drop = -foot;
+      if (drop < 0.15) continue;
+      // The V stands in the plane of the slab's edge (front and back), its arms running along the edge, so it
+      // shows below the overhang the way V-columns do in an elevation; under the middle it would only hide.
+      const edge = (alongX ? b.d : b.w) / 2 - 0.06, arm = 0.36;
+      for (const f of [-1, 1]) {
+        const px = alongX ? lx : lx + f * edge, pz = alongX ? lz + f * edge : lz;
+        for (const s of [-1, 1]) {
+          const ax = alongX ? s * arm : 0, az = alongX ? 0 : s * arm, len = Math.hypot(arm, drop);
+          const strut = new THREE.CylinderGeometry(0.03, 0.036, len, 10).translate(0, len / 2, 0);
+          strut.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, new THREE.Vector3(ax, drop, az).normalize())).translate(px, foot, pz);
+          parts.push(strut);
+        }
+        parts.push(new THREE.CylinderGeometry(0.08, 0.09, 0.035, 14).translate(px, foot + 0.0175, pz));
+      }
+    }
+    if (!parts.length) return;
+    const m = new THREE.Mesh(mergeGeometries(parts.map(p => { p.deleteAttribute('uv'); return p; })), TRUSS);
+    m.castShadow = true; m.userData.noInk = true; g.add(m);
   }
   // In the inside view: rooms on this floor are cut open; rooms above are hidden; rooms below stay solid.
   function makeInside(b) {
@@ -114,14 +151,14 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     if (!spans || !CUTTABLE.has(b.shape)) { const g = makeGroup(b); return { g }; }
     const floorY = storeyFloor(b, L);
     const top = S.walkMode ? (SINGLE_SPACE.has(b.type) ? b.h * LEVEL : LEVEL) : 0;
-    const room = cutRoom(b, colourHex(b.colour), floorY, S.cutH, S.walkMode ? { walk: true, top, boxH: b.h * LEVEL } : {});
+    const room = cutRoom({ ...b, links: model.links(b) }, colourHex(b.colour), floorY, S.cutH, S.walkMode ? { walk: true, top, boxH: b.h * LEVEL } : {});
     if (S.walkMode) for (const [ax, az, bx, bz] of room.segments) walls.push([ax + b.x + b.w / 2, az + b.z + b.d / 2, bx + b.x + b.w / 2, bz + b.z + b.d / 2]);
     let g = room.group;
     if (S.walkMode) {
       // The real building (roof, upper floors, window frames, canopies), with the storey being walked cut away,
       // where the room with its real window openings stands instead.
       const y0 = yOf(b), k = SINGLE_SPACE.has(b.type) ? 0 : L - b.level;
-      const real = buildPiece({ ...b, hex: colourHex(b.colour) }, { open: model.open(b), walkK: k, ink: false });
+      const real = buildPiece({ ...b, hex: colourHex(b.colour), links: model.links(b), exits: model.exits(b) }, { open: model.open(b), walkK: k, ink: false });
       // (The lower cut sits a hair below the floor, so the building's bottom face never fights the levelled ground.)
       const planes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -(y0 + floorY + top)), new THREE.Plane(new THREE.Vector3(0, -1, 0), y0 + floorY - 0.003)];
       real.traverse(o => {
@@ -131,6 +168,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       });
       const both = new THREE.Group(); both.add(real, g); g = both;
     } else addInk(g);
+    addTrusses(g, b);
     g.position.set(b.x + b.w / 2, yOf(b), b.z + b.d / 2);
     g.traverse(o => { o.userData.boxId = b.id; });
     return { g, room };
@@ -147,7 +185,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       if (S.inside) { const r = makeInside(b); if (!r) continue; g = r.g; room = r.room; }
       else g = makeGroup(b);
       design.add(g); pieces.set(b.id, g);
-      if (gone.has(b.id) && !gone.get(b.id).landing) g.traverse(o => { if (o.userData.rocket) o.visible = false; });
+      if (gone.has(b.id) && !gone.get(b.id).landing) { g.traverse(o => { if (o.userData.rocket) o.visible = false; }); setArms(b.id, 1); }
       zones.push(...peopleFor(b, g, room));
       // Where people can sit, in the world: room seats, or the benches and steps of a piece.
       const cx = b.x + b.w / 2, cz = b.z + b.d / 2, y0 = yOf(b);
@@ -470,6 +508,8 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   // comes down out of the sky onto the pad, ready to go again.
   const ROCKET_WAIT = 60000, gone = new Map();          // box id -> the timer for the next rocket
   const rocketOf = id => { let rk = null; pieces.get(id)?.traverse(o => { if (o.userData.rocket) rk = o; }); return rk; };
+  // The chopsticks: k = 0 closed round the booster, 1 swung open. (Eased, so they move like big machinery.)
+  const setArms = (id, k) => { const e = k * k * (3 - 2 * k); pieces.get(id)?.traverse(o => { if (o.userData.chopstick) o.rotation.y = -o.userData.chopstick * 1.05 * e; }); };
   const rocketReady = b => b.shape === 'rocket' && !gone.has(b.id);
   // The big red button, bottom right, whenever there is a rocket on the site. While the next rocket is on its way
   // it counts down instead.
@@ -500,6 +540,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     const fn = dt => {
       t += dt;
       rk.position.y = base + (t < 0.8 ? 0 : Math.pow(t - 0.8, 2) * 1.6);
+      setArms(b.id, Math.min(1, t / 0.8));
       const fl = rk.userData.flame; if (fl) { fl.visible = t > 0.3; fl.scale.set(1 + Math.sin(t * 41) * 0.15, (t < 0.8 ? 0.6 : 1) + Math.sin(t * 29) * 0.25, 1 + Math.sin(t * 37) * 0.15); }
       if (t > 0.3 && t < 4.5 && Math.random() < 0.6) {
         const p = new THREE.Mesh(new THREE.SphereGeometry(0.08 + Math.random() * 0.06, 8, 6), new THREE.MeshLambertMaterial({ color: '#ffffff', transparent: true, opacity: 0.9 }));
@@ -527,6 +568,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       t += dt;
       const e = Math.min(1, t / 3.2), s = 1 - Math.pow(1 - e, 3);        // eases in to land softly
       rk.position.y = base + from * (1 - s);
+      setArms(id, 1 - Math.min(1, e / 0.3));
       const fl = rk.userData.flame; if (fl) { fl.visible = e < 1; fl.scale.set(0.7 + Math.sin(t * 41) * 0.1, 0.5 + Math.sin(t * 29) * 0.15, 0.7 + Math.sin(t * 37) * 0.1); }
       if (e >= 1) { rk.position.y = base; rk.userData.flying = false; world.updaters.delete(fn); gone.delete(id); updateLaunch(); sfx.cheer(); confetti(new THREE.Vector3(b.x + b.w / 2, yOf(b) + 0.4, b.z + b.d / 2)); say('A new rocket is ready on the launch pad!'); if (S.selected === id) drawSelbar(b); }
     };

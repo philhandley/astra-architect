@@ -161,7 +161,7 @@ const PATTERNS = {
   // Neat rows of framed windows.
   grid: (r, rh) => { if (r.len < 0.16) return []; const n = Math.max(1, Math.round(r.len / 0.34)); return spread(r.len, n, Math.min(0.2, (r.len / n) * 0.62), rh > 0.6 ? 0.12 : 0.13, rh > 0.6 ? rh - 0.14 : 0.36); },
   // Big picture windows in deep coloured frames that stick out, like boxes.
-  big: (r, rh) => { if (r.len < 0.24) return []; const n = Math.max(1, Math.round(r.len / 0.55)); return spread(r.len, n, Math.min(0.46, (r.len / n) * 0.74), 0.07, rh > 0.6 ? rh * 0.74 : 0.42, { deep: true, cross: true }); },
+  big: (r, rh) => { if (r.len < 0.24) return []; const n = Math.max(1, Math.round(r.len / 0.55)); return spread(r.len, n, Math.min(0.46, (r.len / n) * 0.74), 0.07, rh > 0.6 ? rh * 0.74 : 0.42, { deep: true }); },
   // One long strip window round each storey.
   ribbon: (r, rh) => { if (r.len < 0.22) return []; const out = [], rows = rh > 0.6 ? Math.max(1, Math.round(rh / LEVEL)) : 1; for (let i = 0; i < rows; i++) out.push({ s0: 0.07, s1: r.len - 0.07, y0: i * LEVEL + 0.17, y1: i * LEVEL + 0.36, mull: 0.17 }); return out; },
   // Round windows, like a ship.
@@ -180,7 +180,6 @@ const PATTERNS = {
       const sz = sizes[Math.floor(rnd() * 3)]; if (r.len - 0.08 - sz < 0 || rh - 0.1 - sz < 0) continue;
       const s0 = 0.04 + rnd() * (r.len - 0.08 - sz), y0 = 0.05 + rnd() * (rh - 0.1 - sz), w = { s0, s1: s0 + sz, y0, y1: y0 + sz };
       if (out.some(o => o.s0 < w.s1 + 0.03 && w.s0 < o.s1 + 0.03 && o.y0 < w.y1 + 0.03 && w.y0 < o.y1 + 0.03)) continue;
-      if (rnd() < 0.45) w.frame = PIXEL_FRAMES[Math.floor(rnd() * PIXEL_FRAMES.length)];
       out.push(w);
     }
     return out;
@@ -240,6 +239,24 @@ export function openings(b, k, runs = wallRuns(b, k)) {
     }
   });
   if (door) out.push({ run: door.run, s0: door.s0, s1: door.s1, y0: 0, y1: 0.3, door: true });
+  // Doors where a bridge, walkway, stairs or ramp arrives at this storey: on the nearest outside wall, facing it.
+  for (const L of b.links || []) {
+    if (L.k !== k) continue;
+    const lx = L.x + 0.5 - (b.x + b.w / 2), lz = L.z + 0.5 - (b.z + b.d / 2);
+    let best = null;
+    runs.forEach((r, ri) => {
+      if (!r.outer) return;
+      for (let i = 0; i < r.pts.length - 1; i++) {
+        const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1;
+        const tt = Math.max(0, Math.min(1, ((lx - ax) * dx + (lz - az) * dz) / l2)), d = Math.hypot(lx - ax - dx * tt, lz - az - dz * tt);
+        if (!best || d < best.d) best = { d, ri, s: r.s[i] + Math.sqrt(l2) * tt, len: r.len };
+      }
+    });
+    if (!best || best.len < 0.26) continue;
+    const s0 = Math.max(0.03, best.s - 0.09), s1 = Math.min(best.len - 0.03, best.s + 0.09);
+    for (let i = out.length - 1; i >= 0; i--) { const o = out[i]; if (o.run === best.ri && o.s1 > s0 - 0.03 && o.s0 < s1 + 0.03) out.splice(i, 1); }
+    out.push({ run: best.ri, s0, s1, y0: 0, y1: 0.3, door: true, link: true });
+  }
   return out;
 }
 

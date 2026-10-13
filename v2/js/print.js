@@ -287,7 +287,7 @@ function drawPlan(model, siteView, L, mode = 'colour', cut = null) {
     path(g, b, X, Z, s, k);
     g.fillStyle = b.shape === 'pool' ? '#bfe6f0' : tint(colourHex(b.colour), 0.3); g.fill('evenodd');
     g.strokeStyle = '#1d1f24'; g.lineWidth = b.shape === 'track' || b.shape === 'pool' || b.shape === 'garden' ? 3 : 7; g.stroke();
-    planOpenings(g, b, X, Z, s, k);
+    planOpenings(g, { ...b, links: model.links(b) }, X, Z, s, k);
     // Little symbols.
     g.lineWidth = 2;
     if (b.shape === 'stairs' || b.shape === 'steps') { const n = b.shape === 'stairs' ? 6 : Math.round(Math.max(b.w, b.d) * 3); for (let i = 1; i < n; i++) { g.beginPath(); if (b.w >= b.d) { const x = X(b.x) + (s * b.w * i) / n; g.moveTo(x, Z(b.z) + 6); g.lineTo(x, Z(b.z + b.d) - 6); } else { const z = Z(b.z) + (s * b.d * i) / n; g.moveTo(X(b.x) + 6, z); g.lineTo(X(b.x + b.w) - 6, z); } g.stroke(); } }

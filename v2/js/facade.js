@@ -58,6 +58,7 @@ function frontDoor(L, run, o, yb) {
   panel(L.frame, p.x, yb + 0.158, p.z, p.nx, p.nz, w + 0.036, 0.316, 0.012, 0.006);
   panel(L.pop, p.x, yb + 0.15, p.z, p.nx, p.nz, w, 0.3, 0.014, 0.012);
   panel(L.glass, p.x, yb + 0.225, p.z, p.nx, p.nz, w * 0.46, 0.07, 0.01, 0.021);
+  if (o.link) return;                            // (a door onto a bridge or stairs: no canopy, no step)
   panel(L.frame, p.x, yb + 0.345, p.z, p.nx, p.nz, w + 0.12, 0.016, 0.1, 0.05);
   panel(L.step, p.x, yb + 0.008, p.z, p.nx, p.nz, w + 0.08, 0.016, 0.07, 0.035);
 }

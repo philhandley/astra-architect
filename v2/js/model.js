@@ -37,6 +37,44 @@ export class Model {
   style(type) { const P = PROGRAMMES[type]; return { shape: P.shapes[0], colour: P.colour, ...(this.styles[type] || {}) }; }
   setStyle(type, patch) { this.styles[type] = { ...this.style(type), ...patch }; this.save(); for (const fn of this.listeners) fn({ style: type }); }
   hex(b) { return colourHex(b.colour); }
+  // For a link piece (stairs, ramp, bridge, tube, walkway): which ways it opens onto a room, as unit directions
+  // [dx, dz] in the world, with the level it arrives at. (The mirror of links(): the piece's side of the join.)
+  exits(p) {
+    const out = [], long = p.w >= p.d;
+    const hit = (ax, az, level, dx, dz) => { const r = this.at(ax, az, level); if (r && r.id !== p.id && level - r.level >= 0 && level - r.level < r.h && !out.some(e => e[0] === dx && e[1] === dz)) out.push([dx, dz]); };
+    if (['bridge', 'tube', 'canopy'].includes(p.shape)) {
+      if (long) for (let z = p.z; z < p.z + p.d; z++) { hit(p.x - 1, z, p.level, -1, 0); hit(p.x + p.w, z, p.level, 1, 0); }
+      else for (let x = p.x; x < p.x + p.w; x++) { hit(x, p.z - 1, p.level, 0, -1); hit(x, p.z + p.d, p.level, 0, 1); }
+    } else if (p.shape === 'stairs' || p.shape === 'spiral') {
+      for (const [x, z] of this.squares(p)) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) hit(x + dx, z + dz, p.level + p.h, dx, dz);
+    } else if (p.shape === 'ramp') {
+      if (long) for (let z = p.z; z < p.z + p.d; z++) hit(p.x + p.w, z, p.level + p.h, 1, 0);
+      else for (let x = p.x; x < p.x + p.w; x++) hit(x, p.z + p.d, p.level + p.h, 0, 1);
+    }
+    return out;
+  }
+  // Where bridges, tubes, covered walkways, stairs and ramps arrive at this room: [{ x, z, k }], the square the
+  // link ends on and which storey of the room it reaches, so the room can have a door facing it.
+  links(b) {
+    const out = [], hit = (ax, az, level, px, pz) => { if (this.at(ax, az, level)?.id !== b.id) return; const k = level - b.level; if (k >= 0 && k < b.h) out.push({ x: px, z: pz, k }); };
+    for (const p of this.boxes) {
+      if (p.id === b.id) continue;
+      const long = p.w >= p.d;
+      if (['bridge', 'tube', 'canopy'].includes(p.shape)) {
+        // Both ends, at the deck's level.
+        if (long) for (let z = p.z; z < p.z + p.d; z++) { hit(p.x - 1, z, p.level, p.x, z); hit(p.x + p.w, z, p.level, p.x + p.w - 1, z); }
+        else for (let x = p.x; x < p.x + p.w; x++) { hit(x, p.z - 1, p.level, x, p.z); hit(x, p.z + p.d, p.level, x, p.z + p.d - 1); }
+      } else if (p.shape === 'stairs' || p.shape === 'spiral') {
+        // Any room next to the top of the stairs.
+        for (const [x, z] of this.squares(p)) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) hit(x + dx, z + dz, p.level + p.h, x, z);
+      } else if (p.shape === 'ramp') {
+        // The landing at the top end of the ramp (the far end along its length).
+        if (long) for (let z = p.z; z < p.z + p.d; z++) hit(p.x + p.w, z, p.level + p.h, p.x + p.w - 1, z);
+        else for (let x = p.x; x < p.x + p.w; x++) hit(x, p.z + p.d, p.level + p.h, x, p.z + p.d - 1);
+      }
+    }
+    return out;
+  }
   // The size a new room of this type takes: its programme's size, square for a curve (which bends round a corner).
   sizeOf(type) { const [w, d, h] = PROGRAMMES[type].size; return this.style(type).shape === 'arc' ? [Math.max(w, d), Math.max(w, d), h] : [w, d, h]; }
 

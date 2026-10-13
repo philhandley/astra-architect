@@ -236,35 +236,45 @@ const BUILD = {
     }
     return g;
   },
-  stairs(w, d, H, c) {
+  stairs(w, d, H, c, o) {
     // Chunky switchback stairs: a flight up one side, a landing, a flight back up the other side, and so on.
     // Each flight is one solid piece (stepped on top, a smooth sloping underside), with a solid wall on the
-    // outside and a wall down the middle between the two sides; slim posts hold up the landings.
+    // outside and a wall down the middle between the two sides; slim posts hold up the landings. Where the top
+    // landing meets a room's door, that side of the landing is open and a threshold crosses the gap.
     const L = Math.max(w, d) - 2 * GAP, W = Math.min(w, d) - 2 * GAP, n = Math.max(1, Math.round(H / LEVEL));
     const land = Math.min(0.2, L * 0.2), run = L - 2 * land, steps = 7, rise = LEVEL / steps, thick = 0.06, spine = 0.03, lw = (W - spine) / 2, wall = 0.024, rail = 0.12;
-    const flat = [], box = (sx, sy, sz, x, y, z) => flat.push(new THREE.BoxGeometry(sx, sy, sz).translate(x, y, z));
-    const solid = (pts, len, z) => { const s = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y))); flat.push(new THREE.ExtrudeGeometry(s, { depth: len, bevelEnabled: false }).translate(0, 0, z - len / 2)); };
+    const flat = [], walls = [], box = (sx, sy, sz, x, y, z, list = flat) => list.push(new THREE.BoxGeometry(sx, sy, sz).translate(x, y, z));
+    const solid = (pts, len, z, list = flat) => { const s = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y))); list.push(new THREE.ExtrudeGeometry(s, { depth: len, bevelEnabled: false }).translate(0, 0, z - len / 2)); };
+    // The way out at the top, in this piece's own frame (before any turn): along its length (ex) or to a side (ez).
+    const ang = o?.box ? turnAngle(o.box) : 0, exits = (o?.box?.exits || []).map(([dx, dz]) => { const x = dx * Math.cos(ang) + dz * Math.sin(ang), z = -dx * Math.sin(ang) + dz * Math.cos(ang); return d > w ? [Math.round(-z), Math.round(x)] : [Math.round(x), Math.round(z)]; });
+    const ex = exits.find(e => e[0])?.[0] || 0, ez = exits.find(e => e[1])?.[1] || 0;
+    const lastDir = (n - 1) % 2 ? -1 : 1, start = ex ? ex * lastDir : 1;
     for (let k = 0; k < n; k++) {
-      const y0 = k * LEVEL, dir = k % 2 ? -1 : 1, side = k % 2 ? 1 : -1, zc = side * (spine / 2 + lw / 2), X = x => x * dir;
+      const y0 = k * LEVEL, dir = start * (k % 2 ? -1 : 1), side = k % 2 ? 1 : -1, zc = side * (spine / 2 + lw / 2), X = x => x * dir;
       const pts = [[X(-run / 2), y0]];
       for (let i = 0; i < steps; i++) { const y = y0 + rise * (i + 1); pts.push([X(-run / 2 + (run * i) / steps), y], [X(-run / 2 + (run * (i + 1)) / steps), y]); }
       if (k === 0) pts.push([X(run / 2), 0]); else pts.push([X(run / 2), y0 + LEVEL - thick], [X(-run / 2), y0 - thick]);
       solid(pts, lw, zc);
       // The solid wall on the outside of the flight.
       const lo0 = k === 0 ? 0 : y0 - thick, lo1 = k === 0 ? 0 : y0 + LEVEL - thick;
-      solid([[X(-run / 2), lo0], [X(run / 2), lo1], [X(run / 2), y0 + LEVEL + rail], [X(-run / 2), y0 + rail]], wall, side * (W / 2 - wall / 2));
+      solid([[X(-run / 2), lo0], [X(run / 2), lo1], [X(run / 2), y0 + LEVEL + rail], [X(-run / 2), y0 + rail]], wall, side * (W / 2 - wall / 2), walls);
       // The landing at the top, across both sides, with a low wall round it and two posts under its corners.
-      const lx = dir * (run / 2 + land / 2), top = y0 + LEVEL;
+      const lx = dir * (run / 2 + land / 2), top = y0 + LEVEL, last = k === n - 1;
       box(land, thick, W, lx, top - thick / 2, 0);
-      box(wall, rail + thick, W, dir * (L / 2 - wall / 2), top - thick + (rail + thick) / 2, 0);
-      for (const s of [-1, 1]) box(land, rail + thick, wall, lx, top - thick + (rail + thick) / 2, s * (W / 2 - wall / 2));
+      if (!(last && ex === dir)) box(wall, rail + thick, W, dir * (L / 2 - wall / 2), top - thick + (rail + thick) / 2, 0, walls);
+      for (const s of [-1, 1]) if (!(last && ez === s)) box(land, rail + thick, wall, lx, top - thick + (rail + thick) / 2, s * (W / 2 - wall / 2), walls);
       for (const s of [-1, 1]) flat.push(new THREE.CylinderGeometry(0.018, 0.018, top - thick, 10).translate(dir * (L / 2 - 0.04), (top - thick) / 2, s * (W / 2 - 0.04)));
+      // The threshold across the gap to the room's door.
+      if (last && ex === dir) box(2 * GAP + 0.03, thick, Math.min(W, 0.34), dir * (L / 2 + GAP), top - thick / 2, 0);
+      if (last && ez) box(land, thick, 2 * GAP + 0.03, lx, top - thick / 2, ez * (W / 2 + GAP));
     }
     // The wall down the middle, from the ground to a rail above the top flight.
-    box(run, H + rail, spine, 0, (H + rail) / 2, 0);
-    const geo = mergeGeometries(flat.map(p => (p.index ? p.toNonIndexed() : p)).map(p => { if (p.attributes.uv) p.deleteAttribute('uv'); return p; }));
-    if (d > w) geo.rotateY(Math.PI / 2);
-    const g = new THREE.Group(); g.add(mesh(geo, mat(c))); return g;
+    box(run, H + rail, spine, 0, (H + rail) / 2, 0, walls);
+    const clean = list => mergeGeometries(list.map(p => (p.index ? p.toNonIndexed() : p)).map(p => { if (p.attributes.uv) p.deleteAttribute('uv'); return p; }));
+    const geo = clean(flat), wgeo = clean(walls);
+    if (d > w) { geo.rotateY(Math.PI / 2); wgeo.rotateY(Math.PI / 2); }
+    const g = new THREE.Group(), steps3 = mesh(geo, mat(c)); steps3.userData.noInk = true;      // (only the walls carry outlines)
+    g.add(steps3, mesh(wgeo, mat(c))); return g;
   },
   spiral(w, d, H, c) {
     // A spiral staircase: steps winding round a pole, with a handrail.
@@ -344,6 +354,29 @@ const BUILD = {
       const pts = ln.getPoints(48).map(p => new THREE.Vector3(p.x, 0.09, -p.y));
       const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#ffffff' }));
       g.add(line);
+    }
+    // A football pitch on the infield: brighter grass, white markings, and a goal at each end.
+    const iw = W - 0.06 - 2 * band - 0.12, id = D - 0.06 - 2 * band - 0.12;
+    if (iw > 0.5 && id > 0.35) {
+      const pitch = new THREE.Group(), L = Math.max(iw, id), B = Math.min(iw, id), y = 0.064, white = new THREE.LineBasicMaterial({ color: '#ffffff' });
+      pitch.add(mesh(new THREE.BoxGeometry(L, 0.006, B).translate(0, 0.061, 0), mat('#a6d86e'), false));
+      const seg = [], R = Math.min(B * 0.18, 0.12), ga = Math.min(L * 0.16, 0.22), gw = B * 0.5;
+      const line = (x0, z0, x1, z1) => seg.push(x0, y, z0, x1, y, z1);
+      line(-L / 2, -B / 2, L / 2, -B / 2); line(L / 2, -B / 2, L / 2, B / 2); line(L / 2, B / 2, -L / 2, B / 2); line(-L / 2, B / 2, -L / 2, -B / 2);
+      line(0, -B / 2, 0, B / 2);
+      for (const s of [-1, 1]) { line(s * L / 2, -gw / 2, s * (L / 2 - ga), -gw / 2); line(s * (L / 2 - ga), -gw / 2, s * (L / 2 - ga), gw / 2); line(s * (L / 2 - ga), gw / 2, s * L / 2, gw / 2); }
+      for (let i = 0; i < 32; i++) { const a0 = (i / 32) * Math.PI * 2, a1 = ((i + 1) / 32) * Math.PI * 2; line(Math.cos(a0) * R, Math.sin(a0) * R, Math.cos(a1) * R, Math.sin(a1) * R); }
+      pitch.add(new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(seg, 3)), white));
+      // Goals: two posts, a crossbar and a little net frame behind.
+      const gh = 0.08, gwid = Math.min(B * 0.34, 0.26), post = (x, z) => mesh(new THREE.CylinderGeometry(0.006, 0.006, gh, 6).translate(x, 0.06 + gh / 2, z), mat(WHITE), false);
+      for (const s of [-1, 1]) {
+        const gx = s * (L / 2 + 0.01), back = s * (L / 2 + 0.05);
+        pitch.add(post(gx, -gwid / 2), post(gx, gwid / 2), mesh(new THREE.BoxGeometry(0.012, 0.012, gwid + 0.012).translate(gx, 0.06 + gh, 0), mat(WHITE), false));
+        pitch.add(mesh(new THREE.BoxGeometry(Math.abs(back - gx), 0.006, 0.006).translate((gx + back) / 2, 0.06 + gh, -gwid / 2), mat(WHITE), false), mesh(new THREE.BoxGeometry(Math.abs(back - gx), 0.006, 0.006).translate((gx + back) / 2, 0.06 + gh, gwid / 2), mat(WHITE), false));
+        const net = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(back - gx), gh, gwid).translate((gx + back) / 2, 0.06 + gh / 2, 0), mat('#ffffff', { transparent: true, opacity: 0.35, depthWrite: false })); net.userData.noInk = true; net.raycast = () => {}; pitch.add(net);
+      }
+      if (id > iw) pitch.rotation.y = Math.PI / 2;
+      g.add(pitch);
     }
     return g;
   },
@@ -729,11 +762,16 @@ Object.assign(BUILD, {
       }
     }
     g.add(mesh(mergeGeometries(bars.map(x => { x.deleteAttribute('uv'); return x; })), mat(WHITE)));
-    g.add(mesh(new THREE.BoxGeometry(0.2, 0.16, 0.3).translate(gx, armY, gz), mat(dark)));
+    // The carriage on the tower, and the two chopsticks hinged on pins at its corners (userData.chopstick is which
+    // side; the pad swings them open before lift-off and closes them again before the next rocket comes down).
+    g.add(mesh(new THREE.BoxGeometry(0.2, 0.16, 0.5).translate(gx, armY, gz), mat(dark)));
     const armL = rx + 0.16 - (gx + 0.1), arm = new THREE.Shape(); arm.moveTo(0, -0.04); arm.lineTo(armL, -0.02); arm.lineTo(armL, 0.02); arm.lineTo(0, 0.04); arm.closePath();
     for (const s of [-1, 1]) {
-      g.add(mesh(new THREE.ExtrudeGeometry(arm, { depth: 0.05, bevelEnabled: false }).rotateX(-Math.PI / 2).translate(gx + 0.1, armY - 0.025, gz + s * 0.21), mat(dark)));
-      g.add(mesh(new THREE.BoxGeometry(0.09, 0.054, 0.044).translate(gx + 0.1 + armL - 0.045, armY, gz + s * 0.21), mat(c)));
+      const pivot = new THREE.Group(); pivot.position.set(gx + 0.1, armY, gz + s * 0.21); pivot.userData.chopstick = s;
+      pivot.add(mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.2, 12), mat(dark)));
+      pivot.add(mesh(new THREE.ExtrudeGeometry(arm, { depth: 0.05, bevelEnabled: false }).rotateX(-Math.PI / 2).translate(0, -0.025, 0), mat(dark)));
+      pivot.add(mesh(new THREE.BoxGeometry(0.09, 0.054, 0.044).translate(armL - 0.045, 0, 0), mat(c)));
+      g.add(pivot);
     }
     g.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.18, 5).translate(gx, gh + 0.19, gz), mat(WHITE), false));
     g.add(mesh(new THREE.BoxGeometry(0.1, 0.06, 0.01).translate(gx + 0.055, gh + 0.25, gz), mat(c), false));
@@ -1002,6 +1040,15 @@ export function buildPiece(box, opts = {}) {
   const ang = turnAngle(box);
   if (ang) { const inner = new THREE.Group(); while (g.children.length) inner.add(g.children[0]); inner.rotation.y = -ang; g.add(inner); }
   if (box.surface && box.surface !== 'plain' && !opts.ghost) applySurface(g, box);
+  // A bridge or ramp deck reaches across the gap to the door of the room it meets.
+  if (!opts.ghost && box.exits?.length && ['bridge', 'ramp', 'tube'].includes(box.shape)) {
+    const deck = box.shape === 'ramp' ? H : 0.07, wide = Math.min(box.w, box.d) - (box.shape === 'ramp' ? 0.24 : 0.3), long = box.w >= box.d;
+    for (const [dx, dz] of box.exits) {
+      if (box.shape === 'ramp' && !(long ? dx === 1 && !dz : dz === 1 && !dx)) continue;      // (only the top end)
+      const sx = dx ? 2 * GAP + 0.03 : wide, sz = dz ? 2 * GAP + 0.03 : wide;
+      g.add(mesh(new THREE.BoxGeometry(sx, 0.03, sz).translate(dx * (box.w / 2 + 0.005), deck - 0.015, dz * (box.d / 2 + 0.005)), mat(box.hex)));
+    }
+  }
   if (!opts.ghost) {
     addFacade(g, box, H, { walkK: opts.walkK });
     if (opts.open && ['box', 'drum', 'ring'].includes(box.shape)) addTerrace(g, box, H);

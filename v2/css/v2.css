@@ -289,3 +289,10 @@ svg.ic.big { width: 34px; height: 34px; }
 /* (With Share in the top bar, the buttons sit a little closer so all of them fit on the tablet.) */
 .acts { gap: 6px; }
 .acts .ab:not(.round) { padding: 0 12px; }
+
+/* The big red rocket button: bottom right of the site whenever there is a rocket on its launch pad. */
+.launch-btn { position: absolute; right: 16px; bottom: 16px; width: 108px; height: 108px; border: 0; border-radius: 50%; cursor: pointer; pointer-events: auto; color: #fff; font: inherit; font-weight: 800; font-size: 16px; line-height: 1.1; padding: 0 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: radial-gradient(circle at 50% 32%, #ff8276, #e5483d 58%, #c4352c); box-shadow: 0 7px 0 #9c2a22, 0 12px 26px rgba(0, 0, 0, .28), inset 0 2px 0 rgba(255, 255, 255, .35); transition: transform .08s, box-shadow .08s; }
+.launch-btn .ic { width: 36px; height: 36px; }
+.launch-btn:active { transform: translateY(6px); box-shadow: 0 1px 0 #9c2a22, 0 4px 10px rgba(0, 0, 0, .25), inset 0 2px 0 rgba(255, 255, 255, .35); }
+.launch-btn.wait { background: radial-gradient(circle at 50% 32%, #c3c8cf, #8f94a0 58%, #6b707c); box-shadow: 0 7px 0 #555b68, 0 12px 26px rgba(0, 0, 0, .2); font-size: 12px; }
+.launch-btn[hidden] { display: none; }

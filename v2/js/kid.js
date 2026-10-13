@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 // The body (feet at y = 0, facing +z; a grown-up is drawn at full size, children a bit smaller).
-export const HIP = 0.06, SHOULDER = 0.128, LEG_X = 0.015, ARM_X = 0.034;
+export const HIP = 0.06, SHOULDER = 0.128, LEG_X = 0.015, ARM_X = 0.034, SEAT = 0.058;
 const R = 0.046, HEAD_Y = 0.176;
 
 // Outfits that go together: [top, trousers, shoes].
@@ -81,10 +81,16 @@ export function inkOf(geo, w = 0.003) {
   return g;
 }
 
-// One child standing still, as a little group of meshes.
+// Poses for a child who is not part of the crowd: [legs forward, arms raised, arms out] in radians.
+const POSES = {
+  stand: [0, 0, 0.12], sit: [-1.45, -0.5, 0.12], ride: [-1.45, -1.0, 0.12], hold: [0, -1.1, 0.12],
+  swing: [-1.2, -2.84, 0.45], hang: [-0.4, -2.95, -0.3], climb: [-0.3, -2.7, 0.3],
+};
+// One child, still, in a pose (feet at y = 0 standing; the bottom of the top is at y = 0.058 for sitting).
 let miniN = 0;
-export function miniKid() {
-  const P = kidParts(), L = kidLook(miniN++ * 7 + 3), k = new THREE.Group();
+export function miniKid(pose = 'stand') {
+  const P = kidParts(), L = kidLook(miniN++ * 7 + 3), k = new THREE.Group(), [legX, armX, out] = POSES[pose] || POSES.stand;
+  k.userData.pose = pose;
   const add = (geo, hex, parent = k, line = true) => {
     const m = new THREE.Mesh(geo, toon(hex)); m.castShadow = geo === P.torso || geo === P.head; m.raycast = () => {}; m.userData.people = true; parent.add(m);
     if (line) { const o = new THREE.Mesh(inkOf(geo), KID_LINE); o.raycast = () => {}; o.userData.people = true; parent.add(o); }
@@ -94,8 +100,8 @@ export function miniKid() {
   if (L.style === 3) add(P.hat, L.hat);
   if (L.bag) add(P.bag, L.bag);
   for (const s of [-1, 1]) {
-    const leg = new THREE.Group(); leg.position.set(s * LEG_X, HIP, 0); add(P.leg, L.shorts, leg); add(P.shoe, L.shoes, leg); k.add(leg);
-    const arm = new THREE.Group(); arm.position.set(s * ARM_X, SHOULDER, 0); arm.rotation.z = s * 0.12; add(P.arm, L.top, arm); add(P.hand, L.skin, arm); k.add(arm);
+    const leg = new THREE.Group(); leg.position.set(s * LEG_X, HIP, 0); leg.rotation.x = legX; add(P.leg, L.shorts, leg); add(P.shoe, L.shoes, leg); k.add(leg);
+    const arm = new THREE.Group(); arm.position.set(s * ARM_X, SHOULDER, 0); arm.rotation.set(armX, 0, s * out); add(P.arm, L.top, arm); add(P.hand, L.skin, arm); k.add(arm);
   }
   return k;
 }

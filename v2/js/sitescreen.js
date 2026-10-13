@@ -38,6 +38,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     <div class="growbar" hidden><button class="fbtn reset" type="button">${icon('undo')}<span>Start again</span></button><button class="fbtn ok done" type="button">${icon('done')}<span>Done</span></button></div>
     <div class="selbar" hidden></div>
     <div class="hint"><span class="hint-text"></span><button class="hint-say" type="button" aria-label="Hear this">${icon('speaker')}</button></div>
+    <button class="launch-btn" type="button" hidden>${icon('rocket')}<b>Launch!</b></button>
   </div>`);
   root.appendChild(ui);
   const trayIn = ui.querySelector('.tray-in'), selbar = ui.querySelector('.selbar'), hint = ui.querySelector('.hint'), floorsEl = ui.querySelector('.floors');
@@ -146,7 +147,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       if (S.inside) { const r = makeInside(b); if (!r) continue; g = r.g; room = r.room; }
       else g = makeGroup(b);
       design.add(g); pieces.set(b.id, g);
-      if (gone.has(b.id)) g.traverse(o => { if (o.userData.rocket) o.visible = false; });
+      if (gone.has(b.id) && !gone.get(b.id).landing) g.traverse(o => { if (o.userData.rocket) o.visible = false; });
       zones.push(...peopleFor(b, g, room));
       // Where people can sit, in the world: room seats, or the benches and steps of a piece.
       const cx = b.x + b.w / 2, cz = b.z + b.d / 2, y0 = yOf(b);
@@ -162,6 +163,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     siteView.clearTrees(occ);
     if (S.selected && !model.byId.has(S.selected)) select(null); else if (S.selected) placeHandles();
     if (S.inside) drawFloors();
+    updateLaunch();
   }
   model.onChange(() => { if (S.day) stopDay(); redraw(); });
   const ghostUp = new THREE.MeshLambertMaterial({ color: '#ffffff', transparent: true, opacity: 0.22, depthWrite: false });
@@ -438,7 +440,25 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   // comes down out of the sky onto the pad, ready to go again.
   const ROCKET_WAIT = 60000, gone = new Map();          // box id -> the timer for the next rocket
   const rocketOf = id => { let rk = null; pieces.get(id)?.traverse(o => { if (o.userData.rocket) rk = o; }); return rk; };
-  const rocketReady = b => b.shape === 'rocket' && !gone.has(b.id) && !S.inside;
+  const rocketReady = b => b.shape === 'rocket' && !gone.has(b.id);
+  // The big red button, bottom right, whenever there is a rocket on the site. While the next rocket is on its way
+  // it counts down instead.
+  const launchBtn = ui.querySelector('.launch-btn');
+  let launchTick = null;
+  function updateLaunch() {
+    const rockets = model.boxes.filter(b => b.shape === 'rocket'), label = launchBtn.querySelector('b');
+    launchBtn.hidden = !rockets.length;
+    const ready = rockets.find(b => !gone.has(b.id));
+    if (!rockets.length || ready) { clearInterval(launchTick); launchTick = null; launchBtn.classList.remove('wait'); label.textContent = 'Launch!'; return; }
+    const states = rockets.map(b => gone.get(b.id)), secs = Math.max(0, Math.ceil((Math.min(...states.map(s => s.until)) - Date.now()) / 1000));
+    launchBtn.classList.add('wait'); label.textContent = states.some(s => s.landing) ? 'Here it comes!' : `Next rocket in ${secs} s`;
+    if (!launchTick) launchTick = setInterval(updateLaunch, 1000);
+  }
+  launchBtn.addEventListener('click', e => {
+    e.stopPropagation(); sfx.tap();
+    const b = model.boxes.find(x => rocketReady(x));
+    if (b) launch(b); else say('The next rocket is on its way.');
+  });
   function launch(b) {
     const g = pieces.get(b.id), rk = rocketOf(b.id);
     if (!rk || rk.userData.flying || gone.has(b.id)) return;
@@ -461,14 +481,15 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       if (t > 6.5) { rk.visible = false; rk.userData.flying = false; for (const p of puffs) { g.remove(p); p.geometry.dispose(); p.material.dispose(); } world.updaters.delete(fn); toast('Off it goes! A new rocket will come in a minute.'); }
     };
     world.updaters.add(fn);
-    gone.set(b.id, setTimeout(() => nextRocket(b.id), ROCKET_WAIT));
+    gone.set(b.id, { timer: setTimeout(() => nextRocket(b.id), ROCKET_WAIT), until: Date.now() + ROCKET_WAIT });
+    updateLaunch();
     if (S.selected === b.id) drawSelbar(b);
     sfx.whoosh(); setTimeout(() => sfx.whoosh(), 800); setTimeout(() => sfx.whoosh(), 1300);
   }
   function nextRocket(id) {
-    gone.delete(id);
-    const b = model.byId.get(id), rk = rocketOf(id);
-    if (!b || !rk) return;                      // (the pad has gone, or is not drawn right now: the next redraw shows a rocket)
+    const b = model.byId.get(id), rk = rocketOf(id), st = gone.get(id);
+    if (!b || !rk) { gone.delete(id); updateLaunch(); return; }      // (the pad has gone, or is not drawn right now: the next redraw shows a rocket)
+    if (st) st.landing = true; updateLaunch();
     const base = rk.userData.base ?? rk.position.y, from = 9;
     rk.visible = true; rk.position.y = base + from; rk.userData.flying = true;
     let t = 0;
@@ -476,7 +497,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       t += dt;
       const e = Math.min(1, t / 3.2), s = 1 - Math.pow(1 - e, 3);        // eases in to land softly
       rk.position.y = base + from * (1 - s); rk.rotation.y += dt * 0.5;
-      if (e >= 1) { rk.position.y = base; rk.userData.flying = false; world.updaters.delete(fn); sfx.cheer(); confetti(new THREE.Vector3(b.x + b.w / 2, yOf(b) + 0.4, b.z + b.d / 2)); say('A new rocket is ready on the launch pad!'); if (S.selected === id) drawSelbar(b); }
+      if (e >= 1) { rk.position.y = base; rk.userData.flying = false; world.updaters.delete(fn); gone.delete(id); updateLaunch(); sfx.cheer(); confetti(new THREE.Vector3(b.x + b.w / 2, yOf(b) + 0.4, b.z + b.d / 2)); say('A new rocket is ready on the launch pad!'); if (S.selected === id) drawSelbar(b); }
     };
     world.updaters.add(fn);
     sfx.whoosh();

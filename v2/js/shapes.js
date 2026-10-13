@@ -7,7 +7,7 @@ import { LEVEL } from './catalogue.js';
 import { TREE_GREENS } from './site.js';
 import { addFacade, addTerrace, contactShadow } from './facade.js';
 import { REC, SOFFIT, hasColonnade, ringThickness, turnAngle } from './plan.js';
-import { miniKid } from './kid.js';
+import { miniKid, SEAT } from './kid.js';
 
 const GAP = 0.035;                   // a hair of space round every piece, so each reads as its own block
 const ROOF = 0.4;
@@ -285,7 +285,7 @@ const BUILD = {
     const uv = tube.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * curve.getLength() * 3);
     g.add(mesh(tube, mat(WHITE, { map: stripes(c) })));
     // A child whizzing down now and then.
-    const kid = miniKid(); kid.scale.setScalar(0.75);
+    const kid = miniKid('sit'); kid.scale.setScalar(0.75);
     kid.userData.slide = { curve, period: 3.4, pause: 2.2 };
     g.add(kid);
     if (d > w) g.rotation.y = -Math.PI / 2;
@@ -482,14 +482,20 @@ Object.assign(BUILD, {
     return g;
   },
   swings(w, d, H, c) {
-    const g = new THREE.Group(), L = Math.max(w, d) - 0.2, hh = 0.42, inner = new THREE.Group();
-    for (const s of [-1, 1]) for (const k of [-1, 1]) { const leg = mesh(new THREE.CylinderGeometry(0.014, 0.014, hh * 1.08, 8), mat(c)); leg.position.set(s * L / 2, hh / 2, k * 0.12); leg.rotation.x = -k * 0.28; inner.add(leg); }
-    inner.add(mesh(new THREE.CylinderGeometry(0.016, 0.016, L + 0.04, 8).rotateZ(Math.PI / 2).translate(0, hh, 0), mat(c)));
+    // A-frames each end, a round beam, and two swings: a seat on two ropes, with a child sitting on it holding the
+    // ropes, legs out in front.
+    const g = new THREE.Group(), L = Math.max(w, d) - 0.2, hh = 0.42, inner = new THREE.Group(), dark = shade(c, 0.8);
+    for (const s of [-1, 1]) {
+      for (const k of [-1, 1]) { const leg = mesh(new THREE.CylinderGeometry(0.02, 0.024, hh * 1.1, 10), mat(c)); leg.position.set(s * L / 2, hh / 2, k * 0.13); leg.rotation.x = -k * 0.3; inner.add(leg); }
+      inner.add(mesh(new THREE.SphereGeometry(0.032, 12, 8).translate(s * L / 2, hh, 0), mat(dark)));
+      inner.add(mesh(new THREE.BoxGeometry(0.08, 0.02, 0.34).translate(s * L / 2, 0.01, 0), mat(dark)));
+    }
+    inner.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, L + 0.02, 10).rotateZ(Math.PI / 2).translate(0, hh, 0), mat(c)));
     for (const sx of [-L / 4, L / 4]) {
       const pivot = new THREE.Group(); pivot.position.set(sx, hh, 0);
-      for (const o of [-0.045, 0.045]) pivot.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.3, 4).translate(o, -0.15, 0), mat('#3d405b'), false));
-      pivot.add(mesh(new THREE.BoxGeometry(0.11, 0.012, 0.05).translate(0, -0.3, 0), mat('#e2457d')));
-      const kid = miniKid(); kid.position.set(0, -0.36, 0); kid.scale.setScalar(0.75); pivot.add(kid);
+      for (const o of [-0.048, 0.048]) pivot.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.3, 5).translate(o, -0.15, 0), mat('#3d405b'), false));
+      pivot.add(mesh(new RoundedBoxGeometry(0.13, 0.016, 0.07, 2, 0.006).translate(0, -0.3, 0), mat('#e2457d')));
+      const kid = miniKid('swing'); kid.scale.setScalar(0.75); kid.position.set(0, -0.292 - SEAT * 0.75, 0.01); pivot.add(kid);
       pivot.userData.swing = { amp: 0.7, speed: 2.6 + sx };
       inner.add(pivot);
     }
@@ -507,7 +513,8 @@ Object.assign(BUILD, {
       bars.push(bar);
     }
     g.add(mesh(mergeGeometries(bars.map(x => { x.deleteAttribute('uv'); return x; })), mat(c)));
-    for (const [x, y, z] of [[0, R * 0.95, 0], [R * 0.6, R * 0.6, 0.1]]) { const k = miniKid(); k.position.set(x, y, z); k.scale.setScalar(0.75); g.add(k); }
+    { const k = miniKid(); k.position.set(0, R * 0.95, 0); k.scale.setScalar(0.75); g.add(k); }
+    { const k = miniKid('climb'); k.position.set(R * 0.72, R * 0.5, 0.1); k.scale.setScalar(0.75); k.rotation.y = -Math.PI / 2; k.rotation.z = 0.35; g.add(k); }
     return g;
   },
   roundabout(w, d, H, c) {
@@ -515,7 +522,7 @@ Object.assign(BUILD, {
     for (let i = 0; i < 4; i++) spin.add(mesh(new THREE.CylinderGeometry(R, R, 0.03, 24, 1, false, (i / 4) * Math.PI * 2, Math.PI / 2).translate(0, 0.05, 0), mat(i % 2 ? c : '#22b2bf')));
     spin.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.18, 8).translate(0, 0.14, 0), mat(WHITE)));
     spin.add(mesh(new THREE.TorusGeometry(R * 0.6, 0.008, 6, 24).rotateX(Math.PI / 2).translate(0, 0.18, 0), mat(WHITE)));
-    for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2, k = miniKid(); k.position.set(Math.cos(a) * R * 0.75, 0.065, Math.sin(a) * R * 0.75); k.scale.setScalar(0.7); spin.add(k); }
+    for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2, k = miniKid('hold'); k.position.set(Math.cos(a) * R * 0.75, 0.065, Math.sin(a) * R * 0.75); k.scale.setScalar(0.7); k.rotation.y = -a; spin.add(k); }
     spin.userData.yspin = 1.6;
     g.add(mesh(new THREE.CylinderGeometry(R + 0.02, R + 0.04, 0.035, 24).translate(0, 0.0175, 0), mat('#d2cdc4')));
     g.add(spin); return g;
@@ -525,7 +532,7 @@ Object.assign(BUILD, {
     inner.add(mesh(new THREE.ConeGeometry(0.05, 0.1, 4).translate(0, 0.05, 0), mat('#3d405b')));
     const plank = new THREE.Group(); plank.position.y = 0.1;
     plank.add(mesh(new THREE.BoxGeometry(L, 0.02, 0.07), mat(c)));
-    for (const s of [-1, 1]) { plank.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.06, 6).translate(s * (L / 2 - 0.08), 0.04, 0), mat(WHITE))); const k = miniKid(); k.position.set(s * (L / 2 - 0.04), 0.01, 0); k.scale.setScalar(0.7); plank.add(k); }
+    for (const s of [-1, 1]) { plank.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.06, 6).translate(s * (L / 2 - 0.1), 0.04, 0), mat(WHITE))); const k = miniKid('ride'); k.position.set(s * (L / 2 - 0.03), 0.01 - SEAT * 0.7, 0); k.scale.setScalar(0.7); k.rotation.y = -s * Math.PI / 2; plank.add(k); }
     plank.userData.rock = { amp: 0.28, speed: 2.2 };
     inner.add(plank);
     if (d > w) inner.rotation.y = Math.PI / 2;
@@ -559,7 +566,7 @@ Object.assign(BUILD, {
     const cable = mesh(new THREE.CylinderGeometry(0.003, 0.003, Math.hypot(L, hi - lo), 4), mat('#3d405b'), false);
     cable.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(L, lo - hi, 0).normalize()); cable.position.set(0, (hi + lo) / 2, 0); inner.add(cable);
     const rider = new THREE.Group(); rider.add(mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.16, 4).translate(0, -0.08, 0), mat('#3d405b'), false));
-    const k = miniKid(); k.position.set(0, -0.36, 0); k.scale.setScalar(0.75); rider.add(k);
+    const k = miniKid('hang'); k.position.set(0, -0.3, 0); k.scale.setScalar(0.75); rider.add(k);
     rider.userData.zip = { x0: -L / 2 + 0.05, x1: L / 2 - 0.05, y0: hi - 0.02, y1: lo - 0.02, period: 3.2 };
     inner.add(rider);
     if (d > w) inner.rotation.y = -Math.PI / 2;
@@ -633,6 +640,10 @@ Object.assign(BUILD, {
     g.add(mesh(new THREE.RingGeometry(R - 0.012, r + 0.012, 40).rotateX(-Math.PI / 2).translate(0, H + 0.025, 0), mat(WHITE, { side: THREE.DoubleSide })));
     g.add(mesh(new THREE.SphereGeometry(R, 36, 14, Math.PI / 2 + slit / 2, Math.PI * 2 - slit, 0, Math.PI / 2).translate(0, y, 0), mat('#dfe5ea', { side: THREE.DoubleSide })));
     g.add(mesh(new THREE.SphereGeometry(R + 0.012, 12, 14, Math.PI / 2 + slit / 2, slit * 1.05, 0.05, Math.PI / 2 - 0.05).translate(0, y, 0), mat('#b9c2c9', { side: THREE.DoubleSide })));
+    // A dark lining just inside the dome, so the open slit reads as a dark opening with the telescope in it, not a
+    // window onto the room below. (Its faces point outwards, so from inside, walking, you still see the silver dome.)
+    const lining = mesh(new THREE.SphereGeometry(R - 0.012, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, y, 0), mat(shade(c, 0.4)), false);
+    lining.userData.keep = true; lining.userData.noInk = true; g.add(lining);
     // The telescope: pivoted inside the dome, tilted up through the slit.
     const L = 0.56, up = geo => geo.rotateX(0.7).translate(0, H + 0.06, 0);
     g.add(mesh(up(new THREE.CylinderGeometry(0.055, 0.045, L, 14).translate(0, L / 2, 0)), mat(WHITE)));

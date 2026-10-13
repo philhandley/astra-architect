@@ -409,7 +409,20 @@ function rnd(seed) { let a = seed; return () => { a = (a * 16807) % 2147483647; 
 const SURF = {
   // Grey patterns get the room's colour; the others bring their own.
   tiles: { tint: true, scale: 2, whole: true, draw: (g, s) => { const r = rnd(7), n = 4, u = s / n; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = 225 + r() * 30; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x * u, y * u, u, u); } g.strokeStyle = 'rgba(150,150,150,0.9)'; g.lineWidth = 3; for (let i = 0; i <= n; i++) { g.beginPath(); g.moveTo(i * u, 0); g.lineTo(i * u, s); g.moveTo(0, i * u); g.lineTo(s, i * u); g.stroke(); } } },
-  pixel: { tint: true, scale: 1.5, draw: (g, s) => { const r = rnd(11), n = 8, u = s / n; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = 170 + Math.floor(r() * 4) * 28; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x * u, y * u, u, u); } } },
+  // Dazzle: bold stripes in the room's colour and white, in patches that run different ways (like dazzle ships).
+  dazzle: { tint: false, perColour: true, size: 256, scale: 1.2, draw: (g, s, hex) => {
+    const r = rnd(13);
+    const stripes = (ang, sw, gap) => { g.save(); g.translate(s / 2, s / 2); g.rotate(ang); g.fillStyle = hex; for (let x = -s * 1.5; x < s * 1.5; x += sw + gap) g.fillRect(x, -s * 1.5, sw, s * 3); g.restore(); };
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, s, s);
+    stripes(0.45, 11, 11);
+    for (let i = 0; i < 4; i++) {
+      const cx = r() * s, cy = r() * s, a0 = r() * Math.PI * 2, a1 = a0 + 0.9 + r() * 1.2, R = s * 1.6;
+      g.save(); g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a0) * R, cy + Math.sin(a0) * R); g.lineTo(cx + Math.cos(a1) * R, cy + Math.sin(a1) * R); g.closePath(); g.clip();
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, s, s);
+      const sw = 6 + r() * 10; stripes(r() * Math.PI, sw, sw * (0.7 + r() * 0.6));
+      g.restore();
+    }
+  } },
   brick: { tint: true, scale: 3, draw: (g, s) => { const r = rnd(3), rows = 8, bh = s / rows, bw = s / 4; g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, s, s); for (let y = 0; y < rows; y++) for (let x = -1; x < 5; x++) { const v = 215 + r() * 40, ox = (y % 2) * bw / 2; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x * bw + ox + 2, y * bh + 2, bw - 4, bh - 4); } } },
   wood: { tint: true, scale: 3, draw: (g, s) => { const r = rnd(5), n = 8, u = s / n; for (let x = 0; x < n; x++) { const v = 205 + r() * 50; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x * u, 0, u - 3, s); g.fillStyle = 'rgba(120,120,120,0.9)'; g.fillRect(x * u + u - 3, 0, 3, s); } } },
   glass: { tint: false, scale: 2, whole: true, draw: (g, s) => { const gr = g.createLinearGradient(0, 0, s, s); gr.addColorStop(0, '#d9f1fa'); gr.addColorStop(0.5, '#a9d8ea'); gr.addColorStop(1, '#cfeaf5'); g.fillStyle = gr; g.fillRect(0, 0, s, s); g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 10; g.beginPath(); g.moveTo(s * 0.1, s); g.lineTo(s * 0.6, 0); g.stroke(); g.strokeStyle = '#f7f7f4'; g.lineWidth = 6; g.strokeRect(3, 3, s - 6, s - 6); g.beginPath(); g.moveTo(s / 2, 0); g.lineTo(s / 2, s); g.stroke(); } },
@@ -434,8 +447,8 @@ function applySurface(g, box) {
   const body = mat(box.hex), meshes = [];
   g.traverse(o => { if (o.isMesh && (o.material === body || (Array.isArray(o.material) && o.material[0] === body))) meshes.push(o); });
   if (box.surface === 'climb') { for (const m of meshes) m.parent.add(climbingHolds(m, box.id || 1, box)); return; }
-  const S = SURF[box.surface]; if (!S) return;
-  const tex = canvasTex(box.surface, S.draw);
+  const S = SURF[box.surface === 'pixel' ? 'dazzle' : box.surface]; if (!S) return;        // (pixels became dazzle)
+  const tex = canvasTex(box.surface + (S.perColour ? box.hex : ''), (gc, s) => S.draw(gc, s, box.hex), S.size || 128);
   const m2 = mat(S.tint ? box.hex : '#ffffff', { map: tex });
   for (const m of meshes) {
     if (!m.geometry.attributes.normal) m.geometry.computeVertexNormals(); boxUV(m.geometry, S.scale);
@@ -610,14 +623,31 @@ Object.assign(BUILD, {
     return g;
   },
   zipline(w, d, H, c) {
-    const g = new THREE.Group(), L = Math.max(w, d) - 0.2, inner = new THREE.Group(), hi = 0.55, lo = 0.4;
-    for (const [x, hh] of [[-L / 2, hi], [L / 2, lo]]) { inner.add(mesh(new THREE.CylinderGeometry(0.02, 0.025, hh, 8).translate(x, hh / 2, 0), mat(c))); inner.add(mesh(new THREE.BoxGeometry(0.16, 0.025, 0.16).translate(x, 0.0125, 0), mat('#d2cdc4'))); }
+    // A zip line with a little deck and steps to start from, a soft round mat to land on, and a child who zips
+    // down holding the bar, lands, walks back along the side and climbs up for another go.
+    const g = new THREE.Group(), L = Math.max(w, d) - 0.2, inner = new THREE.Group(), hi = 0.58, lo = 0.4, x0 = -L / 2, x1 = L / 2;
+    for (const [x, hh] of [[x0, hi], [x1, lo]]) { inner.add(mesh(new THREE.CylinderGeometry(0.02, 0.025, hh, 8).translate(x, hh / 2, 0), mat(c))); inner.add(mesh(new THREE.BoxGeometry(0.16, 0.025, 0.16).translate(x, 0.0125, 0), mat('#d2cdc4'))); }
     const cable = mesh(new THREE.CylinderGeometry(0.003, 0.003, Math.hypot(L, hi - lo), 4), mat('#3d405b'), false);
     cable.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(L, lo - hi, 0).normalize()); cable.position.set(0, (hi + lo) / 2, 0); inner.add(cable);
-    const rider = new THREE.Group(); rider.add(mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.16, 4).translate(0, -0.08, 0), mat('#3d405b'), false));
-    const k = miniKid('hang'); k.position.set(0, -0.3, 0); k.scale.setScalar(0.75); rider.add(k);
-    rider.userData.zip = { x0: -L / 2 + 0.05, x1: L / 2 - 0.05, y0: hi - 0.02, y1: lo - 0.02, period: 3.2 };
-    inner.add(rider);
+    // The start: a wooden deck round the high post, up three steps on the far side.
+    const deckY = 0.2;
+    inner.add(mesh(new THREE.BoxGeometry(0.3, 0.03, 0.3).translate(x0 + 0.1, deckY, 0), mat('#d8b98c')));
+    for (const [px, pz] of [[-0.05, -0.13], [0.25, -0.13], [-0.05, 0.13], [0.25, 0.13]]) inner.add(mesh(new THREE.CylinderGeometry(0.012, 0.012, deckY, 6).translate(x0 + px, deckY / 2, pz), mat(WHITE)));
+    for (let i = 0; i < 3; i++) inner.add(mesh(new THREE.BoxGeometry(0.07, 0.02, 0.16).translate(x0 + 0.28 + i * 0.07, deckY - 0.05 * (i + 1) - 0.0, 0), mat('#d8b98c')));
+    for (const s of [-1, 1]) inner.add(mesh(new THREE.BoxGeometry(0.3, 0.012, 0.012).translate(x0 + 0.1, deckY + 0.08, s * 0.15), mat(WHITE), false));
+    // The landing: a soft round mat.
+    inner.add(mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.02, 24).translate(x1 - 0.2, 0.01, 0), mat('#ffd1dc'), false));
+    // The rider: a bar on a strap, a child hanging from it facing the way they go; and the same child walking back.
+    const rider = new THREE.Group();
+    rider.add(mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.15, 4).translate(0, -0.075, 0), mat('#3d405b'), false));
+    rider.add(mesh(new THREE.BoxGeometry(0.012, 0.012, 0.1).translate(0, -0.155, 0), mat('#3d405b'), false));
+    const hang = miniKid('hang'); hang.position.set(0, -0.295, 0); hang.scale.setScalar(0.75); hang.rotation.y = Math.PI / 2; rider.add(hang);
+    const walker = miniKid('stand'); walker.scale.setScalar(0.75); walker.visible = false;
+    const legs = [], arms = []; walker.traverse(o => { if (o.userData.limb === 'leg') legs.push(o); if (o.userData.limb === 'arm') arms.push(o); });
+    const path = [new THREE.Vector3(x1 - 0.2, 0, 0.1), new THREE.Vector3(x1 - 0.3, 0, 0.3), new THREE.Vector3(x0 + 0.6, 0, 0.3), new THREE.Vector3(x0 + 0.55, 0, 0)];
+    const lens = [0]; for (let i = 1; i < path.length; i++) lens.push(lens[i - 1] + path[i].distanceTo(path[i - 1]));
+    inner.userData.zipline = { rider, walker, legs, arms, x0: x0 + 0.1, x1: x1 - 0.2, y0: hi - 0.01, y1: lo - 0.01, period: 3.2, walk: lens[lens.length - 1] / 0.33, pause: 2.4, path, lens };
+    inner.add(rider, walker);
     if (d > w) inner.rotation.y = -Math.PI / 2;
     g.add(inner); return g;
   },
@@ -658,15 +688,55 @@ Object.assign(BUILD, {
 // ---------- Astra Nova pieces ----------
 Object.assign(BUILD, {
   rocket(w, d, H, c) {
-    const g = new THREE.Group(), W = w - 2 * GAP, D = d - 2 * GAP;
-    g.add(mesh(new RoundedBoxGeometry(W, 0.1, D, 2, 0.02).translate(0, 0.05, 0), mat('#c9c6bf')));
-    // Yellow and black hazard edge.
-    for (let i = 0; i < 16; i++) { const s = mesh(new THREE.BoxGeometry(W / 16, 0.012, 0.06), mat(i % 2 ? '#26272d' : '#f7c22e'), false); s.position.set(-W / 2 + W / 16 * (i + 0.5), 0.104, D / 2 - 0.05); g.add(s); }
-    // The gantry: a teal tower of thin bars.
-    const gx = -W / 2 + 0.18, gz = 0, gh = 1.9;
-    for (const [px, pz] of [[-0.08, -0.08], [0.08, -0.08], [-0.08, 0.08], [0.08, 0.08]]) g.add(mesh(new THREE.BoxGeometry(0.025, gh, 0.025).translate(gx + px, gh / 2 + 0.1, gz + pz), mat('#22b2bf')));
-    for (let y = 0.3; y < gh; y += 0.25) g.add(mesh(new THREE.BoxGeometry(0.2, 0.02, 0.2).translate(gx, y + 0.1, gz), mat('#22b2bf')));
-    const arm = mesh(new THREE.BoxGeometry(0.28, 0.03, 0.04).translate(gx + 0.2, 1.5, gz), mat('#22b2bf')); g.add(arm);
+    // A launch pad in a park, not a factory: a pale slab painted with big playful rings round the rocket (like the
+    // painted ground of a Bjarke Ingels park), a low white fence round it with a gap at the front, a white gantry
+    // with a flag, and bushes in planters at the back corners.
+    const g = new THREE.Group(), W = w - 2 * GAP, D = d - 2 * GAP, rx = 0.12;
+    g.add(mesh(new RoundedBoxGeometry(W, 0.1, D, 2, 0.02).translate(0, 0.05, 0), mat('#5a5f68')));
+    const pw = W - 0.06, pd = D - 0.06, dark = '#474c55';
+    // The floor: white lines that flow round a star under the rocket, like the painted ground of Superkilen.
+    const paint = canvasTex(`pad${w}x${d}`, (gc, s) => {
+      gc.fillStyle = dark; gc.fillRect(0, 0, s, s);
+      gc.save(); gc.scale(s / pw, s / pd);
+      const cx = pw / 2 + rx, cz = pd / 2, R = 0.4, r = rnd(5), n = Math.round(pd / 0.07);
+      gc.strokeStyle = '#ffffff'; gc.lineWidth = 0.02; gc.lineCap = 'round';
+      for (let i = 0; i <= n; i++) {
+        const z0 = (i / n) * pd, ph = r() * 6.28, amp = 0.04 + r() * 0.05, lam = 0.9 + r() * 0.8;
+        gc.beginPath();
+        for (let x = -0.05; x <= pw + 0.05; x += 0.02) {
+          let z = z0 + Math.sin((x / lam) * 6.28 + ph) * amp;
+          const dx = x - cx, dz = z - cz, dd = Math.hypot(dx, dz), side = dz >= 0 ? 1 : -1;
+          if (dd < R) z = cz + side * Math.sqrt(Math.max(0, R * R - dx * dx)); else if (dd < R + 0.25) z += side * (R + 0.25 - dd) * 0.4;
+          x < 0 ? gc.moveTo(x, z) : gc.lineTo(x, z);
+        }
+        gc.stroke();
+      }
+      gc.fillStyle = '#ffffff'; gc.beginPath(); for (let k = 0; k < 16; k++) { const a = (k * Math.PI) / 8, rr = k % 2 ? 0.17 : 0.3; gc.lineTo(cx + Math.cos(a) * rr, cz + Math.sin(a) * rr); } gc.closePath(); gc.fill();
+      gc.fillStyle = dark; gc.beginPath(); gc.arc(cx, cz, 0.11, 0, Math.PI * 2); gc.fill();
+      gc.restore();
+    }, 512);
+    const top = mesh(new THREE.PlaneGeometry(pw, pd).rotateX(-Math.PI / 2).translate(0, 0.101, 0), mat('#ffffff', { map: paint }), false); top.userData.noInk = true; g.add(top);
+    // The fence: white posts and two rails, open at the front.
+    const posts = [], rails = [], fy = 0.1, ph = 0.09;
+    const run = (x0, z0, x1, z1, gap) => {
+      const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(2, Math.round(len / 0.14)), dx = (x1 - x0) / n, dz = (z1 - z0) / n;
+      for (let i = 0; i <= n; i++) { const x = x0 + dx * i, z = z0 + dz * i; if (gap && Math.abs(x) < 0.17) continue; posts.push(new THREE.BoxGeometry(0.014, ph, 0.014).translate(x, fy + ph / 2, z)); }
+      for (let i = 0; i < n; i++) { const xa = x0 + dx * i, za = z0 + dz * i, xb = xa + dx, zb = za + dz; if (gap && (Math.abs(xa) < 0.17 || Math.abs(xb) < 0.17)) continue; for (const yy of [0.045, 0.08]) rails.push(new THREE.BoxGeometry(dx ? Math.abs(dx) : 0.01, 0.01, dz ? Math.abs(dz) : 0.01).translate((xa + xb) / 2, fy + yy, (za + zb) / 2)); }
+    };
+    const e = 0.035;
+    run(-W / 2 + e, -D / 2 + e, W / 2 - e, -D / 2 + e, false); run(-W / 2 + e, D / 2 - e, W / 2 - e, D / 2 - e, true);
+    run(-W / 2 + e, -D / 2 + e, -W / 2 + e, D / 2 - e, false); run(W / 2 - e, -D / 2 + e, W / 2 - e, D / 2 - e, false);
+    const strip = gs => mergeGeometries(gs.map(x => { x.deleteAttribute('uv'); return x; }));
+    g.add(mesh(strip(posts), mat(WHITE))); g.add(mesh(strip(rails), mat(WHITE), false));
+    // Bushes in planters at the back corners.
+    for (const sx of [-1, 1]) { const bx = sx * (W / 2 - 0.16), bz = -D / 2 + 0.16; g.add(mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.06, 14).translate(bx, fy + 0.03, bz), mat(WHITE))); g.add(mesh(new THREE.SphereGeometry(0.075, 12, 9).translate(bx, fy + 0.11, bz), mat(TREE_GREENS[sx > 0 ? 1 : 3]))); }
+    // The gantry: a slim white tower with a flag, and the arm in the rocket's colour.
+    const gx = -W / 2 + 0.22, gz = 0, gh = 1.9;
+    for (const [px, pz] of [[-0.07, -0.07], [0.07, -0.07], [-0.07, 0.07], [0.07, 0.07]]) g.add(mesh(new THREE.BoxGeometry(0.022, gh, 0.022).translate(gx + px, gh / 2 + 0.1, gz + pz), mat(WHITE)));
+    for (let y = 0.3; y < gh; y += 0.25) g.add(mesh(new THREE.BoxGeometry(0.18, 0.018, 0.18).translate(gx, y + 0.1, gz), mat(WHITE)));
+    g.add(mesh(new THREE.BoxGeometry(0.28, 0.03, 0.04).translate(gx + 0.2, 1.5, gz), mat(c)));
+    g.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.18, 5).translate(gx, gh + 0.19, gz), mat(WHITE), false));
+    g.add(mesh(new THREE.BoxGeometry(0.1, 0.06, 0.01).translate(gx + 0.055, gh + 0.25, gz), mat(c), false));
     // The rocket.
     const rk = new THREE.Group(); rk.position.set(0.12, 0.1, 0);
     rk.add(mesh(new THREE.CylinderGeometry(0.13, 0.15, 1.2, 20).translate(0, 0.72, 0), mat(WHITE)));

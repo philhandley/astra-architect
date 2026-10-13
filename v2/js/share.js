@@ -17,7 +17,7 @@ const SHAPES = ['box', 'house', 'saw', 'vault', 'drum', 'tower', 'ring', 'ringho
   'observatory', 'greenhouse', 'glassdome', 'glassvault', 'treehouse', 'stage', 'circle', 'weather', 'bridge', 'tube', 'canopy', 'terraces', 'ramp', 'swings', 'climbdome', 'roundabout', 'seesaw', 'sandpit', 'playtower', 'zipline'];
 const COLOURS = ['yellow', 'orange', 'red', 'magenta', 'pink', 'purple', 'blue', 'teal', 'mint', 'lime', 'forest', 'white', 'navy'];
 const WINS = ['', 'big', 'pixel', 'ribbon', 'porthole', 'slots', 'grid'];
-const SURFACES = ['', 'climb', 'green', 'tiles', 'pixel', 'brick', 'wood', 'glass', 'chalk'];
+const SURFACES = ['', 'climb', 'green', 'tiles', 'dazzle', 'brick', 'wood', 'glass', 'chalk'];     // (dazzle took pixel's place)
 const FIELDS = [['type', 6, TYPES], ['shape', 6, SHAPES], ['colour', 4, COLOURS], ['x', 6], ['z', 6], ['w', 3, -1], ['d', 3, -1], ['h', 3, -1], ['level', 3], ['rot', 2], ['win', 3, WINS], ['surface', 4, SURFACES]];
 class Bits {
   constructor(bytes) { this.bytes = bytes ? [...bytes] : []; this.i = 0; this.acc = 0; this.n = 0; }

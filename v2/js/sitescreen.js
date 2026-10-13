@@ -242,8 +242,25 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       if (o.userData.yspin) o.rotation.y += dt * o.userData.yspin;
       if (o.userData.swing) o.rotation.x = Math.sin(t * o.userData.swing.speed) * o.userData.swing.amp;
       if (o.userData.rock) o.rotation.z = Math.sin(t * o.userData.rock.speed) * o.userData.rock.amp;
-      const zp = o.userData.zip;
-      if (zp) { const k = (t % (zp.period * 2)) / zp.period, u = k < 1 ? k * k : Math.max(0, 1 - (k - 1) * 1.6); o.position.set(zp.x0 + (zp.x1 - zp.x0) * u, zp.y0 + (zp.y1 - zp.y0) * u, 0); }
+      const zp = o.userData.zipline;
+      if (zp) {
+        // Zip down the cable (holding the bar), land, walk back along the side, climb the steps (out of sight), again.
+        const T = zp.period + zp.walk + zp.pause, k = (t + (o.parent?.parent?.id || 0) * 0.5) % T;
+        if (k < zp.period) {
+          const u = Math.pow(k / zp.period, 1.5);
+          zp.rider.visible = true; zp.walker.visible = false;
+          zp.rider.position.set(zp.x0 + (zp.x1 - zp.x0) * u, zp.y0 + (zp.y1 - zp.y0) * u, 0);
+        } else if (k < zp.period + zp.walk) {
+          const d = ((k - zp.period) / zp.walk) * zp.lens[zp.lens.length - 1];
+          let i = 1; while (i < zp.lens.length - 1 && zp.lens[i] < d) i++;
+          const a = zp.path[i - 1], b = zp.path[i], f = (d - zp.lens[i - 1]) / ((zp.lens[i] - zp.lens[i - 1]) || 1);
+          zp.rider.visible = false; zp.walker.visible = true;
+          zp.walker.position.lerpVectors(a, b, f); zp.walker.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
+          const sw = Math.sin(k * 11) * 0.55;
+          for (const l of zp.legs) l.rotation.x = sw * l.userData.s;
+          for (const m of zp.arms) m.rotation.x = -sw * 0.8 * m.userData.s;
+        } else { zp.rider.visible = false; zp.walker.visible = false; }
+      }
       const sl = o.userData.slide;
       if (sl) {
         // Down the slide (sitting), then walk round to the door, then out of sight climbing the stairs.

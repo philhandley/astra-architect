@@ -114,7 +114,7 @@ export const WINDOWS = [
 // Surfaces Finn can put on the walls.
 export const SURFACES = [
   { id: 'plain', name: 'Plain' }, { id: 'climb', name: 'Climbing wall' }, { id: 'green', name: 'Green wall' },
-  { id: 'tiles', name: 'Tiles' }, { id: 'pixel', name: 'Pixels' }, { id: 'brick', name: 'Bricks' },
+  { id: 'tiles', name: 'Tiles' }, { id: 'dazzle', name: 'Dazzle' }, { id: 'brick', name: 'Bricks' },
   { id: 'wood', name: 'Wood' }, { id: 'glass', name: 'Glass' }, { id: 'chalk', name: 'Chalkboard' },
 ];
 export const NO_SURFACE = new Set(['pool', 'track', 'garden', 'tree', 'turbine', 'slide', 'rocket', 'greenhouse', 'glassdome', 'glassvault', 'treehouse', 'circle', 'weather', 'observatory', 'bridge', 'canopy', 'terraces', 'ramp', 'swings', 'climbdome', 'roundabout', 'seesaw', 'sandpit', 'playtower', 'zipline']);

@@ -120,7 +120,8 @@ svg.ic.big { width: 34px; height: 34px; }
 .sf-climb { background: radial-gradient(circle at 20% 30%, #e6463c 0 4px, transparent 5px), radial-gradient(circle at 60% 20%, #3d8de0 0 4px, transparent 5px), radial-gradient(circle at 40% 70%, #a3d140 0 4px, transparent 5px), radial-gradient(circle at 80% 60%, #f28b30 0 4px, transparent 5px), radial-gradient(circle at 70% 85%, #7c46a8 0 4px, transparent 5px), #d9dde2; }
 .sf-green { background: radial-gradient(circle at 30% 40%, #93c96b 0 6px, transparent 7px), radial-gradient(circle at 70% 60%, #7cb85a 0 7px, transparent 8px), radial-gradient(circle at 50% 20%, #a9d97a 0 5px, transparent 6px), #5c9a43; }
 .sf-tiles { background: repeating-linear-gradient(0deg, #e8c25a 0 1px, transparent 1px 11px), repeating-linear-gradient(90deg, #e8c25a 0 1px, transparent 1px 11px), #f7d36a; }
-.sf-pixel { background: conic-gradient(#f2b51b 0 25%, #f7d36a 0 50%, #f9e09a 0 75%, #f2b51b 0) 0 0 / 16px 16px; }
+.sf-dazzle { background: repeating-linear-gradient(-45deg, #f2b51b 0 4px, #fff 4px 8px); position: relative; overflow: hidden; }
+.sf-dazzle::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(30deg, #f2b51b 0 3px, #fff 3px 7px); clip-path: polygon(55% 0, 100% 0, 100% 100%, 20% 100%); }
 .sf-brick { background: repeating-linear-gradient(0deg, #c9a037 0 2px, transparent 2px 9px), #f0c34a; }
 .sf-wood { background: repeating-linear-gradient(90deg, #c9a037 0 2px, #f0c34a 2px 9px); }
 .sf-glass { background: linear-gradient(135deg, #d9f1fa, #a9d8ea 50%, #cfeaf5); box-shadow: inset 0 0 0 3px #fff; }

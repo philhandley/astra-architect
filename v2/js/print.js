@@ -28,7 +28,7 @@ export async function openPrint(world, model, siteView, { design, handles }) {
   const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   // A sheet: the school's name and the drawing's name along the top; on a plan, the key to its numbered rooms beside it.
   const page = ({ title, key, img }) => `<section class="page"><header><h1>Finn's Dream School</h1><span>${esc(title)} · ${esc(date)}</span></header>${key
-    ? `<div class="sheet-body"><div class="plan-key"><small>Key</small>${key.length ? `<ol>${key.map(k => `<li><i>${k.n}</i><span>${esc(k.name)}</span><em>${esc(k.size)}</em></li>`).join('')}</ol>` : '<span>No rooms on this floor yet.</span>'}</div>${img}</div>`
+    ? `<div class="sheet-body${key.length > 22 ? ' wide' : ''}"><div class="plan-key"><small>Key</small>${key.length ? `<ol>${key.map(k => `<li><i>${k.n}</i><span>${esc(k.name)}</span><em>${esc(k.size)}</em></li>`).join('')}</ol>` : '<span>No rooms on this floor yet.</span>'}</div>${img}</div>`
     : img}</section>`;
   const sheet = h(`<div class="print-sheet">
     <div class="print-bar no-print">

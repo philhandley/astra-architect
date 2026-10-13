@@ -688,34 +688,17 @@ Object.assign(BUILD, {
 // ---------- Astra Nova pieces ----------
 Object.assign(BUILD, {
   rocket(w, d, H, c) {
-    // A launch pad in a park, not a factory: a pale slab painted with big playful rings round the rocket (like the
-    // painted ground of a Bjarke Ingels park), a low white fence round it with a gap at the front, a white gantry
-    // with a flag, and bushes in planters at the back corners.
-    const g = new THREE.Group(), W = w - 2 * GAP, D = d - 2 * GAP, rx = 0.12;
-    g.add(mesh(new RoundedBoxGeometry(W, 0.1, D, 2, 0.02).translate(0, 0.05, 0), mat('#5a5f68')));
-    const pw = W - 0.06, pd = D - 0.06, dark = '#474c55';
-    // The floor: white lines that flow round a star under the rocket, like the painted ground of Superkilen.
-    const paint = canvasTex(`pad${w}x${d}`, (gc, s) => {
-      gc.fillStyle = dark; gc.fillRect(0, 0, s, s);
-      gc.save(); gc.scale(s / pw, s / pd);
-      const cx = pw / 2 + rx, cz = pd / 2, R = 0.4, r = rnd(5), n = Math.round(pd / 0.07);
-      gc.strokeStyle = '#ffffff'; gc.lineWidth = 0.02; gc.lineCap = 'round';
-      for (let i = 0; i <= n; i++) {
-        const z0 = (i / n) * pd, ph = r() * 6.28, amp = 0.04 + r() * 0.05, lam = 0.9 + r() * 0.8;
-        gc.beginPath();
-        for (let x = -0.05; x <= pw + 0.05; x += 0.02) {
-          let z = z0 + Math.sin((x / lam) * 6.28 + ph) * amp;
-          const dx = x - cx, dz = z - cz, dd = Math.hypot(dx, dz), side = dz >= 0 ? 1 : -1;
-          if (dd < R) z = cz + side * Math.sqrt(Math.max(0, R * R - dx * dx)); else if (dd < R + 0.25) z += side * (R + 0.25 - dd) * 0.4;
-          x < 0 ? gc.moveTo(x, z) : gc.lineTo(x, z);
-        }
-        gc.stroke();
-      }
-      gc.fillStyle = '#ffffff'; gc.beginPath(); for (let k = 0; k < 16; k++) { const a = (k * Math.PI) / 8, rr = k % 2 ? 0.17 : 0.3; gc.lineTo(cx + Math.cos(a) * rr, cz + Math.sin(a) * rr); } gc.closePath(); gc.fill();
-      gc.fillStyle = dark; gc.beginPath(); gc.arc(cx, cz, 0.11, 0, Math.PI * 2); gc.fill();
-      gc.restore();
-    }, 512);
+    // A launch pad in a park, not a factory: a slab painted in black-and-white dazzle, a low white fence round it
+    // with a gap at the front, bushes in planters at the back corners, and a mini Starship on its booster beside a
+    // white tower whose two chopstick arms catch the rocket when it comes back.
+    const g = new THREE.Group(), W = w - 2 * GAP, D = d - 2 * GAP, rx = 0.12, dark = '#2b2f36', steel = '#d6d9dd';
+    g.add(mesh(new RoundedBoxGeometry(W, 0.1, D, 2, 0.02).translate(0, 0.05, 0), mat('#3d4149')));
+    const pw = W - 0.06, pd = D - 0.06;
+    const paint = canvasTex('padbw', (gc, s) => SURF.dazzle.draw(gc, s, '#23252b'), 512); paint.repeat.set(2, 2);
     const top = mesh(new THREE.PlaneGeometry(pw, pd).rotateX(-Math.PI / 2).translate(0, 0.101, 0), mat('#ffffff', { map: paint }), false); top.userData.noInk = true; g.add(top);
+    // The launch mount: a dark ring the booster stands on, on a plain circle of the pad.
+    g.add(mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.004, 32).translate(rx, 0.104, 0), mat('#3d4149'), false));
+    g.add(mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.1, 24).translate(rx, 0.15, 0), mat(dark)));
     // The fence: white posts and two rails, open at the front.
     const posts = [], rails = [], fy = 0.1, ph = 0.09;
     const run = (x0, z0, x1, z1, gap) => {
@@ -730,22 +713,29 @@ Object.assign(BUILD, {
     g.add(mesh(strip(posts), mat(WHITE))); g.add(mesh(strip(rails), mat(WHITE), false));
     // Bushes in planters at the back corners.
     for (const sx of [-1, 1]) { const bx = sx * (W / 2 - 0.16), bz = -D / 2 + 0.16; g.add(mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.06, 14).translate(bx, fy + 0.03, bz), mat(WHITE))); g.add(mesh(new THREE.SphereGeometry(0.075, 12, 9).translate(bx, fy + 0.11, bz), mat(TREE_GREENS[sx > 0 ? 1 : 3]))); }
-    // The gantry: a slim white tower with a flag, and the arm in the rocket's colour.
-    const gx = -W / 2 + 0.22, gz = 0, gh = 1.9;
+    // The tower: a slim white lattice taller than the rocket, with a flag, a carriage, and two dark chopstick arms
+    // reaching out either side of the booster, tipped in the pad's colour.
+    const gx = -W / 2 + 0.22, gz = 0, gh = 2.5, armY = 1.22;
     for (const [px, pz] of [[-0.07, -0.07], [0.07, -0.07], [-0.07, 0.07], [0.07, 0.07]]) g.add(mesh(new THREE.BoxGeometry(0.022, gh, 0.022).translate(gx + px, gh / 2 + 0.1, gz + pz), mat(WHITE)));
     for (let y = 0.3; y < gh; y += 0.25) g.add(mesh(new THREE.BoxGeometry(0.18, 0.018, 0.18).translate(gx, y + 0.1, gz), mat(WHITE)));
-    g.add(mesh(new THREE.BoxGeometry(0.28, 0.03, 0.04).translate(gx + 0.2, 1.5, gz), mat(c)));
+    g.add(mesh(new THREE.BoxGeometry(0.2, 0.14, 0.26).translate(gx, armY, gz), mat(dark)));
+    const armL = rx + 0.14 - (gx + 0.1);
+    for (const s of [-1, 1]) { g.add(mesh(new THREE.BoxGeometry(armL, 0.05, 0.05).translate(gx + 0.1 + armL / 2, armY, gz + s * 0.21), mat(dark))); g.add(mesh(new THREE.BoxGeometry(0.1, 0.054, 0.054).translate(gx + 0.1 + armL - 0.05, armY, gz + s * 0.21), mat(c))); }
     g.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.18, 5).translate(gx, gh + 0.19, gz), mat(WHITE), false));
     g.add(mesh(new THREE.BoxGeometry(0.1, 0.06, 0.01).translate(gx + 0.055, gh + 0.25, gz), mat(c), false));
-    // The rocket.
-    const rk = new THREE.Group(); rk.position.set(0.12, 0.1, 0);
-    rk.add(mesh(new THREE.CylinderGeometry(0.13, 0.15, 1.2, 20).translate(0, 0.72, 0), mat(WHITE)));
-    rk.add(mesh(new THREE.ConeGeometry(0.13, 0.36, 20).translate(0, 1.5, 0), mat(c)));
-    // The base of the rocket wears a black-and-white dazzle pattern, like the roll patterns on real rockets.
-    const bw = canvasTex('rocketbase', (gc, s) => SURF.dazzle.draw(gc, s, '#23252b'), 256); bw.repeat.set(3, 1);
-    rk.add(mesh(new THREE.CylinderGeometry(0.155, 0.17, 0.12, 20).translate(0, 0.06, 0), mat('#ffffff', { map: bw })));
-    const win = mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 16).rotateX(Math.PI / 2).translate(0, 1.05, 0.135), mat('#7fd0ea')); rk.add(win);
-    for (let i = 0; i < 3; i++) { const fin = mesh(new THREE.BoxGeometry(0.02, 0.26, 0.16).translate(0, 0.2, 0.2), mat(c)); fin.rotation.y = (i * Math.PI * 2) / 3; rk.add(fin); }
+    // The rocket: a stainless booster with grid fins, and the ship on top with its pointed nose, four flaps and a
+    // band of black heat-shield tiles down one side.
+    const rk = new THREE.Group(); rk.position.set(rx, 0.2, 0);
+    rk.add(mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.95, 24).translate(0, 0.475, 0), mat(steel)));
+    rk.add(mesh(new THREE.CylinderGeometry(0.156, 0.156, 0.07, 24).translate(0, 0.035, 0), mat(dark)));
+    for (let i = 0; i < 4; i++) { const fin = mesh(new THREE.BoxGeometry(0.1, 0.07, 0.014).translate(0, 0.9, 0.165), mat('#5b6069')); fin.rotation.y = Math.PI / 4 + (i * Math.PI) / 2; rk.add(fin); }
+    rk.add(mesh(new THREE.CylinderGeometry(0.152, 0.152, 0.025, 24).translate(0, 0.96, 0), mat(dark)));
+    rk.add(mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.72, 24).translate(0, 1.33, 0), mat(steel)));
+    const nose = []; for (let i = 0; i <= 10; i++) { const t2 = i / 10; nose.push(new THREE.Vector2(0.15 * Math.pow(Math.cos(t2 * Math.PI / 2), 0.7) + (i === 10 ? 0.0001 : 0), 1.69 + t2 * 0.42)); }
+    rk.add(mesh(new THREE.LatheGeometry(nose, 24), mat(steel)));
+    rk.add(mesh(new THREE.CylinderGeometry(0.154, 0.154, 0.72, 16, 1, true, 0, Math.PI).translate(0, 1.33, 0), mat(dark, { side: THREE.DoubleSide })));
+    for (const s of [-1, 1]) { rk.add(mesh(new THREE.BoxGeometry(0.03, 0.22, 0.15).translate(0, 1.1, s * 0.19), mat(steel))); rk.add(mesh(new THREE.BoxGeometry(0.03, 0.15, 0.1).translate(0, 1.78, s * 0.16), mat(steel))); }
+    rk.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.02, 16).rotateX(Math.PI / 2).translate(0, 1.5, 0.145), mat('#7fd0ea')));
     rk.userData.rocket = true;
     g.add(rk);
     return g;

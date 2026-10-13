@@ -20,12 +20,12 @@
 // Dev page: every programme in every shape, outside and cut open, on sheets for checking the design.
 // ?view=out|in  ?only=classroom,hall  ?size=w,d,h (override)  ?win=pixel (window style for all)
 import * as THREE from 'three';
-import { PROGRAMMES, TRAY, LEVEL, colourHex } from '../v2/js/catalogue.js';
+import { PROGRAMMES, TRAY, LEVEL, colourHex, SURFACES, WINDOWS, PALETTE } from '../v2/js/catalogue.js';
 import { buildPiece, addInk } from '../v2/js/shapes.js';
 import { cutRoom, CUTTABLE, storeyFloor } from '../v2/js/inside.js';
 
 const q = new URLSearchParams(location.search);
-const VIEW = q.get('view') || 'out', ONLY = q.get('only')?.split(','), WIN = q.get('win');
+const VIEW = q.get('view') || 'out', ONLY = q.get('only')?.split(','), WIN = q.get('win'), SURF = q.get('surf'), SET = q.get('set');
 const [CW, CH] = (q.get('cell') || '360x300').split('x').map(Number), COLS = +(q.get('cols') || 5), ROWS = +(q.get('rows') || 4);
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1.5); renderer.setSize(CW, CH);
@@ -52,9 +52,13 @@ for (const type of TRAY) {
     if (q.get('rots')) for (let rot = 0; rot < 4; rot++) items.push({ type, shape, w, d, h, rot }); else items.push({ type, shape, w, d, h });
   }
 }
+// ?set=surfs|wins|colours: one classroom in every wall finish, window style or colour, on a few shapes.
+if (SET === 'surfs') { items.length = 0; for (const s of SURFACES) for (const shape of ['box', 'house', 'drum']) items.push({ type: 'classroom', shape, w: 2, d: 1, h: 1, surface: s.id }); }
+if (SET === 'wins') { items.length = 0; for (const w of WINDOWS) for (const shape of ['box', 'house', 'drum', 'vault']) items.push({ type: 'classroom', shape, w: 2, d: 1, h: 1, win: w.id }); }
+if (SET === 'colours') { items.length = 0; for (const c of PALETTE) for (const shape of ['house', 'box']) items.push({ type: 'classroom', shape, w: 1, d: 1, h: 1, colour: c.id }); }
 let id = 1;
 function cell(it) {
-  const box = { id: id++, type: it.type, shape: it.shape, colour: PROGRAMMES[it.type].colour, w: it.w, d: it.d, h: it.h, x: 0, z: 0, level: 0, win: WIN || undefined, rot: it.rot || 0 };
+  const box = { id: id++, type: it.type, shape: it.shape, colour: it.colour || PROGRAMMES[it.type].colour, w: it.w, d: it.d, h: it.h, x: 0, z: 0, level: 0, win: it.win || WIN || undefined, surface: it.surface || SURF || undefined, rot: it.rot || 0 };
   const hex = colourHex(box.colour);
   let g;
   if (VIEW === 'in') {
@@ -78,7 +82,7 @@ for (let s = 0; s * per < items.length; s++) {
     const cx = (i % COLS) * CW, cy = Math.floor(i / COLS) * CH;
     x.drawImage(renderer.domElement, cx, cy, CW, CH);
     x.fillStyle = 'rgba(255,255,255,0.85)'; x.fillRect(cx, cy, CW, 26);
-    x.fillStyle = '#222'; x.font = '600 15px system-ui'; x.fillText(`${PROGRAMMES[it.type].name} · ${it.shape} · ${it.w}×${it.d}×${it.h}${it.rot ? ' · turn ' + it.rot : ''}`, cx + 8, cy + 18);
+    x.fillStyle = '#222'; x.font = '600 15px system-ui'; x.fillText(`${PROGRAMMES[it.type].name} · ${it.shape} · ${it.w}×${it.d}×${it.h}${it.rot ? ' · turn ' + it.rot : ''}${it.surface ? ' · ' + it.surface : ''}${it.win ? ' · ' + it.win : ''}${it.colour ? ' · ' + it.colour : ''}`, cx + 8, cy + 18);
     x.strokeStyle = '#fff'; x.lineWidth = 3; x.strokeRect(cx, cy, CW, CH);
   });
   document.body.append(cv); sheets.push(cv);

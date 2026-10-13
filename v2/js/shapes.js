@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LEVEL } from './catalogue.js';
 import { TREE_GREENS } from './site.js';
 import { addFacade, addTerrace, contactShadow } from './facade.js';
-import { REC, SOFFIT, hasColonnade, ringThickness, turnAngle } from './plan.js';
+import { REC, SOFFIT, hasColonnade, ringThickness, turnAngle, rows, wallRuns, openings } from './plan.js';
 import { miniKid, SEAT } from './kid.js';
 
 const GAP = 0.035;                   // a hair of space round every piece, so each reads as its own block
@@ -74,6 +74,23 @@ function terrace(group, W, D, H, round = false) {
   }
 }
 
+// A pitched building as one mesh with two materials: the walls, then the roof (every face that looks upwards) a
+// shade darker, so the form reads in the flat iso light, and a wall finish stays off the roof.
+function roofed(geo, c, up = 0.3) {
+  const g = geo.index ? geo.toNonIndexed() : geo, p = g.attributes.position, walls = [], roof = [];
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), N = new THREE.Vector3();
+  for (let i = 0; i < p.count; i += 3) {
+    A.fromBufferAttribute(p, i); B.fromBufferAttribute(p, i + 1); C.fromBufferAttribute(p, i + 2);
+    N.subVectors(B, A).cross(C.clone().sub(A)).normalize();
+    (N.y > up ? roof : walls).push(i);
+  }
+  const out = new Float32Array(p.count * 3); let k = 0;
+  for (const list of [walls, roof]) for (const i of list) for (let j = 0; j < 3; j++) { out[k++] = p.getX(i + j); out[k++] = p.getY(i + j); out[k++] = p.getZ(i + j); }
+  const geo2 = new THREE.BufferGeometry(); geo2.setAttribute('position', new THREE.BufferAttribute(out, 3)); geo2.computeVertexNormals();
+  geo2.addGroup(0, walls.length * 3, 0); geo2.addGroup(walls.length * 3, roof.length * 3, 1);
+  return mesh(geo2, [mat(c), mat(shade(c, 0.86))]);
+}
+
 // ---------- the shapes ----------
 const BUILD = {
   box(w, d, H, c, o) {
@@ -86,7 +103,7 @@ const BUILD = {
   house(w, d, H, c) {
     const L = Math.max(w, d) - 2 * GAP - 0.03, W = Math.min(w, d) - 2 * GAP - 0.03, r = Math.min(ROOF + 0.05, W * 0.45);
     const geo = prism([[-W / 2, 0], [W / 2, 0], [W / 2, H], [0, H + r], [-W / 2, H]], L);
-    const g = new THREE.Group(); g.add(mesh(alongLong(geo, w, d), mat(c))); return g;
+    const g = new THREE.Group(); g.add(roofed(alongLong(geo, w, d), c)); return g;
   },
   saw(w, d, H, c) {
     // A row of little pointy-roofed houses, one per square, ridges across the row.
@@ -100,7 +117,7 @@ const BUILD = {
     }
     const geo = mergeGeometries(parts);
     if (d > w) geo.rotateY(Math.PI / 2);
-    const g = new THREE.Group(); g.add(mesh(geo, mat(c))); return g;
+    const g = new THREE.Group(); g.add(roofed(geo, c)); return g;
   },
   vault(w, d, H, c) {
     const L = Math.max(w, d) - 2 * GAP - 0.03, W = Math.min(w, d) - 2 * GAP - 0.03, r = Math.min(W / 2, 0.55);
@@ -318,7 +335,7 @@ const BUILD = {
   },
   track(w, d, H, c) {
     const W = w - 2 * GAP, D = d - 2 * GAP, g = new THREE.Group();
-    g.add(mesh(new RoundedBoxGeometry(W, 0.06, D, 2, 0.02).translate(0, 0.03, 0), mat('#8fcf5b')));
+    g.add(mesh(new RoundedBoxGeometry(W, 0.06, D, 2, 0.02).translate(0, 0.03, 0), mat('#c9df9a')));
     const band = Math.min(0.3, Math.min(W, D) * 0.22);
     const s = roundedRect(W - 0.06, D - 0.06, Math.min(W, D) / 2); s.holes.push(roundedRect(W - 0.06 - 2 * band, D - 0.06 - 2 * band, Math.max(0.05, Math.min(W, D) / 2 - band)));
     const tr = mesh(upExtrude(s, 0.025), mat(c)); tr.position.y = 0.06; g.add(tr);
@@ -391,12 +408,12 @@ function canvasTex(id, draw, size = 128) {
 function rnd(seed) { let a = seed; return () => { a = (a * 16807) % 2147483647; return a / 2147483647; }; }
 const SURF = {
   // Grey patterns get the room's colour; the others bring their own.
-  tiles: { tint: true, scale: 2, draw: (g, s) => { const r = rnd(7), n = 4, u = s / n; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = 225 + r() * 30; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x * u, y * u, u, u); } g.strokeStyle = 'rgba(150,150,150,0.9)'; g.lineWidth = 3; for (let i = 0; i <= n; i++) { g.beginPath(); g.moveTo(i * u, 0); g.lineTo(i * u, s); g.moveTo(0, i * u); g.lineTo(s, i * u); g.stroke(); } } },
+  tiles: { tint: true, scale: 2, whole: true, draw: (g, s) => { const r = rnd(7), n = 4, u = s / n; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = 225 + r() * 30; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x * u, y * u, u, u); } g.strokeStyle = 'rgba(150,150,150,0.9)'; g.lineWidth = 3; for (let i = 0; i <= n; i++) { g.beginPath(); g.moveTo(i * u, 0); g.lineTo(i * u, s); g.moveTo(0, i * u); g.lineTo(s, i * u); g.stroke(); } } },
   pixel: { tint: true, scale: 1.5, draw: (g, s) => { const r = rnd(11), n = 8, u = s / n; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = 170 + Math.floor(r() * 4) * 28; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x * u, y * u, u, u); } } },
   brick: { tint: true, scale: 3, draw: (g, s) => { const r = rnd(3), rows = 8, bh = s / rows, bw = s / 4; g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, s, s); for (let y = 0; y < rows; y++) for (let x = -1; x < 5; x++) { const v = 215 + r() * 40, ox = (y % 2) * bw / 2; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x * bw + ox + 2, y * bh + 2, bw - 4, bh - 4); } } },
   wood: { tint: true, scale: 3, draw: (g, s) => { const r = rnd(5), n = 8, u = s / n; for (let x = 0; x < n; x++) { const v = 205 + r() * 50; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x * u, 0, u - 3, s); g.fillStyle = 'rgba(120,120,120,0.9)'; g.fillRect(x * u + u - 3, 0, 3, s); } } },
-  glass: { tint: false, scale: 2, draw: (g, s) => { const gr = g.createLinearGradient(0, 0, s, s); gr.addColorStop(0, '#d9f1fa'); gr.addColorStop(0.5, '#a9d8ea'); gr.addColorStop(1, '#cfeaf5'); g.fillStyle = gr; g.fillRect(0, 0, s, s); g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 10; g.beginPath(); g.moveTo(s * 0.1, s); g.lineTo(s * 0.6, 0); g.stroke(); g.strokeStyle = '#f7f7f4'; g.lineWidth = 6; g.strokeRect(3, 3, s - 6, s - 6); g.beginPath(); g.moveTo(s / 2, 0); g.lineTo(s / 2, s); g.stroke(); } },
-  green: { tint: false, scale: 2, draw: (g, s) => { const r = rnd(9); g.fillStyle = '#5c9a43'; g.fillRect(0, 0, s, s); const cols = ['#4c8a36', '#7cb85a', '#93c96b', '#3f7a30', '#a9d97a']; for (let i = 0; i < 260; i++) { g.fillStyle = cols[Math.floor(r() * cols.length)]; g.beginPath(); g.ellipse(r() * s, r() * s, 4 + r() * 6, 3 + r() * 4, r() * 3, 0, Math.PI * 2); g.fill(); } for (let i = 0; i < 14; i++) { g.fillStyle = ['#f5a3c7', '#f7c22e', '#ffffff'][i % 3]; g.beginPath(); g.arc(r() * s, r() * s, 2.5, 0, Math.PI * 2); g.fill(); } } },
+  glass: { tint: false, scale: 2, whole: true, draw: (g, s) => { const gr = g.createLinearGradient(0, 0, s, s); gr.addColorStop(0, '#d9f1fa'); gr.addColorStop(0.5, '#a9d8ea'); gr.addColorStop(1, '#cfeaf5'); g.fillStyle = gr; g.fillRect(0, 0, s, s); g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 10; g.beginPath(); g.moveTo(s * 0.1, s); g.lineTo(s * 0.6, 0); g.stroke(); g.strokeStyle = '#f7f7f4'; g.lineWidth = 6; g.strokeRect(3, 3, s - 6, s - 6); g.beginPath(); g.moveTo(s / 2, 0); g.lineTo(s / 2, s); g.stroke(); } },
+  green: { tint: false, scale: 2, whole: true, draw: (g, s) => { const r = rnd(9); g.fillStyle = '#5c9a43'; g.fillRect(0, 0, s, s); const cols = ['#4c8a36', '#7cb85a', '#93c96b', '#3f7a30', '#a9d97a']; for (let i = 0; i < 260; i++) { g.fillStyle = cols[Math.floor(r() * cols.length)]; g.beginPath(); g.ellipse(r() * s, r() * s, 4 + r() * 6, 3 + r() * 4, r() * 3, 0, Math.PI * 2); g.fill(); } for (let i = 0; i < 14; i++) { g.fillStyle = ['#f5a3c7', '#f7c22e', '#ffffff'][i % 3]; g.beginPath(); g.arc(r() * s, r() * s, 2.5, 0, Math.PI * 2); g.fill(); } } },
   chalk: { tint: false, scale: 1, draw: (g, s) => { g.fillStyle = '#2f463d'; g.fillRect(0, 0, s, s); g.strokeStyle = 'rgba(255,255,255,.85)'; g.fillStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 3; g.lineCap = 'round';
     g.beginPath(); g.arc(30, 30, 12, 0, Math.PI * 2); g.stroke(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; g.beginPath(); g.moveTo(30 + Math.cos(a) * 16, 30 + Math.sin(a) * 16); g.lineTo(30 + Math.cos(a) * 22, 30 + Math.sin(a) * 22); g.stroke(); }
     g.font = 'bold 22px sans-serif'; g.fillText('1+1=2', 58, 40); g.beginPath(); g.arc(96, 92, 14, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(96, 95, 7, 0.2, Math.PI - 0.2); g.stroke(); g.fillRect(90, 86, 3, 3); g.fillRect(100, 86, 3, 3);
@@ -415,15 +432,33 @@ function boxUV(geo, scale) {
 }
 function applySurface(g, box) {
   const body = mat(box.hex), meshes = [];
-  g.traverse(o => { if (o.isMesh && o.material === body) meshes.push(o); });
-  if (box.surface === 'climb') { for (const m of meshes) g.add(climbingHolds(m, box.id || 1)); return; }
+  g.traverse(o => { if (o.isMesh && (o.material === body || (Array.isArray(o.material) && o.material[0] === body))) meshes.push(o); });
+  if (box.surface === 'climb') { for (const m of meshes) m.parent.add(climbingHolds(m, box.id || 1, box)); return; }
   const S = SURF[box.surface]; if (!S) return;
   const tex = canvasTex(box.surface, S.draw);
   const m2 = mat(S.tint ? box.hex : '#ffffff', { map: tex });
-  for (const m of meshes) { if (!m.geometry.attributes.normal) m.geometry.computeVertexNormals(); boxUV(m.geometry, S.scale); m.material = m2; }
+  for (const m of meshes) {
+    if (!m.geometry.attributes.normal) m.geometry.computeVertexNormals(); boxUV(m.geometry, S.scale);
+    m.material = Array.isArray(m.material) ? [m2, S.whole ? m2 : m.material[1]] : m2;
+  }
 }
-// Coloured climbing holds scattered over the outside walls.
-function climbingHolds(m, seed) {
+// Where a building's windows and door are (in its turned frame), so climbing holds leave them clear.
+function windowZones(box) {
+  const zones = [];
+  for (const row of rows(box)) { const runs = wallRuns(box, row.k); for (const o of openings(box, row.k, runs)) zones.push({ run: runs[o.run], s0: o.s0 - 0.03, s1: o.s1 + 0.03, y0: row.y0 + o.y0 - 0.03, y1: row.y0 + o.y1 + 0.03 }); }
+  return zones;
+}
+function nearRun(run, x, z) {
+  let best = Infinity, bs = 0;
+  for (let i = 0; i < run.pts.length - 1; i++) {
+    const [ax, az] = run.pts[i], [bx, bz] = run.pts[i + 1], dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2)), d = Math.hypot(x - ax - dx * t, z - az - dz * t);
+    if (d < best) { best = d; bs = run.s[i] + Math.sqrt(l2) * t; }
+  }
+  return [best, bs];
+}
+// Coloured climbing holds scattered over the outside walls (not over the windows or the door).
+function climbingHolds(m, seed, box = null) {
   const geo = m.geometry, p = geo.attributes.position, idx = geo.index, tris = [], A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), N = new THREE.Vector3();
   const count = idx ? idx.count : p.count;
   let total = 0;
@@ -435,17 +470,22 @@ function climbingHolds(m, seed) {
     N.normalize(); if (Math.abs(N.y) > 0.35) continue;
     total += area; tris.push({ a: A.clone(), b: B.clone(), c: C.clone(), n: N.clone(), acc: total });
   }
-  const r = rnd(seed * 7 + 1), n = Math.min(260, Math.max(12, Math.round(total * 34)));
-  const holds = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.024, 0), new THREE.MeshLambertMaterial({ color: '#ffffff' }), n);
+  const r = rnd(seed * 7 + 1), n = Math.min(220, Math.max(10, Math.round(total * 26)));
+  const holds = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.028, 0), new THREE.MeshLambertMaterial({ color: '#ffffff' }), n);
   const cols = ['#e6463c', '#f7c22e', '#3d8de0', '#a3d140', '#f28b30', '#e2457d', '#7c46a8'];
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), pos = new THREE.Vector3(), col = new THREE.Color();
-  for (let i = 0; i < n && tris.length; i++) {
+  const zones = box ? windowZones(box) : [], ang = box ? turnAngle(box) : 0, co = Math.cos(ang), si = Math.sin(ang);
+  const clear = p => { const x = p.x * co - p.z * si, z = p.x * si + p.z * co; return !zones.some(zn => { if (p.y < zn.y0 || p.y > zn.y1) return false; const [d, sAt] = nearRun(zn.run, x, z); return d < 0.08 && sAt >= zn.s0 && sAt <= zn.s1; }); };
+  let placed = 0;
+  for (let tries = 0; placed < n && tries < n * 4 && tris.length; tries++) {
     const k = r() * total, t = tris.find(tt => tt.acc >= k) || tris[tris.length - 1];
     let u = r(), v = r(); if (u + v > 1) { u = 1 - u; v = 1 - v; }
     pos.copy(t.a).addScaledVector(t.b.clone().sub(t.a), u).addScaledVector(t.c.clone().sub(t.a), v).addScaledVector(t.n, 0.008);
+    if (!clear(pos)) continue;
     q.setFromEuler(new THREE.Euler(r() * 3, r() * 3, r() * 3)); s.set(0.7 + r() * 0.8, 0.6 + r() * 0.5, 0.7 + r() * 0.8);
-    m4.compose(pos, q, s); holds.setMatrixAt(i, m4); holds.setColorAt(i, col.set(cols[i % cols.length]));
+    m4.compose(pos, q, s); holds.setMatrixAt(placed, m4); holds.setColorAt(placed, col.set(cols[placed % cols.length])); placed++;
   }
+  holds.count = placed;
   holds.castShadow = true;
   holds.raycast = () => {};
   return holds;

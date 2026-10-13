@@ -715,16 +715,26 @@ Object.assign(BUILD, {
     g.add(mesh(strip(posts), mat(WHITE))); g.add(mesh(strip(rails), mat(WHITE), false));
     // Bushes in planters at the back corners.
     for (const sx of [-1, 1]) { const bx = sx * (W / 2 - 0.16), bz = -D / 2 + 0.16; g.add(mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.06, 14).translate(bx, fy + 0.03, bz), mat(WHITE))); g.add(mesh(new THREE.SphereGeometry(0.075, 12, 9).translate(bx, fy + 0.11, bz), mat(TREE_GREENS[sx > 0 ? 1 : 3]))); }
-    // The tower: a slim white lattice taller than the rocket, with a flag, a carriage, and two dark chopstick arms
-    // reaching out either side of the booster, tipped in the pad's colour.
-    const gx = -W / 2 + 0.22, gz = 0, gh = 2.5, armY = 1.22;
-    for (const [px, pz] of [[-0.07, -0.07], [0.07, -0.07], [-0.07, 0.07], [0.07, 0.07]]) g.add(mesh(new THREE.BoxGeometry(0.022, gh, 0.022).translate(gx + px, gh / 2 + 0.1, gz + pz), mat(WHITE)));
-    for (let y = 0.3; y < gh; y += 0.25) g.add(mesh(new THREE.BoxGeometry(0.18, 0.018, 0.18).translate(gx, y + 0.1, gz), mat(WHITE)));
-    g.add(mesh(new THREE.BoxGeometry(0.2, 0.14, 0.26).translate(gx, armY, gz), mat(dark)));
-    const armL = rx + 0.14 - (gx + 0.1);
-    for (const s of [-1, 1]) { g.add(mesh(new THREE.BoxGeometry(armL, 0.05, 0.05).translate(gx + 0.1 + armL / 2, armY, gz + s * 0.21), mat(dark))); g.add(mesh(new THREE.BoxGeometry(0.1, 0.054, 0.054).translate(gx + 0.1 + armL - 0.05, armY, gz + s * 0.21), mat(c))); }
-    g.add(mesh(new THREE.BoxGeometry(0.14, 0.1, 0.18).translate(gx, 1.56, gz), mat(dark)));
-    g.add(mesh(new THREE.BoxGeometry(rx - 0.15 - (gx + 0.07), 0.035, 0.05).translate((gx + 0.07 + rx - 0.15) / 2, 1.56, gz), mat(dark)));
+    // The tower: a slim white lattice with diagonal bracing, taller than the rocket, with a flag on top, a dark
+    // carriage, and two tapered chopstick arms reaching out either side of the booster, tipped in the pad's colour.
+    const gx = -W / 2 + 0.22, gz = 0, gh = 2.5, armY = 1.22, half = 0.07, bars = [];
+    for (const [px, pz] of [[-half, -half], [half, -half], [-half, half], [half, half]]) bars.push(new THREE.BoxGeometry(0.022, gh, 0.022).translate(gx + px, gh / 2 + 0.1, gz + pz));
+    const lv = 0.25;
+    for (let y = 0.1; y < gh + 0.1 - 0.01; y += lv) {
+      for (const s of [-1, 1]) {
+        bars.push(new THREE.BoxGeometry(2 * half, 0.012, 0.012).translate(gx, y + lv, gz + s * half), new THREE.BoxGeometry(0.012, 0.012, 2 * half).translate(gx + s * half, y + lv, gz));
+        // one diagonal per face per level, zig-zagging
+        const dl = Math.hypot(2 * half, lv), ang = Math.atan2(lv, 2 * half) * (y / lv % 2 < 1 ? 1 : -1);
+        bars.push(new THREE.BoxGeometry(dl, 0.01, 0.01).rotateZ(ang).translate(gx, y + lv / 2, gz + s * half), new THREE.BoxGeometry(0.01, 0.01, dl).rotateX(-ang).translate(gx + s * half, y + lv / 2, gz));
+      }
+    }
+    g.add(mesh(mergeGeometries(bars.map(x => { x.deleteAttribute('uv'); return x; })), mat(WHITE)));
+    g.add(mesh(new THREE.BoxGeometry(0.2, 0.16, 0.3).translate(gx, armY, gz), mat(dark)));
+    const armL = rx + 0.16 - (gx + 0.1), arm = new THREE.Shape(); arm.moveTo(0, -0.04); arm.lineTo(armL, -0.02); arm.lineTo(armL, 0.02); arm.lineTo(0, 0.04); arm.closePath();
+    for (const s of [-1, 1]) {
+      g.add(mesh(new THREE.ExtrudeGeometry(arm, { depth: 0.05, bevelEnabled: false }).rotateX(-Math.PI / 2).translate(gx + 0.1, armY - 0.025, gz + s * 0.21), mat(dark)));
+      g.add(mesh(new THREE.BoxGeometry(0.09, 0.054, 0.044).translate(gx + 0.1 + armL - 0.045, armY, gz + s * 0.21), mat(c)));
+    }
     g.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.18, 5).translate(gx, gh + 0.19, gz), mat(WHITE), false));
     g.add(mesh(new THREE.BoxGeometry(0.1, 0.06, 0.01).translate(gx + 0.055, gh + 0.25, gz), mat(c), false));
     // The rocket: a stainless booster with grid fins, and the ship on top with its pointed nose, four flaps and a
@@ -747,7 +757,10 @@ Object.assign(BUILD, {
     // Black heat-shield tiles down one side of the ship, running up the nose to the tip.
     rk.add(mesh(new THREE.CylinderGeometry(0.154, 0.154, 0.72, 16, 1, true, Math.PI / 4, Math.PI).translate(0, 1.33, 0), mat(dark, { side: THREE.DoubleSide })));
     rk.add(mesh(new THREE.LatheGeometry(noseT, 12, Math.PI / 4, Math.PI), mat(dark, { side: THREE.DoubleSide })));
-    for (const s of [-1, 1]) { rk.add(mesh(new THREE.BoxGeometry(0.03, 0.22, 0.15).translate(0, 1.1, s * 0.19), mat(steel))); rk.add(mesh(new THREE.BoxGeometry(0.03, 0.15, 0.1).translate(0, 1.78, s * 0.16), mat(steel))); }
+    for (const s of [-1, 1]) {
+      rk.add(mesh(new THREE.BoxGeometry(0.026, 0.24, 0.13).translate(0, 1.1, s * 0.205), mat(steel)));
+      rk.add(mesh(new THREE.BoxGeometry(0.026, 0.14, 0.08).translate(0, 1.8, s * 0.175), mat(steel)));
+    }
     rk.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.02, 16).rotateX(Math.PI / 2).translate(0, 1.5, 0.145), mat('#7fd0ea')));
     rk.userData.rocket = true;
     g.add(rk);

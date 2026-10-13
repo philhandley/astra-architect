@@ -799,7 +799,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   }
 
   // ---------- the school day ----------
-  const day = new SchoolDay({ world, model, crowd, yOf, seatsOf: id => seatsById.get(id), layer: ui.querySelector('.bubbles'), onPeriod: (i, P) => drawDaybar(i, P), onEnd: () => { endDay(); setTimeout(() => hooks.dayDone?.(PERIODS), 900); } });
+  const day = new SchoolDay({ world, model, crowd, yOf, seatsOf: id => seatsById.get(id), layer: ui.querySelector('.bubbles'), onPeriod: (i, P) => drawDaybar(i, P), onEnd: facts => { endDay(); setTimeout(() => hooks.dayDone?.(PERIODS, facts), 900); } });
   function startDay() {
     if (!model.boxes.some(b => ['classroom', 'ringhouse', 'treehouse'].includes(b.type))) { sfx.no(); toast('Build a classroom first!'); say('Build a classroom first, so the children have somewhere to learn.'); return; }
     if (S.walking) return;
@@ -881,7 +881,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   frameSite(true);
   setTool(null);
   return {
-    S, select, setTool, redraw, frameSite, setInside, tap: handleTap, crowd, hooks, startDay, resetSite,
+    S, select, setTool, redraw, frameSite, setInside, tap: handleTap, crowd, day, hooks, startDay, resetSite,
     // Everyone cheers and confetti flies (a wish has come true).
     celebrate() {
       for (const b of model.boxes) crowd.cheer(b.id);

@@ -60,11 +60,12 @@ export function mountGuide(root, model, { site, wishes }) {
   }
 
   // ---------- after a school day ----------
-  function debrief(periods) {
+  function debrief(periods, facts = { lines: [], ask: null }) {
     const asks = ['Where did the children walk the most? Can you see their paths in the grass?', 'Was anywhere too crowded? What could you change?', 'Which room do you think the children liked best?'];
-    const ask = asks[Math.floor(Math.random() * asks.length)];
+    const ask = facts?.ask || asks[Math.floor(Math.random() * asks.length)], seen = facts?.lines?.length ? facts.lines.join(' ') : '';
     card.innerHTML = `<div class="nova-head">${emo('🔔', 'emo head-pic')}<div><small>School day done!</small><h2>What was your favourite part of the day?</h2></div><button class="fbtn close" type="button">${icon('close')}</button></div>
       <div class="bq-opts day">${periods.map((p, i) => `<button class="bq-opt" type="button" data-p="${i}">${emo(p.emoji, 'emo big')}<span>${esc(p.name)}</span></button>`).join('')}</div>
+      ${seen ? `<p class="bq-step seen">${emo('👀')} ${esc(seen)}</p>` : ''}
       <p class="bq-step ask">${emo('🗣️')} ${esc(ask)}</p>
       <div class="bq-next"><button class="fbtn ok next" type="button">${icon('done')}<span>Done</span></button></div>`;
     card.onclick = e => {

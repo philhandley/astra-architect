@@ -4,7 +4,7 @@
 // steps, play and stop to chat. They step round each other, say little things in speech bubbles (tap a child
 // to hear them), and the paths they tread wear into the grass.
 import * as THREE from 'three';
-import { PROGRAMMES, LEVEL } from './catalogue.js';
+import { PROGRAMMES, SHAPES, LEVEL } from './catalogue.js';
 import { GRID, square, site } from './site.js';
 import { outline, storeyFloor, CUTTABLE } from './inside.js';
 import { seeded } from './crowd.js';
@@ -27,6 +27,17 @@ const CLASSES = new Set(['classroom', 'ringhouse', 'treehouse']);
 const PLAY = new Set(['playground', 'zipline', 'slide', 'steps', 'terraces', 'garden', 'tree', 'circle', 'track', 'rocket', 'weather']);
 const WALK_THROUGH = new Set(['track', 'garden', 'circle', 'terraces', 'canopy', 'steps', 'tree', 'arch', 'sandpit']);
 const TOP_Y = { track: 0.09, garden: 0.16, circle: 0.045, stage: 0.16, terraces: 0.06, steps: 0.02, tree: 0.012, slide: 0.012, pool: 0.09 };
+// Borrowed from theme-park games: children have simple needs (energy, fun, hunger) and choose what to do from them.
+// Rides take one child at a time, so a queue forms (seconds per go, by shape); tired children look for somewhere to
+// sit; passing something interesting they stop to look; and what they say comes from how they feel.
+const RIDES = { slide: 3.5, swings: 3, zipline: 3, roundabout: 3, seesaw: 3, playtower: 3.5, climbdome: 4 };
+const QUEUE_MAX = 4;                 // (a happy school: short lines, and anyone extra just plays nearby)
+const REST = new Set(['steps', 'circle', 'terraces', 'garden', 'stage', 'treehouse']);
+const LOOK = { rocket: ['🚀', 'Wow, a rocket!'], observatory: ['🔭', 'A telescope!'], aquarium: ['🐠', 'Fish!'], turbine: ['🌬️', 'Round and round!'], weather: ['🌡️', 'Is it windy?'], greenhouse: ['🌱', 'Look, plants!'], pool: ['🏊', 'Splash!'] };
+const NEED_LINES = {
+  tired: [['😮‍💨', 'Phew, I need a sit down'], ['🥱', 'My legs are tired']], hungry: [['🍎', 'I am hungry!'], ['🥪', 'Is it lunch yet?']],
+  happy: [['🌟', 'Best day ever!'], ['😄', 'This is so fun!']], queue: [['⏳', 'My turn next!'], ['🙌', 'Nearly my go!']], ride: [['🛝', 'Wheee!'], ['🎉', 'Again, again!']],
+};
 
 // What children say: [emoji, words], by what they are doing, and by the room they are in.
 const LINES = {
@@ -139,18 +150,59 @@ export class SchoolDay {
         zone = { rect: { x0: b.x - pad, z0: b.z - pad, x1: b.x + b.w + pad, z1: b.z + b.d + pad }, oy: y0 + topY, boxId: b.id, ok: pad > 0 ? (x, z) => !this.blocked(Math.floor(x), Math.floor(z)) || this.model.at(Math.floor(x), Math.floor(z), 0)?.id === b.id : null };
       }
       door = door || [Math.floor(cx), Math.floor(cz)];
-      out.push({ b, type, door, doors: doors?.length ? doors : [door], climb, zone, seats: (this.seatsOf?.(b.id) || []).slice(), cap: sq.length * (CLASSES.has(type) ? 7 : 6) });
+      const place = { b, type, door, doors: doors?.length ? doors : [door], climb, zone, seats: (this.seatsOf?.(b.id) || []).slice(), cap: sq.length * (CLASSES.has(type) ? 7 : 6), ride: RIDES[b.shape] || 0 };
+      if (place.ride) {
+        // The queue starts at the free square next to the ride that is easiest to reach (nearest the gate by the
+        // paths) and runs away from the ride; you come out again to one side.
+        if (doors && doors.length > 1) { const gf = this.fieldTo('gate', [this.gate]); let bd = Infinity; for (const dq of doors) { const dd = gf.dist[dq[0] + dq[1] * GRID.w]; if (dd < bd) { bd = dd; door = dq; } } }
+        const hx = door[0] + 0.5, hz = door[1] + 0.5; let dx = hx - cx, dz = hz - cz; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+        place.q = { hx, hz, dx, dz, sx: -dz, sz: dx, y: Math.max(0.012, square(door[0], door[1])?.base || 0) };
+        place.queue = []; place.busy = null; place.maxQ = 0; place.goes = 0;
+        place.doors = [door];                     // (everyone walks to the one square where the queue starts)
+      }
+      out.push(place);
     }
     return out;
+  }
+
+  qslot(p, i) { const q = p.q, s = i % 2 ? 0.02 : -0.02; return [q.hx + q.dx * 0.085 * i + q.sx * s, q.y, q.hz + q.dz * 0.085 * i + q.sz * s]; }
+  qexit(p) { const q = p.q; return [q.hx + q.sx * 0.3 + q.dx * 0.1, q.y, q.hz + q.sz * 0.3 + q.dz * 0.1]; }
+  // What a child does at playtime, from how they feel: tired children find somewhere to sit; the others pick
+  // something to play on, looking at two and choosing the one with the shorter queue (and giving up on a long one).
+  chooseFun(k) {
+    const n = k.needs;
+    // (Places you can walk to first; if the paths are all cut off, anywhere, as the children find a way.)
+    const near = list => { const can = list.filter(p => this.reachable(k, p)); return can.length ? can : list; };
+    if (n.energy < 0.45) {
+      const rest = near(this.places.filter(p => p.seats.length && (REST.has(p.type) || REST.has(p.b.shape)) && p.seats.some(s => !s.taken)));
+      if (rest.length) return rest[Math.floor(this.r() * rest.length)];
+      this.noSeat++;
+    }
+    const spots = near(this.places.filter(p => PLAY.has(p.type) || PLAY.has(p.b.shape)));
+    if (!spots.length || this.r() < 0.2) return 'yard';
+    const load = p => (p.queue?.length || 0) + this.agents.filter(x => x.dest === p && x.mode === 'path').length * 0.5;
+    const a = spots[Math.floor(this.r() * spots.length)], b = spots[Math.floor(this.r() * spots.length)], pick = load(a) <= load(b) ? a : b;
+    return load(pick) >= 3 ? 'yard' : pick;
+  }
+  // Can this child walk there round the buildings (from the door of the room they are in, if indoors)?
+  reachable(k, p) {
+    const f = this.fieldTo(p.b?.id ?? p.door.join(','), p.doors || [p.door]), from = k.at;
+    const sqs = from && from !== 'gate' && from.zone?.indoor ? (from.doors || [from.door]) : [[Math.floor(k.x), Math.floor(k.z)]];
+    return sqs.some(([x, z]) => isFinite(f.dist[x + z * GRID.w]));
+  }
+  // Something interesting within a short walk (not where this child is going anyway).
+  attractionNear(k) {
+    for (const p of this.places) if (LOOK[p.type] && p !== k.dest && Math.hypot(p.b.x + p.b.w / 2 - k.x, p.b.z + p.b.d / 2 - k.z) < 0.6 + Math.max(p.b.w, p.b.d) / 2) return p;
+    return null;
   }
 
   // ---------- running the day ----------
   start() {
     const m = this.model, r = seeded(m.boxes.length * 31 + 7);
     this.r = r;
-    this.places = this.findPlaces();
     const S = site(), gate = [Math.max(0, Math.min(GRID.w - 1, S.gate[0])), Math.max(0, Math.min(GRID.d - 1, S.gate[1]))];
-    this.gate = gate;
+    this.gate = gate; this.fields = new Map();
+    this.places = this.findPlaces();
     const ok = (x, z) => { const xi = Math.floor(x), zi = Math.floor(z), q = square(xi, zi); return q?.build && !this.blocked(xi, zi); };
     // The yard: all the open land you can build on.
     const land = []; for (let z = 0; z < GRID.d; z++) for (let x = 0; x < GRID.w; x++) if (ok(x + 0.5, z + 0.5)) land.push([x, z]);
@@ -167,7 +219,8 @@ export class SchoolDay {
       const at = () => [gate[0] + 0.25 + r() * 0.5, gate[1] + 0.25 + r() * 0.5];
       const mk = (teacher, k) => {
         const [x, z] = at();
-        const p = { kind: 'agent', pose: 'walk', teacher, g, k, s: teacher ? 1 : 0.72 + r() * 0.1, ph: r() * 6, x, z, y: this.gateZone.oy, yaw: 0, r, mode: 'idle', speed: teacher ? 0.85 : 1.05 * (0.9 + r() * 0.2), wait: 0 };
+        const p = { kind: 'agent', pose: 'walk', teacher, g, k, s: teacher ? 1 : 0.72 + r() * 0.1, ph: r() * 6, x, z, y: this.gateZone.oy, yaw: 0, r, mode: 'idle', speed: teacher ? 0.85 : 1.05 * (0.9 + r() * 0.2), wait: 0,
+          needs: { energy: 0.3 + r() * 0.7, fun: r() * 0.4, hunger: r() * 0.3 }, hidden: false };
         if (teacher) p.look = { top: '#2e4a8c', shorts: '#3d405b', skin: ['#f6d7bf', '#c98c62', '#e7b892', '#9a6544'][gi % 4], hair: ['#3b2a20', '#e3b65a', '#1f1b18', '#b5652e'][gi % 4], style: gi % 3 };
         people.push(p); return p;
       };
@@ -178,7 +231,7 @@ export class SchoolDay {
     });
     this.agents = people;
     this.crowd.people = people; this.crowd.setCount(people.length);
-    this.t = 0; this.period = -1; this.running = true; this.sayT = 0.6; this.stepT = 0; this.clock = 0;
+    this.t = 0; this.period = -1; this.running = true; this.sayT = 0.6; this.stepT = 0; this.clock = 0; this.noSeat = 0;
     this.world.updaters.add(this.tick);
     this.next();
   }
@@ -188,7 +241,18 @@ export class SchoolDay {
     this.world.updaters.delete(this.tick);
     for (const bb of this.bubbles) bb.el.remove();
     this.bubbles = [];
-    if (!silent) this.onEnd?.();
+    if (!silent) this.onEnd?.(this.facts());
+  }
+  // One or two things the day showed (said as observations and a question, never a score).
+  facts() {
+    const rides = this.places.filter(p => p.ride), goes = rides.reduce((n, p) => n + p.goes, 0), lines = [];
+    const busiest = rides.slice().sort((a, b) => b.maxQ - a.maxQ)[0];
+    let ask = null;
+    if (goes) lines.push(`The children had ${goes} goes on the rides.`);
+    const rideName = p => (p.type === 'playground' ? SHAPES[p.b.shape]?.name : PROGRAMMES[p.type]?.name) || p.b.shape;
+    if (busiest && busiest.maxQ >= 3) { lines.push(`The longest queue was ${busiest.maxQ} children, at the ${rideName(busiest).toLowerCase()}.`); ask = 'Would another ride help, or a bigger one? Where would you put it?'; }
+    if (this.noSeat > 3) { lines.push(`${this.noSeat} tired children could not find anywhere to sit down.`); ask = ask || 'Where could tired children sit down? Big steps or a garden bench?'; }
+    return { lines, ask };
   }
   next() {
     this.period++;
@@ -261,17 +325,16 @@ export class SchoolDay {
     g.activity = P.id;
     if (dest === 'play') {
       // Playtime: everyone scatters to something to play on (or the yard), and the teacher keeps an eye out.
-      const spots = this.places.filter(p => PLAY.has(p.type) || PLAY.has(p.b.shape));
       for (const k of [t, ...g.kids]) {
         if (k.seat) { k.seat.taken = false; k.seat = null; }
-        const to = k.teacher || !spots.length || this.r() < 0.25 ? 'yard' : spots[Math.floor(this.r() * spots.length)];
-        this.sendOne(k, to);
+        this.sendOne(k, k.teacher ? 'yard' : this.chooseFun(k));
+        k.again = 4 + this.r() * 4;
       }
       g.place = 'play'; g.together = false;
       return;
     }
     if (g.together && dest === g.place) return;
-    for (const k of [t, ...g.kids]) if (k.seat) { k.seat.taken = false; k.seat = null; }
+    for (const k of [t, ...g.kids]) { if (k.seat) { k.seat.taken = false; k.seat = null; } this.leaveQueue(k); }
     if (g.together) {
       // A crocodile: the teacher leads, the children follow the teacher's path two by two.
       t.path = this.plan(g.place, t, dest); t.pi = 0; t.mode = 'lead'; t.dest = dest;
@@ -291,12 +354,18 @@ export class SchoolDay {
     k.path = this.plan(from, k, target === 'gate' ? 'gate' : target, 0.5); k.pi = 0; k.mode = 'path'; k.dest = target; k.seat = null; k.at = null;
   }
   yardSquare() { return this.land[Math.floor(this.r() * this.land.length)]; }
+  leaveQueue(k) {
+    if (k.ride) { const i = k.ride.queue.indexOf(k); if (i >= 0) k.ride.queue.splice(i, 1); if (k.ride.busy === k) k.ride.busy = null; k.ride = null; }
+    if (k.hidden) { k.hidden = false; }
+  }
   // What a child does on arriving: find a seat, or wander about the place.
   arrive(k) {
     const d = k.dest; k.at = d; k.path = null;
     if (d === 'gate') { k.mode = 'wander'; k.zone = this.gateZone; k.tx = k.x; k.tz = k.z; return; }
     k.zone = d.zone;
-    if (!k.teacher && d.seats?.length && !['break'].includes(k.g.activity)) {
+    const playing = k.g.activity === 'break';
+    if (playing && !k.teacher && d.ride && d.queue.length < QUEUE_MAX) { d.queue.push(k); d.maxQ = Math.max(d.maxQ, d.queue.length); k.ride = d; k.mode = 'queue'; return; }
+    if (!k.teacher && d.seats?.length && (!playing || ((REST.has(d.type) || REST.has(d.b?.shape)) && k.needs.energy < 0.5))) {
       // The nearest free seat.
       let best = -1, bd = Infinity;
       d.seats.forEach((s, i) => { if (s.taken) return; const dd = Math.hypot(s[0] - k.x, s[2] - k.z); if (dd < bd) { bd = dd; best = i; } });
@@ -315,6 +384,12 @@ export class SchoolDay {
     }
     for (const g of this.groups) this.moveTeacher(g, dt);
     for (const k of this.agents) if (!k.teacher || k.mode !== 'lead') this.moveOne(k, dt);
+    for (const k of this.agents) {
+      const n = k.needs;
+      n.energy = Math.max(0, Math.min(1, n.energy + (k.moving ? (k.pose === 'run' ? -0.045 : -0.02) : k.mode === 'sit' ? 0.025 : 0.005) * dt));
+      n.fun = Math.max(0, n.fun - 0.003 * dt);
+      n.hunger = Math.max(0, Math.min(1, n.hunger + (k.g.activity === 'lunch' && k.mode === 'sit' ? -0.15 : 0.0025) * dt));
+    }
     this.separate(dt);
     this.wearPaths(dt);
     this.talk(dt);
@@ -370,6 +445,35 @@ export class SchoolDay {
         const w = k.path?.[k.pi];
         if (!w) { this.arrive(k); return; }
         if (this.stepTo(k, w.x, w.y, w.z, k.speed, dt, 0.025)) k.pi++;
+        // Passing something interesting, now and then a child stops to look at it.
+        if (!k.teacher && k.y < 0.06 && this.r() < 0.005 && this.agents.filter(a => a.mode === 'look').length < 3) {
+          const a = this.attractionNear(k);
+          if (a) { k.back = 'path'; k.mode = 'look'; k.lookT = 1.6; k.lookAt = a.type; k.yaw = Math.atan2(a.b.x + a.b.w / 2 - k.x, a.b.z + a.b.d / 2 - k.z); k.moving = false; this.bubble(k, LOOK[a.type]); }
+        }
+        return;
+      }
+      case 'look': { k.moving = false; k.lookT -= dt; if (k.lookT <= 0) k.mode = k.back || 'wander'; return; }
+      case 'queue': {
+        const p = k.ride, i = p ? p.queue.indexOf(k) : -1;
+        if (i < 0) { k.ride = null; k.zone = this.yard; k.mode = 'wander'; return; }
+        const [sx, sy, sz] = this.qslot(p, i), there = this.stepTo(k, sx, sy, sz, k.speed * 0.7, dt, 0.015);
+        if (!k.moving) k.yaw = Math.atan2(-p.q.dx, -p.q.dz);
+        if (there && i === 0 && !p.busy) {
+          // My go! (Out of sight on the ride, then out again at the side.)
+          p.busy = k; p.queue.shift(); p.goes++; k.mode = 'riding'; k.rideT = p.ride; k.hidden = true; k.moving = false;
+          const e = this.qexit(p); k.x = e[0]; k.y = e[1]; k.z = e[2];
+        }
+        return;
+      }
+      case 'riding': {
+        k.moving = false; k.rideT -= dt;
+        if (k.rideT <= 0) {
+          const p = k.ride; if (p && p.busy === k) p.busy = null;
+          k.hidden = false; k.ride = null; k.at = null; k.zone = this.yard; k.mode = 'wander'; [k.tx, k.tz] = this.crowd.pick(this.yard, this.r);
+          k.needs.fun = Math.min(1, k.needs.fun + 0.45); k.needs.energy = Math.max(0, k.needs.energy - 0.08);
+          k.wait = 0.6 + this.r(); k.again = 2 + this.r() * 3;
+          this.bubble(k, NEED_LINES.ride[Math.floor(this.r() * NEED_LINES.ride.length)]);
+        }
         return;
       }
       case 'toSeat': {
@@ -377,9 +481,19 @@ export class SchoolDay {
         if (this.stepTo(k, s[0], s[1], s[2], k.speed * 0.8, dt, 0.01)) { k.mode = 'sit'; k.x = s[0]; k.z = s[2]; k.y = s[1]; k.yaw = Math.atan2((k.zone.ox ?? k.x) - k.x, (k.zone.oz ?? k.z) - k.z); }
         return;
       }
-      case 'sit': k.pose = 'sit'; k.moving = false; return;
+      case 'sit': {
+        k.pose = 'sit'; k.moving = false;
+        // Rested at playtime: up and off to play.
+        if (k.g.activity === 'break' && !k.teacher && k.needs.energy > 0.85) { k.seat.taken = false; k.seat = null; this.sendOne(k, this.chooseFun(k)); k.again = 4 + this.r() * 4; }
+        return;
+      }
       case 'chat': { k.pose = 'walk'; k.moving = false; k.chatT -= dt; if (k.chatT <= 0) { k.mode = 'wander'; k.wait = 0.5; } return; }
       case 'wander': {
+        // At playtime, after a while, a child picks something else to do.
+        if (k.g.activity === 'break' && !k.teacher && (k.again = (k.again ?? 4) - dt) <= 0) {
+          const to = this.chooseFun(k); k.again = 3 + this.r() * 2;
+          if (to !== 'yard') { this.sendOne(k, to); return; }
+        }
         if (k.tx === undefined) [k.tx, k.tz] = this.crowd.pick(k.zone, this.r);
         if (this.stepTo(k, k.tx, k.zone.oy, k.tz, k.speed * (k.g.activity === 'break' ? 1.1 : 0.5), dt, 0.02)) {
           k.wait = 0.4 + this.r() * (k.g.activity === 'break' ? 1 : 2.5); [k.tx, k.tz] = this.crowd.pick(k.zone, this.r);
@@ -417,6 +531,14 @@ export class SchoolDay {
 
   // ---------- speech bubbles ----------
   lineFor(k) {
+    const n = k.needs, two = list => list[Math.floor(this.r() * list.length)];
+    if (k.mode === 'queue') return two(NEED_LINES.queue);
+    if (k.mode === 'look' && LOOK[k.lookAt]) return LOOK[k.lookAt];
+    if (n && !k.teacher && this.r() < 0.5) {
+      if (n.energy < 0.3) return two(NEED_LINES.tired);
+      if (n.hunger > 0.75 && k.g.activity !== 'lunch') return two(NEED_LINES.hungry);
+      if (n.fun > 0.85) return two(NEED_LINES.happy);
+    }
     const room = k.at && k.at !== 'gate' ? ROOM_LINES[k.at.type] || ROOM_LINES[k.at.b?.shape] : null;
     const list = room && this.r() < 0.6 ? room : LINES[k.g.activity] || LINES.chat;
     return list[Math.floor(this.r() * list.length)];
@@ -444,7 +566,7 @@ export class SchoolDay {
     if ((this.sayT -= dt) > 0) return;
     this.sayT = 0.9 + this.r() * 1.2;
     // Someone who is settled (sitting, playing or arriving) says something.
-    const pool = this.agents.filter(k => !k.teacher && ['sit', 'wander', 'follow'].includes(k.mode));
+    const pool = this.agents.filter(k => !k.teacher && !k.hidden && ['sit', 'wander', 'follow', 'queue'].includes(k.mode));
     if (!pool.length) return;
     const k = pool[Math.floor(this.r() * pool.length)];
     const s = this.world.toScreen(v3(k.x, k.y, k.z)), r = this.layer?.getBoundingClientRect();
@@ -455,7 +577,7 @@ export class SchoolDay {
   tap(cx, cy) {
     if (!this.running) return false;
     let best = null, bd = 34;
-    for (const k of this.agents) { const s = this.world.toScreen(v3(k.x, k.y + 0.15 * k.s, k.z)), d = Math.hypot(s.x - cx, s.y - cy); if (d < bd) { bd = d; best = k; } }
+    for (const k of this.agents) { if (k.hidden) continue; const s = this.world.toScreen(v3(k.x, k.y + 0.15 * k.s, k.z)), d = Math.hypot(s.x - cx, s.y - cy); if (d < bd) { bd = d; best = k; } }
     if (!best) return false;
     const old = this.bubbles.find(b => b.k === best);
     const line = old ? old.line : best.teacher ? [['🍎', 'Well done, everyone!'], ['🔔', 'This way, class!'], ['⭐', 'Super work!']][Math.floor(this.r() * 3)] : this.lineFor(best);

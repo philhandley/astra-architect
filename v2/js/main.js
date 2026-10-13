@@ -74,7 +74,7 @@ async function boot() {
   const guide = mountGuide(overlay, model, { site, wishes });
   const share = mountShare(overlay, model);
   if (shown) mountViewer(overlay);
-  site.hooks.dayDone = periods => guide.debrief(periods);
+  site.hooks.dayDone = (periods, facts) => guide.debrief(periods, facts);
   site.hooks.bigQuestion = () => guide.bigQuestion();
 
   function route() {

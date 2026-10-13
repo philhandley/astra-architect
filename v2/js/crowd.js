@@ -142,7 +142,7 @@ export class Crowd {
     else if (moving) { const a = kind === 'run' ? 0.9 : 0.55; legL = swing * a; legR = -swing * a; armL = -swing * a * 0.9; armR = swing * a * 0.9; y += Math.abs(Math.cos(p.walk || 0)) * (kind === 'run' ? 0.012 : 0.006); lean = kind === 'run' ? 0.18 : 0.04; }
     else { armL = Math.sin(t * 1.5 + p.ph) * 0.05; armR = -armL; }
     if (p.jumpT > 0) { p.jumpT -= dt; y += Math.abs(Math.sin(t * 9 + p.ph)) * 0.07; const wave = 2.7 + Math.sin(t * 14 + p.ph) * 0.25; outL = -wave; outR = wave; armL = armR = 0; }
-    const nr = this.near, hide = nr && Math.abs(p.y - nr.y) < 0.2 && Math.hypot(p.x - nr.x, p.z - nr.z) < nr.r;
+    const nr = this.near, hide = p.hidden || (nr && Math.abs(p.y - nr.y) < 0.2 && Math.hypot(p.x - nr.x, p.z - nr.z) < nr.r);
     q.setFromAxisAngle(up, p.yaw); v.set(p.x, y, p.z); s.setScalar(hide ? 1e-4 : p.s);
     base.compose(v, q, s);
     if (lean) base.multiply(rot.makeRotationX(lean));

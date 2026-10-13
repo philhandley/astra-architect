@@ -115,7 +115,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     const sq = model.squares(b), has = (x, z) => sq.some(([a, c]) => a === x && c === z), held = (x, z) => !!model.at(x, z, b.level - 1);
     const un = sq.filter(([x, z]) => !held(x, z));
     if (un.length < 2 || un.length === sq.length) return;
-    const cx = b.x + b.w / 2, cz = b.z + b.d / 2, y0 = yOf(b), parts = [], up = new THREE.Vector3(0, 1, 0);
+    const cx = b.x + b.w / 2, cz = b.z + b.d / 2, y0 = yOf(b), parts = [];
     for (const [x, z] of un) {
       // Which way the cantilever runs: towards the nearest held square of the same room.
       let bx = Infinity, bz = Infinity;
@@ -126,11 +126,13 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       const lx = x + 0.5 - cx, lz = z + 0.5 - cz, foot = yb - y0, drop = -foot;
       if (drop < 0.15) continue;
       // One V under each overhanging square: its foot in the middle, its arms up to the two edges of the slab.
-      const edge = (alongX ? b.d : b.w) / 2 - 0.04;
+      // Each arm is a vertical tube sheared over, so both its ends are level: the top is hidden inside the slab
+      // and the bottom inside the foot plate (a tube cut square to its axis shows an ellipse below the slab).
+      const edge = (alongX ? b.d : b.w) / 2 - 0.06, r = 0.045, h = drop - 0.012;
       for (const s of [-1, 1]) {
-        const ax = alongX ? 0 : s * edge, az = alongX ? s * edge : 0, len = Math.hypot(edge, drop);
-        const strut = new THREE.CylinderGeometry(0.034, 0.04, len, 10).translate(0, len / 2, 0);
-        strut.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, new THREE.Vector3(ax, drop, az).normalize())).translate(lx, foot, lz);
+        const ax = alongX ? 0 : s * edge, az = alongX ? s * edge : 0;
+        const strut = new THREE.CylinderGeometry(r, r, h, 12).translate(0, 0.02 + h / 2, 0);
+        strut.applyMatrix4(new THREE.Matrix4().set(1, ax / drop, 0, 0, 0, 1, 0, 0, 0, az / drop, 1, 0, 0, 0, 0, 1)).translate(lx, foot, lz);
         parts.push(strut);
       }
       parts.push(new THREE.CylinderGeometry(0.09, 0.1, 0.04, 14).translate(lx, foot + 0.02, lz));

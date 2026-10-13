@@ -2,8 +2,9 @@
 // They sit at tables, wander round rooms and roof terraces, run in the hall, swim, stroll across the meadow,
 // cheer, and in the school day walk from room to room.
 // Each body part is one instanced mesh, so a whole school of children stays fast. Parts that move together
-// (the body, head, face and hair; a leg and its shoe; an arm and its hand) share one set of matrices, and each
-// part's ink line shares the matrices of its part.
+// (the body, head and face; a leg and its shoe; an arm and its hand) share one set of matrices, and each part's
+// ink line shares the matrices of its part. Each hairstyle (and the bag) lists only the children who have it, so
+// nobody draws hair they aren't wearing.
 import * as THREE from 'three';
 import { HIP, SHOULDER, LEG_X, ARM_X, kidParts, kidLook, HAIR_PART, toon, KID_LINE, inkOf } from './kid.js';
 
@@ -12,7 +13,6 @@ export function seeded(seed) {
   let a = seed >>> 0;
   return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
-const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 const look = p => kidLook(Math.floor(p.ph * 1e6));
 // (Looks made elsewhere, like the teachers', may leave some of these out.)
 const LOOK_DEFAULTS = { shoes: '#fbfaf6', hat: '#e6463c', bag: null };
@@ -32,7 +32,7 @@ export class Crowd {
       legL: [P.leg, null, null, false, true], legR: [P.leg, null, null, false, true], shoeL: [P.shoe, null, 'legL', false, true], shoeR: [P.shoe, null, 'legR', false, true],
       armL: [P.arm, null, null, false, true], armR: [P.arm, null, null, false, true], handL: [P.hand, null, 'armL', false, true], handR: [P.hand, null, 'armR', false, true],
     };
-    this.meshes = {};
+    this.meshes = {}; this.inks = {};
     for (const [name, [geo, colour, share, shadow, ink]] of Object.entries(SPEC)) {
       const m = new THREE.InstancedMesh(geo, colour ? toon(colour) : tinted, MAX);
       if (share) m.instanceMatrix = this.meshes[share].instanceMatrix;
@@ -41,7 +41,7 @@ export class Crowd {
       if (ink) {
         const o = new THREE.InstancedMesh(inkOf(geo), KID_LINE, MAX);
         o.instanceMatrix = m.instanceMatrix; o.count = 0; o.frustumCulled = false; o.userData.people = true; o.raycast = () => {};
-        world.scene.add(o); this.all.push(o);
+        world.scene.add(o); this.all.push(o); this.inks[name] = o;
       }
     }
     // Which colour each instanced part takes from the child's look.
@@ -56,11 +56,21 @@ export class Crowd {
     world.updaters.add(dt => this.update(dt));
   }
   setCount(n) {
-    for (const m of this.all) m.count = n;
-    const c = new THREE.Color();
-    this.people.forEach((p, i) => {
+    const c = new THREE.Color(), counts = Object.fromEntries(HAIR_PART.map(h => [h, 0]));
+    let bags = 0;
+    // Each child's place in its hairstyle's list (p.hi) and, if it has one, in the list of bags (p.bi).
+    for (const p of this.people) {
       p.look = { ...LOOK_DEFAULTS, ...(p.look || look(p)) };
-      for (const [name, key] of Object.entries(this.colourOf)) this.meshes[name].setColorAt(i, c.set(p.look[key] || '#ffffff'));
+      p.hair = HAIR_PART[p.look.style | 0] || HAIR_PART[0]; p.hi = counts[p.hair]++;
+      p.bi = p.look.bag ? bags++ : -1;
+    }
+    const countOf = name => (name in counts ? counts[name] : name === 'hat' ? counts.capHair : name === 'bag' ? bags : n);
+    for (const [name, m] of Object.entries(this.meshes)) { m.count = countOf(name); if (this.inks[name]) this.inks[name].count = m.count; }
+    this.people.forEach((p, i) => {
+      for (const [name, key] of Object.entries(this.colourOf)) {
+        const j = name in counts ? (name === p.hair ? p.hi : -1) : name === 'hat' ? (p.hair === 'capHair' ? p.hi : -1) : name === 'bag' ? p.bi : i;
+        if (j >= 0) this.meshes[name].setColorAt(j, c.set(p.look[key] || '#ffffff'));
+      }
     });
     for (const name of Object.keys(this.colourOf)) if (this.meshes[name].instanceColor) this.meshes[name].instanceColor.needsUpdate = true;
   }
@@ -147,9 +157,8 @@ export class Crowd {
     base.compose(v, q, s);
     if (lean) base.multiply(rot.makeRotationX(lean));
     M.torso.setMatrixAt(i, base);         // also the head and face
-    const st = p.look ? p.look.style : 0;
-    HAIR_PART.forEach((name, k) => M[name].setMatrixAt(i, st === k ? base : ZERO));      // (the hat goes with the cap)
-    M.bag.setMatrixAt(i, p.look?.bag ? base : ZERO);
+    if (p.hair) M[p.hair].setMatrixAt(p.hi, base);      // (the hat goes with the cap)
+    if (p.bi >= 0) M.bag.setMatrixAt(p.bi, base);
     const limb = (mesh, x, yy, rx, rz) => { part.makeTranslation(x, yy, 0).multiply(rot.makeRotationFromEuler(e.set(rx, 0, rz))); mesh.setMatrixAt(i, part.premultiply(base)); };
     limb(M.legL, -LEG_X, HIP, legL, 0);
     limb(M.legR, LEG_X, HIP, legR, 0);

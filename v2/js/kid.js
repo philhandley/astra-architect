@@ -35,30 +35,30 @@ function join(list) {
   }
   return out;
 }
-const cap = (r, a0, a1, tilt, y = HEAD_Y + 0.002) => new THREE.SphereGeometry(r, 14, 7, 0, Math.PI * 2, a0, a1).rotateX(tilt).translate(0, y, -0.004);
+const cap = (r, a0, a1, tilt, y = HEAD_Y + 0.002) => new THREE.SphereGeometry(r, 12, 6, 0, Math.PI * 2, a0, a1).rotateX(tilt).translate(0, y, -0.004);
 let PARTS = null;
 export function kidParts() {
   if (PARTS) return PARTS;
   const prof = [[0, 0.058], [0.035, 0.058], [0.037, 0.064], [0.03, 0.118], [0.022, 0.135], [0.012, 0.142], [0, 0.142]].map(([r, y]) => new THREE.Vector2(r, y));
-  const eye = x => new THREE.SphereGeometry(0.0055, 6, 5).scale(0.75, 1.15, 0.5).translate(x, HEAD_Y - 0.002, R - 0.003);
+  const eye = x => new THREE.SphereGeometry(0.0055, 5, 4).scale(0.75, 1.15, 0.5).translate(x, HEAD_Y - 0.002, R - 0.003);
   PARTS = {
-    torso: new THREE.LatheGeometry(prof, 18),
-    head: new THREE.SphereGeometry(R, 16, 12).translate(0, HEAD_Y, 0),
+    torso: new THREE.LatheGeometry(prof, 14),
+    head: new THREE.SphereGeometry(R, 14, 10).translate(0, HEAD_Y, 0),
     eyes: join([eye(-0.015), eye(0.015)]),
     // One piece of hair for each style (only the child's own style is shown).
     bob: cap(R * 1.08, 0, Math.PI * 0.62, -0.3).scale(1.06, 1, 1.04),
-    quiff: join([cap(R * 1.05, 0, Math.PI * 0.46, -0.45), new THREE.SphereGeometry(R * 0.5, 10, 6).scale(1.2, 0.7, 1).rotateX(0.5).translate(0, HEAD_Y + R * 0.92, R * 0.35)]),
-    puff: new THREE.SphereGeometry(R * 1.18, 16, 12).translate(0, HEAD_Y + R * 0.3, -R * 0.2),
+    quiff: join([cap(R * 1.05, 0, Math.PI * 0.46, -0.45), new THREE.SphereGeometry(R * 0.5, 9, 5).scale(1.2, 0.7, 1).rotateX(0.5).translate(0, HEAD_Y + R * 0.92, R * 0.35)]),
+    puff: new THREE.SphereGeometry(R * 1.18, 13, 9).translate(0, HEAD_Y + R * 0.3, -R * 0.2),
     capHair: cap(R * 1.04, Math.PI * 0.38, Math.PI * 0.2, -0.4, HEAD_Y),
-    bunches: join([cap(R * 1.05, 0, Math.PI * 0.5, -0.4), ...[-1, 1].map(s => new THREE.SphereGeometry(R * 0.42, 10, 7).translate(s * R * 1.05, HEAD_Y + R * 0.15, -R * 0.2))]),
-    pony: join([cap(R * 1.05, 0, Math.PI * 0.5, -0.4), new THREE.SphereGeometry(R * 0.4, 10, 7).scale(0.8, 1.5, 0.8).rotateX(0.5).translate(0, HEAD_Y + R * 0.15, -R * 1.15)]),
-    hat: join([new THREE.SphereGeometry(R * 1.07, 16, 7, 0, Math.PI * 2, 0, Math.PI * 0.42).rotateX(-0.2).translate(0, HEAD_Y + 0.003, -0.002),
-      new THREE.CylinderGeometry(R * 0.75, R * 0.75, 0.005, 16, 1, false, -Math.PI / 2, Math.PI).scale(1, 1, 0.9).translate(0, HEAD_Y + R * 0.55, R * 0.62).rotateX(0.1)]),
-    leg: new THREE.CapsuleGeometry(0.0105, 0.026, 3, 8).translate(0, -0.02, 0),                     // hangs from the hip
-    shoe: new THREE.CapsuleGeometry(0.0105, 0.012, 3, 8).rotateX(Math.PI / 2).scale(1.05, 0.8, 1).translate(0, -0.048, 0.006),
-    arm: new THREE.CapsuleGeometry(0.009, 0.03, 3, 8).translate(0, -0.022, 0),                      // hangs from the shoulder
-    hand: new THREE.SphereGeometry(0.0095, 8, 6).translate(0, -0.05, 0),
-    bag: new RoundedBoxGeometry(0.046, 0.05, 0.022, 2, 0.01).translate(0, 0.104, -0.034),
+    bunches: join([cap(R * 1.05, 0, Math.PI * 0.5, -0.4), ...[-1, 1].map(s => new THREE.SphereGeometry(R * 0.42, 8, 6).translate(s * R * 1.05, HEAD_Y + R * 0.15, -R * 0.2))]),
+    pony: join([cap(R * 1.05, 0, Math.PI * 0.5, -0.4), new THREE.SphereGeometry(R * 0.4, 8, 6).scale(0.8, 1.5, 0.8).rotateX(0.5).translate(0, HEAD_Y + R * 0.15, -R * 1.15)]),
+    hat: join([new THREE.SphereGeometry(R * 1.07, 13, 6, 0, Math.PI * 2, 0, Math.PI * 0.42).rotateX(-0.2).translate(0, HEAD_Y + 0.003, -0.002),
+      new THREE.CylinderGeometry(R * 0.75, R * 0.75, 0.005, 10, 1, false, -Math.PI / 2, Math.PI).scale(1, 1, 0.9).translate(0, HEAD_Y + R * 0.55, R * 0.62).rotateX(0.1)]),
+    leg: new THREE.CapsuleGeometry(0.0105, 0.026, 2, 7).translate(0, -0.02, 0),                     // hangs from the hip
+    shoe: new THREE.CapsuleGeometry(0.0105, 0.012, 2, 7).rotateX(Math.PI / 2).scale(1.05, 0.8, 1).translate(0, -0.048, 0.006),
+    arm: new THREE.CapsuleGeometry(0.009, 0.03, 2, 7).translate(0, -0.022, 0),                      // hangs from the shoulder
+    hand: new THREE.SphereGeometry(0.0095, 7, 5).translate(0, -0.05, 0),
+    bag: new RoundedBoxGeometry(0.046, 0.05, 0.022, 1, 0.01).translate(0, 0.104, -0.034),
   };
   for (const g of Object.values(PARTS)) { g.deleteAttribute('uv'); g.userData.shared = true; }
   return PARTS;

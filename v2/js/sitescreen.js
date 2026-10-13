@@ -278,6 +278,9 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       if (o.userData.yspin) o.rotation.y += dt * o.userData.yspin;
       if (o.userData.swing) o.rotation.x = Math.sin(t * o.userData.swing.speed) * o.userData.swing.amp;
       if (o.userData.rock) o.rotation.z = Math.sin(t * o.userData.rock.speed) * o.userData.rock.amp;
+      // Moving parts inside rooms: joints that swing to and fro (wave) and parts that slide to and fro (glide).
+      const wv = o.userData.wave; if (wv) o.rotation[wv.axis] = wv.base + Math.sin(t * wv.speed + wv.phase) * wv.amp;
+      const gl = o.userData.glide; if (gl) o.position[gl.axis] = gl.base + Math.sin(t * gl.speed + gl.phase) * gl.amp;
       const zp = o.userData.zipline;
       if (zp) {
         // Zip down the cable (holding the bar), land, walk back along the side, climb the steps (out of sight), again.

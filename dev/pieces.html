@@ -57,6 +57,7 @@ if (SET === 'surfs') { items.length = 0; for (const s of SURFACES) for (const sh
 if (SET === 'wins') { items.length = 0; for (const w of WINDOWS) for (const shape of ['box', 'house', 'drum', 'vault']) items.push({ type: 'classroom', shape, w: 2, d: 1, h: 1, win: w.id }); }
 if (SET === 'colours') { items.length = 0; for (const c of PALETTE) for (const shape of ['house', 'box']) items.push({ type: 'classroom', shape, w: 1, d: 1, h: 1, colour: c.id }); }
 let id = 1;
+window.__tris = [];
 function cell(it) {
   const box = { id: id++, type: it.type, shape: it.shape, colour: it.colour || PROGRAMMES[it.type].colour, w: it.w, d: it.d, h: it.h, x: 0, z: 0, level: 0, win: it.win || WIN || undefined, surface: it.surface || SURF || undefined, rot: it.rot || 0 };
   const hex = colourHex(box.colour);
@@ -67,10 +68,12 @@ function cell(it) {
   } else g = buildPiece({ ...box, hex }, { open: true });
   scene.add(g);
   const bb = new THREE.Box3(); g.updateMatrixWorld(true); g.traverse(m => { if (m.isMesh && !m.userData.noInk) bb.expandByObject(m, false); }); const size = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
-  const f = Math.max(size.x, size.z) * 0.62 + size.y * 0.42 + 0.15;
+  const f = (Math.max(size.x, size.z) * 0.62 + size.y * 0.42 + 0.15) / +(q.get('zoom') || 1);
   const a = CW / CH; cam.left = -f * a; cam.right = f * a; cam.top = f; cam.bottom = -f; cam.updateProjectionMatrix();
   const turn = +(q.get('turn') || 0); const el = +(q.get('el') || 5.2); cam.position.set(c.x + 6 * Math.cos(turn) + 7.2 * Math.sin(turn), c.y + el, c.z + 7.2 * Math.cos(turn) - 6 * Math.sin(turn)); cam.lookAt(c.x, c.y, c.z);
   renderer.render(scene, cam);
+  let tris = 0; g.traverse(m => { if (m.isMesh && m.visible) tris += (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3 * (m.isInstancedMesh ? m.count : 1); });
+  it.tris = Math.round(tris); window.__tris.push({ name: PROGRAMMES[it.type].name + ' ' + it.shape, tris: it.tris });
   scene.remove(g);
 }
 const per = COLS * ROWS, sheets = [];
@@ -82,7 +85,7 @@ for (let s = 0; s * per < items.length; s++) {
     const cx = (i % COLS) * CW, cy = Math.floor(i / COLS) * CH;
     x.drawImage(renderer.domElement, cx, cy, CW, CH);
     x.fillStyle = 'rgba(255,255,255,0.85)'; x.fillRect(cx, cy, CW, 26);
-    x.fillStyle = '#222'; x.font = '600 15px system-ui'; x.fillText(`${PROGRAMMES[it.type].name} · ${it.shape} · ${it.w}×${it.d}×${it.h}${it.rot ? ' · turn ' + it.rot : ''}${it.surface ? ' · ' + it.surface : ''}${it.win ? ' · ' + it.win : ''}${it.colour ? ' · ' + it.colour : ''}`, cx + 8, cy + 18);
+    x.fillStyle = '#222'; x.font = '600 15px system-ui'; x.fillText(`${PROGRAMMES[it.type].name} · ${it.shape} · ${it.w}×${it.d}×${it.h}${it.rot ? ' · turn ' + it.rot : ''} · ${(it.tris / 1000).toFixed(1)}k▲${it.surface ? ' · ' + it.surface : ''}${it.win ? ' · ' + it.win : ''}${it.colour ? ' · ' + it.colour : ''}`, cx + 8, cy + 18);
     x.strokeStyle = '#fff'; x.lineWidth = 3; x.strokeRect(cx, cy, CW, CH);
   });
   document.body.append(cv); sheets.push(cv);

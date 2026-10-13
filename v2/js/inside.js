@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LEVEL } from './catalogue.js';
 import { mat, colonnade, courtyard, INK } from './shapes.js';
-import { Bag, FEATURES, PLANS, placeWallItems, seededRnd, wallTanks, waterTunnel, hangingPlanets, WALLS } from './furnish.js';
+import { Bag, FEATURES, PLANS, placeWallItems, seededRnd, wallTanks, waterTunnel, hangingPlanets, bunting } from './furnish.js';
 import { outline, roundedRect, wallRuns, openings, eachPiece, runAt, TALL, WALL_T } from './plan.js';
 export { outline } from './plan.js';
 
@@ -159,6 +159,7 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
   // Things on and against the walls first (clear of doors and windows), then loose furniture in the floor left.
   placeWallItems(bag, b, k, plan, rnd, placed, seats);
   if (opts.walk && b.shape === 'observatory') hangingPlanets(bag, opts.top);
+  if (opts.walk && ['classroom', 'ringhouse', 'art', 'lunch', 'music'].includes(b.type) && o.kind !== 'ring') bunting(bag, o, opts.top, rnd);
   for (const [kind, count] of plan) {
     const F = FEATURES[kind];
     if (!F) continue;

@@ -174,6 +174,16 @@ export const WALLS = {
     s.box(WHITE, 0.18, 0.066, 0.04, 0, 0.033, 0);
     for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) s.box(pickC(rnd), 0.036, 0.024, 0.006, -0.06 + c * 0.04, 0.018 + r * 0.03, 0.021);
     s.box(pickC(rnd), 0.03, 0.014, 0.022, -0.05, 0.073, -0.002); s.box(pickC(rnd), 0.03, 0.003, 0.022, 0.04, 0.0675, -0.004);
+    if (rnd() < 0.6) { s.cyl('#f0e2c0', 0.014, 0.004, 0.0, 0.068, 0, 0.012, 10); s.sphere('~#5ec4e2', 0.019, 0.0, 0.085, 0, 12); s.add(ORANGE, new THREE.SphereGeometry(0.006, 6, 4).scale(1.6, 1, 0.6).translate(0.002, 0.084, 0.003)); s.add(ORANGE, new THREE.ConeGeometry(0.004, 0.006, 4).rotateZ(Math.PI / 2).translate(-0.009, 0.084, 0.003)); }
+  } },
+  // An upright piano against the wall, with its stool.
+  piano: { w: 0.18, h: 0.13, d: 0.11, seat: [[0, 0.035]], make(s, rnd) {
+    const body = '#2b2d3a', z0 = -0.055;
+    s.box(body, 0.16, 0.13, 0.05, 0, 0.065, z0 + 0.025); s.box(pickC(rnd), 0.162, 0.008, 0.052, 0, 0.126, z0 + 0.025);
+    s.box(body, 0.152, 0.012, 0.03, 0, 0.074, z0 + 0.065); s.box(PAPER, 0.144, 0.004, 0.024, 0, 0.082, z0 + 0.066);
+    for (let i = 0; i < 10; i++) if (i % 7 !== 2 && i % 7 !== 6) s.box('#1d1f24', 0.006, 0.004, 0.012, -0.063 + i * 0.014, 0.085, z0 + 0.06);
+    s.box(PAPER, 0.05, 0.035, 0.003, 0.02, 0.105, z0 + 0.052); s.box(body, 0.006, 0.07, 0.012, -0.073, 0.035, z0 + 0.06); s.box(body, 0.006, 0.07, 0.012, 0.073, 0.035, z0 + 0.06);
+    s.cyl(DARK, 0.018, 0.006, 0, 0.047, 0.035); s.cyl(DARK, 0.005, 0.044, 0, 0.022, 0.035, 0.008, 8);
   } },
   // A low bookcase full of books (against the wall).
   books: { w: 0.21, h: 0.16, d: 0.05, make(s, rnd) {
@@ -187,9 +197,9 @@ export const WALLS = {
     }
   } },
   // Wooden climbing bars (against the wall, in a hall).
-  wallbars: { w: 0.22, h: 0.25, d: 0.03, make(s) {
-    for (const x of [-0.1, -0.033, 0.033, 0.1]) s.box(WOOD, 0.012, 0.25, 0.02, x, 0.125, 0);
-    for (let i = 0; i < 9; i++) s.add('#e8cfa4', new THREE.CylinderGeometry(0.004, 0.004, 0.2, 6).rotateZ(Math.PI / 2).translate(0, 0.02 + i * 0.026, 0.002));
+  wallbars: { w: 0.12, h: 0.25, d: 0.03, make(s) {
+    for (const x of [-0.052, 0.052]) s.box(WOOD, 0.012, 0.25, 0.02, x, 0.125, 0);
+    for (let i = 0; i < 9; i++) s.add('#e8cfa4', new THREE.CylinderGeometry(0.004, 0.004, 0.1, 6).rotateZ(Math.PI / 2).translate(0, 0.02 + i * 0.026, 0.002));
   } },
   // A drying rack of paintings (against the wall, in the art room).
   rack: { w: 0.14, h: 0.15, d: 0.06, make(s, rnd) {
@@ -513,6 +523,120 @@ export const FEATURES = {
       });
     });
     return []; } },
+  // ---- the music room ----
+  // A drum kit: a big drum on its side, two drums on top, a drum and two cymbals on stands, and a stool.
+  drums: { r: 0.1, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28), col = [RED, '#3d8de0', '#7c46a8', ORANGE][Math.floor(rnd() * 4)];
+    bag.within(m, s => {
+      s.add(col, new THREE.CylinderGeometry(0.034, 0.034, 0.03, 16).rotateX(Math.PI / 2).translate(0, 0.036, 0.01));
+      s.add(PAPER, new THREE.CircleGeometry(0.03, 16).translate(0, 0.036, 0.0251)); s.add(PAPER, new THREE.CircleGeometry(0.03, 16).rotateY(Math.PI).translate(0, 0.036, -0.0051));
+      for (const sx of [-0.019, 0.019]) { s.add(col, new THREE.CylinderGeometry(0.015, 0.015, 0.016, 12).rotateX(0.35).translate(sx, 0.08, 0.004)); s.add(PAPER, new THREE.CylinderGeometry(0.0145, 0.0145, 0.002, 12).rotateX(0.35).translate(sx, 0.087, 0.0065)); }
+      s.cyl(STEEL, 0.002, 0.065, 0.058, 0.0325, -0.01, 0.002, 4); s.cyl(col, 0.018, 0.012, 0.058, 0.07, -0.01); s.cyl(PAPER, 0.0175, 0.002, 0.058, 0.077, -0.01);
+      for (const [cx, cy] of [[-0.06, 0.1], [0.045, 0.115]]) { s.cyl(STEEL, 0.0018, cy, cx, cy / 2, -0.03, 0.0018, 4); s.cyl(GOLD, 0.024, 0.002, cx, cy, -0.03, 0.006, 14); }
+      s.cyl(DARK, 0.016, 0.006, 0, 0.045, -0.06); s.cyl(DARK, 0.004, 0.042, 0, 0.021, -0.06, 0.008, 6);
+    });
+    return [at(m, 0, -0.06)]; } },
+  // A xylophone: rainbow bars on a wooden frame, and two beaters.
+  xylophone: { r: 0.065, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28);
+    bag.within(m, s => {
+      for (const sz of [-0.022, 0.022]) s.add(WOOD, new THREE.BoxGeometry(0.11, 0.008, 0.008).rotateY(sz > 0 ? 0.12 : -0.12).translate(0, 0.05, sz));
+      for (const [lx, lz] of [[-0.05, -0.028], [0.05, -0.016], [-0.05, 0.028], [0.05, 0.016]]) s.box(WOOD, 0.006, 0.046, 0.006, lx, 0.023, lz);
+      for (let i = 0; i < 8; i++) { const len = 0.07 - i * 0.004; s.box(RAINBOW[i], 0.01, 0.005, len, -0.043 + i * 0.0123, 0.0565, 0); }
+      for (const sz of [-0.01, 0.012]) { s.add(WOOD, new THREE.CylinderGeometry(0.0015, 0.0015, 0.05, 4).rotateZ(Math.PI / 2).rotateY(sz * 20).translate(0.035, 0.062, sz + 0.03)); s.sphere(RED, 0.005, 0.01, 0.062, sz + 0.03 - 0.004, 6); }
+    });
+    return [at(m, 0, -0.07), at(m, 0, 0.07)]; } },
+
+  // ---- the hall ----
+  // A rainbow play parachute spread on the floor, with children all round it.
+  parachute: { r: 0.19, make(bag, x, z, c, rnd) {
+    const r = 0.16, rot = rnd() * 6;
+    for (let i = 0; i < 12; i++) bag.floor(RAINBOW[i % 8], new THREE.CircleGeometry(r, 3, rot + (i / 12) * Math.PI * 2, Math.PI * 2 / 12), x, 0.003, z);
+    bag.floor(PAPER, new THREE.CircleGeometry(0.025, 12), x, 0.0034, z);
+    const seats = []; for (let i = 0; i < 8; i++) { const a = rot + (i / 8) * Math.PI * 2; seats.push([x + Math.cos(a) * (r + 0.015), z - Math.sin(a) * (r + 0.015)]); }
+    return seats; } },
+  // A thick blue gym mat.
+  gymmat: { r: 0.1, make(bag, x, z, c, rnd) { const rot = rnd() * 6.28; bag.add('#3d8de0', new THREE.BoxGeometry(0.1, 0.016, 0.17).rotateY(rot).translate(x, 0.008, z)); bag.add('#6aa8ec', new THREE.BoxGeometry(0.084, 0.002, 0.154).rotateY(rot).translate(x, 0.017, z)); return [[x, z]]; } },
+  // A wooden climbing frame: two A-frames joined by rungs, with a slide board hooked on one side.
+  climbframe: { r: 0.15, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28), H = 0.17, half = 0.07;
+    bag.within(m, s => {
+      for (const sx of [-0.06, 0.06]) for (const sg of [-1, 1]) s.add(WOOD, new THREE.BoxGeometry(0.01, Math.hypot(H, half), 0.012).rotateX(-sg * Math.atan2(half, H)).translate(sx, H / 2, sg * half / 2));
+      for (let i = 1; i < 7; i++) { const y = i * H / 7, zz = half * (1 - y / H); for (const sg of [-1, 1]) s.add('#e8cfa4', new THREE.CylinderGeometry(0.0035, 0.0035, 0.12, 6).rotateZ(Math.PI / 2).translate(0, y, sg * zz)); }
+      s.add('#e8cfa4', new THREE.CylinderGeometry(0.005, 0.005, 0.13, 6).rotateZ(Math.PI / 2).translate(0, H, 0));
+      s.add(pickC(rnd), new THREE.BoxGeometry(0.07, 0.006, 0.19).rotateX(0.73).translate(0, 0.068, 0.11));
+    });
+    return [at(m, 0, -0.12)]; } },
+  // Big soft foam shapes to build and climb: a wedge, steps, a roll and a cube.
+  softplay: { r: 0.13, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28);
+    bag.within(m, s => {
+      const wedge = new THREE.Shape(); wedge.moveTo(0, 0); wedge.lineTo(0.1, 0); wedge.lineTo(0, 0.05); wedge.closePath();
+      s.add(RAINBOW[0], new THREE.ExtrudeGeometry(wedge, { depth: 0.07, bevelEnabled: false }).translate(-0.12, 0, -0.035));
+      s.box(RAINBOW[2], 0.05, 0.05, 0.07, -0.045, 0.025, 0); s.box(RAINBOW[4], 0.05, 0.025, 0.07, 0.005, 0.0125, 0);
+      s.add(RAINBOW[5], new THREE.CylinderGeometry(0.025, 0.025, 0.08, 14).rotateX(Math.PI / 2).translate(0.07, 0.025, -0.03));
+      s.box(RAINBOW[7], 0.045, 0.045, 0.045, 0.07, 0.0225, 0.05);
+    });
+    return [at(m, -0.045, 0.06), at(m, 0.07, 0.1)]; } },
+  // A vaulting box: wooden layers and a soft red top.
+  vault: { r: 0.075, make(bag, x, z, c, rnd) {
+    const rot = rnd() * 6.28;
+    for (let i = 0; i < 4; i++) bag.add(i % 2 ? '#c9975f' : WOOD, new THREE.BoxGeometry(0.13 - i * 0.008, 0.024, 0.07 - i * 0.004).rotateY(rot).translate(x, 0.012 + i * 0.024, z));
+    bag.add(RED, new THREE.BoxGeometry(0.1, 0.012, 0.056).rotateY(rot).translate(x, 0.102, z));
+    return []; } },
+  // A basket heaped with balls.
+  balls: { r: 0.06, make(bag, x, z, c, rnd) {
+    bag.cyl(STEEL, 0.04, 0.035, x, 0.0175, z, 0.036, 12); bag.cyl('#e9e4da', 0.036, 0.002, x, 0.034, z, 0.036, 12);
+    for (let i = 0; i < 7; i++) { const a = i * 0.9, rr = i ? 0.02 : 0; bag.sphere(RAINBOW[(i * 3) % 8], 0.013, x + Math.cos(a) * rr, 0.045 + (i ? 0 : 0.012), z + Math.sin(a) * rr, 8); }
+    bag.sphere(ORANGE, 0.013, x + 0.06, 0.013, z + 0.02, 8);
+    return []; } },
+  // A long, low PE bench.
+  bench: { r: 0.14, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28);
+    bag.within(m, s => { s.box(WOOD, 0.26, 0.012, 0.04, 0, 0.045, 0); for (const sx of [-0.1, 0.1]) { s.box(STEEL, 0.008, 0.039, 0.036, sx, 0.0195, 0); } s.box('#c9975f', 0.24, 0.006, 0.012, 0, 0.012, 0); });
+    return [at(m, -0.08, 0), at(m, 0, 0), at(m, 0.08, 0)]; } },
+  // Little orange cones and a rope ladder on the floor, for races.
+  cones: { r: 0.13, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28);
+    bag.within(m, s => {
+      for (let i = 0; i < 4; i++) { s.cyl(ORANGE, 0.0015, 0.026, -0.09 + i * 0.06, 0.013, -0.03, 0.011, 8); s.cyl(ORANGE, 0.014, 0.002, -0.09 + i * 0.06, 0.001, -0.03, 0.014, 8); }
+      for (const sz of [0.02, 0.05]) s.box('#f7c22e', 0.24, 0.002, 0.004, 0, 0.001, sz);
+      for (let i = 0; i < 7; i++) s.box('#f7c22e', 0.004, 0.0022, 0.03, -0.11 + i * 0.037, 0.0011, 0.035);
+    });
+    return []; } },
+
+  // ---- the lunch hall ----
+  // A water fountain with cups.
+  water: { r: 0.045, make(bag, x, z, c, rnd) {
+    bag.box(WHITE, 0.034, 0.064, 0.034, x, 0.032, z); bag.cyl('~#8fd3f4', 0.014, 0.032, x, 0.082, z, 0.014, 10); bag.cyl('#3d8de0', 0.006, 0.006, x, 0.1, z, 0.006, 8);
+    for (let i = 0; i < 3; i++) bag.cyl(PAPER, 0.004, 0.008, x + 0.006 * i - 0.006, 0.068, z + 0.012, 0.003, 6);
+    return []; } },
+  // Three bins for recycling: paper, plastic and food.
+  bins: { r: 0.06, make(bag, x, z, c, rnd) {
+    const rot = rnd() * 6.28;
+    ['#3d8de0', '#f7c22e', '#7db45a'].forEach((col, i) => { const bx = x + Math.cos(rot) * (i - 1) * 0.036, bz = z - Math.sin(rot) * (i - 1) * 0.036; bag.cyl(col, 0.016, 0.05, bx, 0.025, bz, 0.014, 10); bag.cyl(PAPER, 0.0165, 0.006, bx, 0.053, bz, 0.0165, 10); });
+    return []; } },
+
+  // ---- the library ----
+  // A big story chair with a cushion, and a lamp on a little table beside it.
+  storychair: { r: 0.09, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28), col = pickC(rnd);
+    bag.within(m, s => {
+      s.box(col, 0.09, 0.035, 0.075, 0, 0.0175, 0); s.box(col, 0.09, 0.08, 0.02, 0, 0.055, -0.03);
+      for (const sx of [-0.04, 0.04]) s.box(col, 0.016, 0.06, 0.075, sx, 0.03, 0);
+      s.box(PAPER, 0.06, 0.012, 0.05, 0, 0.041, 0.005); s.ball(pickC(rnd), 0.02, -0.02, 0.047, -0.012);
+      s.cyl(WOOD, 0.018, 0.004, 0.075, 0.05, -0.01); s.cyl(WOOD, 0.003, 0.05, 0.075, 0.025, -0.01, 0.003, 6);
+      s.cyl(DARK, 0.002, 0.04, 0.075, 0.072, -0.01, 0.002, 4); s.cyl('*#ffe7a3', 0.009, 0.014, 0.075, 0.095, -0.01, 0.016, 10);
+      s.box(RAINBOW[Math.floor(rnd() * 8)], 0.02, 0.006, 0.026, 0.075, 0.055, -0.01);
+    });
+    return [at(m, 0, 0.005)]; } },
+  // A globe on a stand.
+  globe: { r: 0.045, make(bag, x, z, c, rnd) {
+    bag.cyl(WOOD, 0.02, 0.006, x, 0.003, z, 0.024, 10); bag.cyl(WOOD, 0.004, 0.06, x, 0.033, z, 0.004, 6);
+    bag.sphere('#3d8de0', 0.03, x, 0.09, z, 12);
+    for (let i = 0; i < 5; i++) { const a = rnd() * 6.28, e = (rnd() - 0.5) * 1.4; bag.sphere('#7db45a', 0.011 + rnd() * 0.007, x + Math.cos(a) * Math.cos(e) * 0.025, 0.09 + Math.sin(e) * 0.025, z + Math.sin(a) * Math.cos(e) * 0.025, 6); }
+    bag.add(GOLD, new THREE.TorusGeometry(0.034, 0.002, 3, 16, Math.PI).rotateZ(-0.4 + Math.PI / 2).translate(x, 0.09, z));
+    return []; } },
   // A sculpture on a plinth.
   sculpture: { r: 0.06, make(bag, x, z, c, rnd) {
     bag.box(WHITE, 0.06, 0.07, 0.06, x, 0.035, z);
@@ -645,6 +769,20 @@ export function waterTunnel(bag, o, top, rnd) {
   }
 }
 
+// Walking: strings of rainbow bunting across the ceiling, corner to corner.
+export function bunting(bag, o, top, rnd) {
+  const W = o.W / 2 - 0.12, D = o.D / 2 - 0.12, y = top - 0.05;
+  if (W < 0.1 || D < 0.1) return;
+  for (const [x0, z0, x1, z1] of [[-W, -D, W, D], [-W, D, W, -D]]) {
+    if (!o.inside(x0, z0, 0.04) || !o.inside(x1, z1, 0.04)) continue;
+    const len = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(z1 - z0, x1 - x0), sag = 0.035, n = Math.floor(len / 0.045), c0 = Math.floor(rnd() * 8);
+    const pts = []; for (let i = 0; i <= 12; i++) { const t = i / 12; pts.push(new THREE.Vector3(x0 + (x1 - x0) * t, y - Math.sin(t * Math.PI) * sag, z0 + (z1 - z0) * t)); }
+    bag.tube('#e8e4da', pts, 0.0012, 24, 3);
+    const flag = new THREE.Shape(); flag.moveTo(-0.014, 0); flag.lineTo(0.014, 0); flag.lineTo(0, -0.03); flag.closePath();
+    for (let i = 1; i < n; i++) { const t = i / n; bag.add(RAINBOW[(c0 + i) % 8], new THREE.ExtrudeGeometry(flag, { depth: 0.001, bevelEnabled: false }).rotateY(-a).translate(x0 + (x1 - x0) * t, y - Math.sin(t * Math.PI) * sag, z0 + (z1 - z0) * t)); }
+  }
+}
+
 // The observatory, walking: planets hanging in the dome on long strings, turning slowly over your head.
 export function hangingPlanets(bag, top) {
   const mobile = partGroup(p => {
@@ -661,15 +799,15 @@ export function hangingPlanets(bag, top) {
 // What goes in each kind of room (piece, how many), by floor area in blocks. Wall pieces (WALLS) go up first.
 export const PLANS = {
   classroom: A => [['cubbies', 1], ['pinboard', 1 + Math.floor(A / 2)], ['art', 1], ['frieze', A >= 2 ? 1 : 0], ['books', A >= 2 ? 1 : 0],
-    ['rug', 1], ['roundTable', Math.max(2, Math.round(A * 1.6))], ['kidney', A >= 2 ? 1 : 0], ['mountain', A >= 2 ? 1 : 0], ['cave', A >= 3 ? 1 : 0], ['beanbag', A + 1], ['plant', A + 1]],
+    ['rug', 1], ['roundTable', Math.max(2, Math.round(A * 1.6))], ['artwall', A >= 2 ? 1 : 0], ['kidney', A >= 2 ? 1 : 0], ['mountain', A >= 2 ? 1 : 0], ['cave', A >= 3 ? 1 : 0], ['beanbag', A + 1], ['plant', A + 1]],
   ringhouse: A => PLANS.classroom(A),
   treehouse: A => [['rug', 1], ['beanbag', 2]],
-  hall: A => [['trampoline', Math.max(1, Math.round(A / 3))], ['mats', A * 2], ['hoop', 1], ['sofa', A >= 4 ? 1 : 0], ['beanbag', A]],
-  library: A => [['books', 2 + A], ['shelf', Math.max(1, A - 1)], ['tree', A >= 2 ? 1 : 0], ['cave', 1], ['beanbag', A * 2 + 1], ['rug', 1], ['plant', A]],
-  lunch: A => [['lunchTable', Math.max(2, A * 2)], ['counter', 1], ['plant', A]],
+  hall: A => [['wallbars', 3], ['parachute', 1], ['climbframe', 1], ['softplay', A >= 4 ? 1 : 0], ['trampoline', A >= 4 ? 1 : 0], ['gymmat', Math.max(2, Math.round(A / 2))], ['vault', 1], ['balls', 1], ['bench', A >= 4 ? 2 : 1], ['hoop', 1], ['cones', A >= 4 ? 1 : 0], ['beanbag', Math.round(A / 3)]],
+  library: A => [['books', 2 + A], ['shelf', Math.max(1, A - 1)], ['storychair', 1], ['tree', A >= 2 ? 1 : 0], ['cave', 1], ['globe', 1], ['beanbag', A * 2], ['rug', 1], ['plant', A]],
+  lunch: A => [['servery', 1], ['art', 1], ['lunchTable', Math.max(2, A * 2)], ['water', 1], ['bins', 1], ['plant', A]],
   art: A => [['rack', 1], ['art', 2 + A], ['painttable', Math.max(1, A)], ['artwall', 1], ['easel', A + 1], ['sculpture', A >= 2 ? 1 : 0], ['plant', 1]],
   maker: A => [['pegboard', 1 + Math.floor(A / 2)], ['cubbies', 1], ['printers', 1], ['robot', 1], ['workbench', A >= 2 ? 1 : 0], ['rover', A >= 2 ? 1 : 0], ['cardrocket', 1], ['kidney', A >= 3 ? 1 : 0], ['plant', 1]],
-  music: A => [['guitars', 1], ['art', 1], ['stage', 1], ['beanbag', A + 2], ['plant', 1]],
+  music: A => [['guitars', 1], ['piano', 1], ['art', 1], ['drums', 1], ['xylophone', 1], ['stage', A >= 2 ? 1 : 0], ['beanbag', A + 1], ['plant', 1]],
   yoga: A => [['rug', 1], ['yogamat', 3 + A * 2], ['plant', 2]],
   aquarium: A => [['tank', A >= 2 ? Math.min(3, A - 1) : 1], ['jelly', A >= 3 ? 1 : 0], ['beanbag', Math.max(1, A - 1)], ['plant', 1]],
   archway: A => [],

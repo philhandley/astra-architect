@@ -273,3 +273,19 @@ svg.ic.big { width: 34px; height: 34px; }
   .plan-key li { grid-template-columns: 3.8mm 1fr auto; gap: 1.4mm; margin-bottom: 0.8mm; }
   .plan-key em { font-size: 6pt; }
 }
+
+/* Show and tell: the link card in the builder, and the look-only viewer a link opens. */
+.share-text { font-size: 16px; line-height: 1.45; color: var(--ink-2); margin: 12px 0; }
+.share-link { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; padding: 12px 14px; border: 2px solid var(--line); border-radius: 14px; background: var(--paper-2); color: var(--ink); margin-bottom: 14px; }
+.view-card { width: min(640px, 100%); }
+.view-go { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
+.view-go .fbtn { justify-content: center; }
+.view-tag { display: none; align-items: center; gap: 6px; font-weight: 700; color: var(--ink-3); font-size: 14px; margin-left: auto; }
+.view-tag .ic { width: 20px; height: 20px; }
+.shell.viewer .view-tag { display: flex; }
+.shell.viewer .tabs, .shell.viewer .acts [data-a="wishes"], .shell.viewer .acts [data-a="finn"], .shell.viewer .acts [data-a="clear"], .shell.viewer .acts [data-a="reset"], .shell.viewer .acts [data-a="share"] { display: none !important; }
+.site-ui.viewer .tray, .site-ui.viewer .side [data-a="undo"], .site-ui.viewer .side [data-a="grow"] { display: none !important; }
+.site-ui.viewer .hint { max-width: min(640px, calc(100% - 300px)); }
+/* (With Share in the top bar, the buttons sit a little closer so all of them fit on the tablet.) */
+.acts { gap: 6px; }
+.acts .ab:not(.round) { padding: 0 12px; }

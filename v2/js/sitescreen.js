@@ -15,8 +15,9 @@ import { WHY } from './model.js';
 import { icon, winSwatch } from './icons.js';
 import { h, esc, emo, say, sfx, toast } from './ui.js';
 
-export function mountSite(root, world, model, siteView, thumbs) {
-  const ui = h(`<div class="site-ui">
+// viewer: opened from a show-and-tell link, so you can look round, go inside and walk, but not build or change.
+export function mountSite(root, world, model, siteView, thumbs, { viewer = false } = {}) {
+  const ui = h(`<div class="site-ui ${viewer ? 'viewer' : ''}">
     <aside class="tray"><div class="tray-in"></div></aside>
     <div class="side">
       <button class="sbtn" data-a="undo" aria-label="Undo">${icon('undo')}<span>Undo</span></button>
@@ -79,6 +80,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
   hint.querySelector('.hint-say').addEventListener('click', () => { sfx.tap(); say(hintText.textContent); });
   function defaultHint() {
     if (S.inside) return setHint('Inside the school! Choose a floor at the bottom.');
+    if (viewer) return setHint('Finn designed this school. Tap a room to hear what it is.');
     if (S.tool) return setHint(`${emo(PROGRAMMES[S.tool].emoji)} Tap a square to build a ${esc(PROGRAMMES[S.tool].name.toLowerCase())}. Tap on top of a room to stack it.`);
     setHint(model.boxes.length ? 'Tap a room to change it, or choose a room on the left to build.' : 'Choose a room on the left, then tap the grid.');
   }
@@ -779,7 +781,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
 
   function handleTap(x, y) {
     if (S.day && day.tap(x, y)) return;
-    if (S.inside) { const b = boxAt(x, y); if (b) { say(PROGRAMMES[b.type].name); cheer(b); } return; }
+    if (S.inside || viewer) { const b = boxAt(x, y); if (b) { say(PROGRAMMES[b.type].name); cheer(b); } return; }
     if (S.tool) { const t = target(x, y); if (t) place(t); return; }
     const b = boxAt(x, y);
     if (b) { if (b.id === S.selected) select(null); else select(b.id); }

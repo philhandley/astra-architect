@@ -7,7 +7,9 @@ const KEY = 'astraarch2';
 const k3 = (x, z, l) => `${x},${z},${l}`;
 
 export class Model {
-  constructor() {
+  // shown: a design from a show-and-tell link, to look at but not change (and never saved over the one kept here).
+  constructor(shown = null) {
+    this.readOnly = !!shown;
     this.boxes = [];
     this.nextId = 1;
     this.styles = {};            // programme -> { shape, colour } chosen in the Rooms area
@@ -15,7 +17,7 @@ export class Model {
     this.pad = { w: 0, e: 0, n: 0, s: 0 };   // squares of new land added round the site with the green arrows
     this.history = [];
     this.listeners = new Set();
-    this.load();
+    if (shown) { this.boxes = shown.boxes; this.nextId = shown.boxes.length + 1; this.pad = shown.pad; this.grown = shown.grown; } else this.load();
     this.reindex();
   }
 
@@ -26,7 +28,7 @@ export class Model {
       if (s) { this.boxes = s.boxes || []; this.nextId = s.nextId || 1; this.styles = s.styles || {}; this.grown = s.grown || []; this.pad = { w: 0, e: 0, n: 0, s: 0, ...(s.pad || {}) }; }
     } catch (e) { /* a fresh start */ }
   }
-  save() { try { localStorage.setItem(KEY, JSON.stringify({ boxes: this.boxes, nextId: this.nextId, styles: this.styles, grown: this.grown, pad: this.pad })); } catch (e) { /* storage full or blocked */ } }
+  save() { if (this.readOnly) return; try { localStorage.setItem(KEY, JSON.stringify({ boxes: this.boxes, nextId: this.nextId, styles: this.styles, grown: this.grown, pad: this.pad })); } catch (e) { /* storage full or blocked */ } }
   onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
   changed(what = {}) { this.reindex(); this.save(); for (const fn of this.listeners) fn(what); }
   snapshot() { this.history.push(JSON.stringify(this.boxes)); if (this.history.length > 80) this.history.shift(); }

@@ -9,6 +9,7 @@ import { h, emo, say, hush, sfx, toast, speechOn, setSpeech, soundOn, setSound }
 import { icon, MARK } from './icons.js';
 import { mountWishes } from './wishes.js';
 import { mountGuide } from './guide.js';
+import { mountShare, mountViewer, unpackDesign, shownCode } from './share.js';
 
 // Finn's wooden-block model from the photos: green classrooms along the beach, orange bars round the meadow,
 // a blue pool in the middle, a ring of green curves and an orange drum by the waterfall.
@@ -36,13 +37,18 @@ const FINNS_MODEL = [
 
 async function boot() {
   const app = document.getElementById('app');
-  const shell = h(`<div class="shell">
+  // Show and tell: a link with ?show= in it opens that design just to look round (see share.js).
+  let shown = null;
+  if (shownCode()) { try { shown = await unpackDesign(shownCode()); } catch (e) { setTimeout(() => toast('That show-and-tell link did not work.'), 600); } }
+  const shell = h(`<div class="shell ${shown ? 'viewer' : ''}">
     <header class="top">
       <div class="brand">${MARK}<div><small>Astra Architect</small><b>Finn's Dream School</b></div></div>
       <nav class="tabs"><button data-go="rooms" type="button">${icon('rooms')} Rooms</button><button data-go="site" type="button">${icon('site')} Site</button></nav>
+      <span class="view-tag">${icon('inside')} Show and tell: just looking</span>
       <div class="acts">
         <button class="ab wishbtn" data-a="wishes" type="button"></button>
         <button class="ab" data-a="photo" type="button">${icon('camera')} Photo</button>
+        <button class="ab" data-a="share" type="button">${icon('share')} Share</button>
         <button class="ab" data-a="finn" type="button">${icon('blocks')} Finn's model</button>
         <button class="ab" data-a="clear" type="button">${icon('leaf')} Empty site</button>
         <button class="ab" data-a="reset" type="button">${icon('undo')} Reset site</button>
@@ -55,21 +61,24 @@ async function boot() {
   app.appendChild(shell);
   const worldHost = shell.querySelector('.world'), overlay = shell.querySelector('.overlay'), roomsHost = shell.querySelector('.rooms-host');
 
-  const model = new Model();
+  const model = new Model(shown);
   await loadSite(model.pad);
   const world = new World(worldHost);
   const siteView = buildSite(world);
   const thumbs = trayThumbs(model);
-  const site = mountSite(overlay, world, model, siteView, thumbs);
+  const site = mountSite(overlay, world, model, siteView, thumbs, { viewer: !!shown });
   const rooms = mountRooms(roomsHost, model, { thumbs, onBuild: id => { location.hash = '#site'; setTimeout(() => site.setTool(id), 50); } });
   model.onChange(w => { if (w.style) site.refreshTray(); });
-  const wishes = mountWishes(shell.querySelector('.stage'), model, { button: shell.querySelector('.wishbtn'), celebrate: () => { if (location.hash !== '#rooms') site.celebrate(); } });
+  // (Someone just looking can't earn Finn's stickers, and nothing of theirs is saved.)
+  const wishes = shown ? { award() {}, addStar() {} } : mountWishes(shell.querySelector('.stage'), model, { button: shell.querySelector('.wishbtn'), celebrate: () => { if (location.hash !== '#rooms') site.celebrate(); } });
   const guide = mountGuide(overlay, model, { site, wishes });
+  const share = mountShare(overlay, model);
+  if (shown) mountViewer(overlay);
   site.hooks.dayDone = periods => guide.debrief(periods);
   site.hooks.bigQuestion = () => guide.bigQuestion();
 
   function route() {
-    const r = location.hash === '#rooms' ? 'rooms' : 'site';
+    const r = location.hash === '#rooms' && !shown ? 'rooms' : 'site';
     hush();
     shell.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.go === r));
     roomsHost.hidden = r !== 'rooms';
@@ -87,6 +96,7 @@ async function boot() {
     const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
     if (a === 'speech') { setSpeech(!speechOn); paint(); toast(speechOn ? 'Read-aloud on' : 'Read-aloud off'); }
     if (a === 'sound') { setSound(!soundOn); paint(); sfx.tap(); }
+    if (a === 'share') { sfx.tap(); if (location.hash === '#rooms') location.hash = '#site'; share.open(); }
     if (a === 'photo') { if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => site.photo(), 400); } else site.photo(); }
     if (a === 'finn') {
       if (model.boxes.length && !confirm('Put Finn\'s wooden-block model on the site? (Undo brings back what is there now.)')) return;
@@ -98,7 +108,7 @@ async function boot() {
   });
   paint();
   route();
-  if (!model.boxes.length) setTimeout(() => say('Welcome to your site! Choose a room on the left, then tap the grid to build it.'), 800);
+  if (!model.boxes.length && !shown) setTimeout(() => say('Welcome to your site! Choose a room on the left, then tap the grid to build it.'), 800);
   window.__v2 = { world, model, site, rooms, siteView, guide, wishes };   // testing aid
   if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') navigator.serviceWorker.register('../sw.js', { scope: '../' }).catch(() => {});
 }

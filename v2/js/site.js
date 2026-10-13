@@ -34,6 +34,26 @@ export async function loadSite() {
     }
     S.squares.push(row);
   }
+  // A bigger site: the meadow and beach spread one square into the edge of the forest, which is cleared and levelled.
+  const grow = [];
+  for (let sz = 0; sz < GRID.d; sz++) for (let sx = 0; sx < GRID.w; sx++) {
+    const q = S.squares[sz][sx];
+    if (q.build || q.zone !== 'forest') continue;
+    let near = false;
+    for (let dz = -1; dz <= 1 && !near; dz++) for (let dx = -1; dx <= 1; dx++) { const n = S.squares[sz + dz]?.[sx + dx]; if (n && (n.zone === 'meadow' || n.zone === 'beach')) { near = true; break; } }
+    if (near && q.lo > -0.05 && q.lo < 0.5) grow.push([sx, sz]);
+  }
+  for (const [sx, sz] of grow) S.squares[sz][sx] = { zone: 'meadow', build: true, base: 0, lo: 0, grown: true };
+  // Level the ground under the grown squares (and ease it back up at their edges).
+  const k = GRID.k, res = s.res, flat = (x, z) => S.squares[z]?.[x]?.grown;
+  for (let j = 0; j < hd; j++) for (let i = 0; i < hw; i++) {
+    const wx = i / res / k, wz = j / res / k, sx = Math.floor(wx), sz = Math.floor(wz);
+    const fx = wx - sx, fz = wz - sz, n = heights[j * hw + i];
+    let w = 0;
+    for (const [ox, oz] of [[0, 0], [fx < 0.2 ? -1 : fx > 0.8 ? 1 : 0, 0], [0, fz < 0.2 ? -1 : fz > 0.8 ? 1 : 0]]) if (flat(sx + ox, sz + oz)) w = Math.max(w, ox || oz ? 0.6 : 1);
+    if (w > 0 && n > 0) heights[j * hw + i] = n * (1 - w);
+  }
+  S.grown = new Set(grow.map(([x, z]) => `${x},${z}`));
   return S;
 }
 export const site = () => S;
@@ -59,7 +79,7 @@ export function buildSite(world) {
   const px = 16, cv = document.createElement('canvas');
   cv.width = s.w * px; cv.height = s.d * px;
   const g = cv.getContext('2d');
-  for (let z = 0; z < s.d; z++) for (let x = 0; x < s.w; x++) { g.fillStyle = ZONE_COL[s.zones[z][x]] || '#cfe39c'; g.fillRect(x * px, z * px, px, px); }
+  for (let z = 0; z < s.d; z++) for (let x = 0; x < s.w; x++) { const grown = S.grown.has(`${Math.floor(x / GRID.k)},${Math.floor(z / GRID.k)}`); g.fillStyle = grown ? ZONE_COL.m : ZONE_COL[s.zones[z][x]] || '#cfe39c'; g.fillRect(x * px, z * px, px, px); }
   const soft = document.createElement('canvas'); soft.width = cv.width; soft.height = cv.height;
   const sg = soft.getContext('2d');
   sg.filter = 'blur(9px)'; sg.drawImage(cv, 0, 0); sg.filter = 'none';
@@ -149,7 +169,7 @@ export function treeGeometries() {
 function forestTrees() {
   const s = S.raw, r = rng(4242), list = [];
   for (let z = 0; z < s.d; z++) for (let x = 0; x < s.w; x++) {
-    if (s.zones[z][x] !== 'f' || r() > 0.42) continue;
+    if (s.zones[z][x] !== 'f' || r() > 0.42 || S.grown.has(`${Math.floor(x / GRID.k)},${Math.floor(z / GRID.k)}`)) continue;
     const wx = (x + 0.15 + r() * 0.7) / GRID.k, wz = (z + 0.15 + r() * 0.7) / GRID.k;
     if (Math.abs(wx - S.waterfall[0]) < 0.55 && wz > S.waterfall[1] - 1.2 && wz < S.waterfall[1] + 0.7) continue;   // keep the falls clear
     const y = groundAt(wx, wz);

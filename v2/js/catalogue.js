@@ -47,6 +47,8 @@ export const SHAPES = {
   rocket: { name: 'Rocket', cap: true },
   observatory: { name: 'Star dome', cap: true },
   greenhouse: { name: 'Glass house', cap: true },
+  glassdome: { name: 'Glass dome', cap: true },
+  glassvault: { name: 'Glass tunnel', cap: true },
   treehouse: { name: 'Treehouse', cap: true },
   stage: { name: 'Stage', cap: true },
   circle: { name: 'Talking circle', cap: true },
@@ -55,6 +57,14 @@ export const SHAPES = {
   tube: { name: 'Tube', cap: true },
   canopy: { name: 'Covered walk', cap: true },
   terraces: { name: 'Tree terraces', cap: true },
+  ramp: { name: 'Ramp', cap: true },
+  swings: { name: 'Swings', cap: true },
+  climbdome: { name: 'Climbing dome', cap: true },
+  roundabout: { name: 'Roundabout', cap: true },
+  seesaw: { name: 'Seesaw', cap: true },
+  sandpit: { name: 'Sandpit', cap: true },
+  playtower: { name: 'Play tower', cap: true },
+  zipline: { name: 'Zip line', cap: true },
 };
 
 // Programmes: what each piece is for. size = [width, depth, storeys].
@@ -102,18 +112,21 @@ export const SURFACES = [
   { id: 'tiles', name: 'Tiles' }, { id: 'pixel', name: 'Pixels' }, { id: 'brick', name: 'Bricks' },
   { id: 'wood', name: 'Wood' }, { id: 'glass', name: 'Glass' }, { id: 'chalk', name: 'Chalkboard' },
 ];
-export const NO_SURFACE = new Set(['pool', 'track', 'garden', 'tree', 'turbine', 'slide', 'rocket', 'greenhouse', 'treehouse', 'circle', 'weather', 'observatory', 'bridge', 'canopy', 'terraces']);
+export const NO_SURFACE = new Set(['pool', 'track', 'garden', 'tree', 'turbine', 'slide', 'rocket', 'greenhouse', 'glassdome', 'glassvault', 'treehouse', 'circle', 'weather', 'observatory', 'bridge', 'canopy', 'terraces', 'ramp', 'swings', 'climbdome', 'roundabout', 'seesaw', 'sandpit', 'playtower', 'zipline']);
 
 PROGRAMMES.rocket = { name: 'Rocket launch pad', emoji: '🚀', size: [2, 2, 1], shapes: ['rocket'], colour: 'red', holds: '', say: 'A rocket on its launch pad! Tap Launch to send it up.' };
 PROGRAMMES.observatory = { name: 'Observatory', emoji: '🔭', size: [1, 1, 1], shapes: ['observatory'], colour: 'navy', holds: '10 star-gazers', say: 'An observatory with a big telescope, to look at the stars and planets.' };
-PROGRAMMES.greenhouse = { name: 'Greenhouse', emoji: '🌱', size: [2, 1, 1], shapes: ['greenhouse'], colour: 'lime', holds: 'lots of plants', say: 'A glass greenhouse, to grow plants and do science experiments.' };
+PROGRAMMES.greenhouse = { name: 'Greenhouse', emoji: '🌱', size: [2, 1, 1], shapes: ['greenhouse', 'glassdome', 'glassvault'], colour: 'lime', holds: 'lots of plants', say: 'A glass greenhouse, to grow plants and do science experiments.' };
 PROGRAMMES.treehouse = { name: 'Treehouse classroom', emoji: '🌳', size: [1, 1, 2], shapes: ['treehouse'], colour: 'orange', holds: '12 children', say: 'A classroom up in a tree! Climb the ladder to get in.' };
 PROGRAMMES.stage = { name: 'Stage', emoji: '🎭', size: [2, 1, 1], shapes: ['stage'], colour: 'purple', holds: 'a show', say: 'A stage for shows, plays and talks.' };
 PROGRAMMES.maker = { name: 'Maker workshop', emoji: '🛠️', size: [2, 1, 1], shapes: ['saw', 'box', 'vault'], colour: 'orange', holds: '20 makers', say: 'A workshop to build and test inventions, like real engineers.' };
 PROGRAMMES.circle = { name: 'Conundrum circle', emoji: '💬', size: [2, 2, 1], shapes: ['circle'], colour: 'blue', holds: '16 thinkers', say: 'A circle to sit in and talk about big questions. There is no right answer!' };
 PROGRAMMES.bridge = { name: 'Bridge', emoji: '🌉', size: [1, 3, 1], shapes: ['bridge', 'tube'], colour: 'magenta', holds: '', say: 'A bridge between buildings. Tap on top of a building to start it, then stretch it to the next one.' };
 PROGRAMMES.walkway = { name: 'Covered walkway', emoji: '☂️', size: [1, 3, 1], shapes: ['canopy'], colour: 'teal', holds: '', say: 'A covered walkway, to stay dry walking between buildings.' };
+PROGRAMMES.playground = { name: 'Playground', emoji: '🎠', size: [1, 1, 1], shapes: ['swings', 'climbdome', 'roundabout', 'seesaw', 'sandpit', 'playtower'], colour: 'yellow', holds: '8 children playing', say: 'Playground things! Tap Shape to choose swings, a climbing dome, a roundabout, a seesaw, a sandpit or a play tower.' };
+PROGRAMMES.zipline = { name: 'Zip line', emoji: '🪂', size: [1, 4, 1], shapes: ['zipline'], colour: 'red', holds: '', say: 'A zip line! Hold on tight and whizz from one end to the other.' };
+PROGRAMMES.ramp = { name: 'Ramp', emoji: '↗️', size: [1, 3, 1], shapes: ['ramp'], colour: 'lime', holds: '', say: 'A ramp, a gentle slope up onto a roof. Put it next to a building.' };
 PROGRAMMES.terraces = { name: 'Tree terraces', emoji: '🌲', size: [3, 3, 1], shapes: ['terraces'], colour: 'orange', holds: '40 children sitting', say: 'Rings of seats round a big tree, for stories and lessons outside.' };
 PROGRAMMES.weather = { name: 'Weather station', emoji: '🌦️', size: [1, 1, 1], shapes: ['weather'], colour: 'white', holds: '', say: 'A weather station measures the wind and the rain.' };
 
-export const TRAY = ['classroom', 'hall', 'pool', 'aquarium', 'library', 'yoga', 'lunch', 'art', 'music', 'ringhouse', 'maker', 'greenhouse', 'observatory', 'treehouse', 'stage', 'circle', 'rocket', 'terraces', 'steps', 'stairs', 'bridge', 'walkway', 'slide', 'archway', 'track', 'garden', 'tree', 'turbine', 'weather'];
+export const TRAY = ['classroom', 'hall', 'pool', 'aquarium', 'library', 'yoga', 'lunch', 'art', 'music', 'ringhouse', 'maker', 'greenhouse', 'observatory', 'treehouse', 'stage', 'circle', 'rocket', 'playground', 'zipline', 'terraces', 'steps', 'stairs', 'ramp', 'bridge', 'walkway', 'slide', 'archway', 'track', 'garden', 'tree', 'turbine', 'weather'];

@@ -40,7 +40,7 @@ function renderAxo(world, siteView, design, handles) {
   scene.traverse(o => {
     if (!o.isMesh || o === world.__skip) return;
     if (o.material && o.material.isSpriteMaterial) return;
-    const isPeople = o.isInstancedMesh && o.geometry.attributes.position.count < 400 && o.material.color && o.material.color.getHex() === 0x23252b;
+    const isPeople = !!o.userData.people;
     if (isPeople) return;
     swapped.push([o, o.material, o.instanceColor || null]);
     if (o.isInstancedMesh) o.instanceColor = null;

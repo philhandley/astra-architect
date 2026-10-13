@@ -3,13 +3,13 @@
 import * as THREE from 'three';
 import { PROGRAMMES, LEVEL } from './catalogue.js';
 import { GRID, square, groundAt, site } from './site.js';
-import { storeyFloor, CUTTABLE } from './inside.js';
+import { storeyFloor, CUTTABLE, outline } from './inside.js';
 import { icon } from './icons.js';
 import { h, esc, emo, say, sfx } from './ui.js';
 
 const EYE = 0.17;           // about 1.3 metres: a six-year-old's eyes
 
-export function startWalk({ world, model, root, yOf, setFloor, onExit }) {
+export function startWalk({ world, model, root, yOf, walls = () => [], setFloor, onExit, crowd }) {
   const cam = new THREE.PerspectiveCamera(70, world.w / world.h, 0.01, 120);
   const saved = { camera: world.camera, controls: world.controls.enabled };
   world.controls.enabled = false;
@@ -77,10 +77,14 @@ export function startWalk({ world, model, root, yOf, setFloor, onExit }) {
   }
   function goTo(b) {
     const fy = yOf(b) + storeyFloor(b, b.level) + 0.02;
-    const tx = b.x + b.w / 2, tz = b.z + b.d / 2;
-    // Stand just inside, looking across the room.
-    const dir = Math.atan2(me.x - tx, me.z - tz);
-    const sx = tx + Math.sin(dir) * Math.max(0.15, Math.min(b.w, b.d) * 0.3), sz = tz + Math.cos(dir) * Math.max(0.15, Math.min(b.w, b.d) * 0.3);
+    const tx = b.x + b.w / 2, tz = b.z + b.d / 2, o = outline(b);
+    // Stand just inside the door (on the front wall), looking into the room; otherwise near the side I came from.
+    let sx, sz, dir;
+    for (let k = b.d / 2 - 0.17; k > 0.05; k -= 0.05) if (o.inside(0, k, 0.1)) { sx = tx; sz = tz + k; dir = 0; break; }
+    if (sx === undefined) {
+      dir = Math.atan2(me.x - tx, me.z - tz);
+      sx = tx + Math.sin(dir) * Math.max(0.15, Math.min(b.w, b.d) * 0.3); sz = tz + Math.cos(dir) * Math.max(0.15, Math.min(b.w, b.d) * 0.3);
+    }
     auto = { x0: me.x, z0: me.z, y0: me.y, x1: sx, z1: sz, y1: fy, yaw0: me.yaw, yaw1: dir, t: 0 };
     if (b.level !== me.floor) { me.floor = b.level; setFloor(b.level); }
   }
@@ -109,12 +113,18 @@ export function startWalk({ world, model, root, yOf, setFloor, onExit }) {
       me.yaw -= stick.x * dt * 1.6;
       const sp = -stick.y * dt * 0.9;
       const nx = Math.max(0.2, Math.min(GRID.w - 0.2, me.x - Math.sin(me.yaw) * sp)), nz = Math.max(0.2, Math.min(GRID.d - 0.2, me.z - Math.cos(me.yaw) * sp));
-      const f = floorAt(nx, nz);
-      if (f !== null) { me.x = nx; me.z = nz; me.y += (f - me.y) * Math.min(1, dt * 8); }
+      // Bump into walls (slide along them); doorways are gaps.
+      const free = (x, z) => { for (const [ax, az, bx, bz] of walls()) { const vx = bx - ax, vz = bz - az, l2 = vx * vx + vz * vz || 1; const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / l2)); if (Math.hypot(x - ax - vx * t, z - az - vz * t) < 0.055) return false; } return true; };
+      let tx = nx, tz = nz;
+      if (!free(tx, tz)) { if (free(nx, me.z)) tz = me.z; else if (free(me.x, nz)) tx = me.x; else { tx = me.x; tz = me.z; } }
+      const f = floorAt(tx, tz);
+      if (f !== null) { me.x = tx; me.z = tz; me.y += (f - me.y) * Math.min(1, dt * 8); }
       const step = Math.abs(sp) > 0 ? Math.abs(Math.sin(performance.now() / 120)) * 0.006 : 0;
       me.bob = step;
     }
     cam.position.set(me.x, me.y + EYE + (me.bob || 0), me.z);
+    // Children right next to me step aside (so a head never fills the view).
+    if (crowd) crowd.near = { x: me.x, y: me.y, z: me.z, r: 0.18 };
     cam.rotation.set(me.pitch, me.yaw, 0, 'YXZ');
   };
   me.y = floorAt(me.x, me.z) ?? 0;
@@ -123,6 +133,7 @@ export function startWalk({ world, model, root, yOf, setFloor, onExit }) {
 
   function stop() {
     world.updaters.delete(fn);
+    if (crowd) crowd.near = null;
     world.camera = saved.camera;
     world.controls.enabled = saved.controls;
     cv.removeEventListener('pointerdown', onDown, { capture: true });

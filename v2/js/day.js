@@ -82,7 +82,7 @@ export class SchoolDay {
   // ---------- places in the school ----------
   findPlaces() {
     const m = this.model, out = [];
-    const stairs = m.boxes.filter(b => b.type === 'stairs');
+    const stairs = m.boxes.filter(b => b.type === 'stairs' || b.type === 'ramp');
     for (const b of m.boxes) {
       const type = b.type, cx = b.x + b.w / 2, cz = b.z + b.d / 2, y0 = this.yOf(b);
       const sq = m.squares(b);
@@ -140,7 +140,7 @@ export class SchoolDay {
       p.place = null;
       people.push(p);
     }
-    this.crowd.people = people; this.crowd.mesh.count = people.length;
+    this.crowd.people = people; this.crowd.setCount(people.length);
     this.t = 0; this.period = -1; this.running = true;
     this.world.updaters.add(this.tick);
     this.next();

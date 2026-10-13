@@ -58,6 +58,22 @@ function personGeo() {
   PERSON.userData.shared = true;
   return PERSON;
 }
+// A little white figure with a pencil outline, to ride on swings, roundabouts and zip lines.
+let MINI = null;
+export function miniKid() {
+  if (!MINI) {
+    const g = personGeo(), hull = g.clone(), p = hull.attributes.position, n = hull.attributes.normal;
+    for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) + n.getX(i) * 0.005, p.getY(i) + n.getY(i) * 0.005, p.getZ(i) + n.getZ(i) * 0.005);
+    hull.userData.shared = true;
+    MINI = { body: g, hull, ink: new THREE.MeshBasicMaterial({ color: '#2a2c31', side: THREE.BackSide }) };
+    MINI.ink.userData.shared = true;
+  }
+  const k = new THREE.Group();
+  const b = mesh(MINI.body, mat('#ffffff')); const o = new THREE.Mesh(MINI.hull, MINI.ink);
+  b.raycast = o.raycast = () => {};
+  k.add(b, o);
+  return k;
+}
 function people(group, spots) {
   for (const [x, y, z] of spots) { const p = mesh(personGeo(), mat(WHITE)); p.position.set(x, y, z); p.raycast = () => {}; group.add(p); }
 }
@@ -101,7 +117,7 @@ const BUILD = {
     for (let i = 0; i < n; i++) {
       const hh = H + (i % 2 ? 0.06 : 0);
       const geo = prism([[-u / 2, 0], [u / 2, 0], [u / 2, hh], [0, hh + Math.min(ROOF, u * 0.48)], [-u / 2, hh]], W);
-      geo.rotateY(Math.PI / 2); geo.translate(-L / 2 + GAP + u * (i + 0.5), 0, 0);
+      geo.translate(-L / 2 + GAP + u * (i + 0.5), 0, 0);
       parts.push(geo);
     }
     const geo = mergeGeometries(parts);
@@ -189,7 +205,6 @@ const BUILD = {
     const pts = [[-L / 2, 0], [L / 2, 0], [L / 2, H]];
     for (let i = n - 1; i >= 0; i--) { const x = -L / 2 + (L * i) / n, y = (H * i) / n; pts.push([x + L / n, y], [x, y]); }
     const geo = prism(pts.slice(0, -1).concat([[-L / 2, 0]]), W);
-    geo.rotateY(Math.PI / 2);
     if (d > w) geo.rotateY(Math.PI / 2);
     const g = new THREE.Group(); g.add(mesh(geo, mat(c)));
     // Where children sit on the steps.
@@ -262,7 +277,7 @@ const BUILD = {
     const uv = tube.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * curve.getLength() * 3);
     g.add(mesh(tube, mat(WHITE, { map: stripes(c) })));
     // A child whizzing down now and then.
-    const kid = mesh(personGeo(), mat('#23252b'), false); kid.scale.setScalar(0.75);
+    const kid = miniKid(); kid.scale.setScalar(0.75);
     kid.userData.slide = { curve, period: 3.4, pause: 2.2 };
     g.add(kid);
     if (d > w) g.rotation.y = -Math.PI / 2;
@@ -445,6 +460,106 @@ Object.assign(BUILD, {
     g.add(inner); g.userData.walk = { w: d > w ? W - 0.2 : L - 0.2, d: d > w ? L - 0.2 : W - 0.2, y: 0.012 };
     return g;
   },
+  swings(w, d, H, c) {
+    const g = new THREE.Group(), L = Math.max(w, d) - 0.2, hh = 0.42, inner = new THREE.Group();
+    for (const s of [-1, 1]) for (const k of [-1, 1]) { const leg = mesh(new THREE.CylinderGeometry(0.014, 0.014, hh * 1.08, 8), mat(c)); leg.position.set(s * L / 2, hh / 2, k * 0.12); leg.rotation.x = -k * 0.28; inner.add(leg); }
+    inner.add(mesh(new THREE.CylinderGeometry(0.016, 0.016, L + 0.04, 8).rotateZ(Math.PI / 2).translate(0, hh, 0), mat(c)));
+    for (const sx of [-L / 4, L / 4]) {
+      const pivot = new THREE.Group(); pivot.position.set(sx, hh, 0);
+      for (const o of [-0.045, 0.045]) pivot.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.3, 4).translate(o, -0.15, 0), mat('#3d405b'), false));
+      pivot.add(mesh(new THREE.BoxGeometry(0.11, 0.012, 0.05).translate(0, -0.3, 0), mat('#e2457d')));
+      const kid = miniKid(); kid.position.set(0, -0.36, 0); kid.scale.setScalar(0.75); pivot.add(kid);
+      pivot.userData.swing = { amp: 0.7, speed: 2.6 + sx };
+      inner.add(pivot);
+    }
+    if (d > w) inner.rotation.y = Math.PI / 2;
+    g.add(inner); return g;
+  },
+  climbdome(w, d, H, c) {
+    // A climbing dome made of bars.
+    const g = new THREE.Group(), R = Math.min(w, d) / 2 - 0.08, ico = new THREE.IcosahedronGeometry(R, 1), edges = new THREE.EdgesGeometry(ico), p = edges.attributes.position, bars = [];
+    for (let i = 0; i < p.count; i += 2) {
+      const a = new THREE.Vector3().fromBufferAttribute(p, i), b = new THREE.Vector3().fromBufferAttribute(p, i + 1);
+      if (a.y < -0.02 || b.y < -0.02) continue;
+      const len = a.distanceTo(b), mid = a.clone().add(b).multiplyScalar(0.5), bar = new THREE.CylinderGeometry(0.008, 0.008, len, 5);
+      bar.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize())).translate(mid.x, mid.y, mid.z);
+      bars.push(bar);
+    }
+    g.add(mesh(mergeGeometries(bars.map(x => { x.deleteAttribute('uv'); return x; })), mat(c)));
+    for (const [x, y, z] of [[0, R * 0.95, 0], [R * 0.6, R * 0.6, 0.1]]) { const k = miniKid(); k.position.set(x, y, z); k.scale.setScalar(0.75); g.add(k); }
+    return g;
+  },
+  roundabout(w, d, H, c) {
+    const g = new THREE.Group(), R = Math.min(w, d) / 2 - 0.12, spin = new THREE.Group();
+    for (let i = 0; i < 4; i++) spin.add(mesh(new THREE.CylinderGeometry(R, R, 0.03, 24, 1, false, (i / 4) * Math.PI * 2, Math.PI / 2).translate(0, 0.05, 0), mat(i % 2 ? c : '#22b2bf')));
+    spin.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.18, 8).translate(0, 0.14, 0), mat(WHITE)));
+    spin.add(mesh(new THREE.TorusGeometry(R * 0.6, 0.008, 6, 24).rotateX(Math.PI / 2).translate(0, 0.18, 0), mat(WHITE)));
+    for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2, k = miniKid(); k.position.set(Math.cos(a) * R * 0.75, 0.065, Math.sin(a) * R * 0.75); k.scale.setScalar(0.7); spin.add(k); }
+    spin.userData.yspin = 1.6;
+    g.add(mesh(new THREE.CylinderGeometry(R + 0.02, R + 0.04, 0.035, 24).translate(0, 0.0175, 0), mat('#d2cdc4')));
+    g.add(spin); return g;
+  },
+  seesaw(w, d, H, c) {
+    const g = new THREE.Group(), L = Math.max(w, d) - 0.15, inner = new THREE.Group();
+    inner.add(mesh(new THREE.ConeGeometry(0.05, 0.1, 4).translate(0, 0.05, 0), mat('#3d405b')));
+    const plank = new THREE.Group(); plank.position.y = 0.1;
+    plank.add(mesh(new THREE.BoxGeometry(L, 0.02, 0.07), mat(c)));
+    for (const s of [-1, 1]) { plank.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.06, 6).translate(s * (L / 2 - 0.08), 0.04, 0), mat(WHITE))); const k = miniKid(); k.position.set(s * (L / 2 - 0.04), 0.01, 0); k.scale.setScalar(0.7); plank.add(k); }
+    plank.userData.rock = { amp: 0.28, speed: 2.2 };
+    inner.add(plank);
+    if (d > w) inner.rotation.y = Math.PI / 2;
+    g.add(inner); return g;
+  },
+  sandpit(w, d, H, c) {
+    const g = new THREE.Group(), W = w - 0.16, D = d - 0.16;
+    g.add(mesh(new THREE.BoxGeometry(W, 0.05, D).translate(0, 0.025, 0), mat('#d8b98c')));
+    g.add(mesh(new THREE.BoxGeometry(W - 0.06, 0.052, D - 0.06).translate(0, 0.027, 0), mat('#f1dfb0')));
+    for (let i = 0; i < 4; i++) { const m = mesh(new THREE.SphereGeometry(0.05 + i * 0.012, 10, 6).scale(1, 0.4, 1).translate((i - 1.5) * 0.15, 0.05, (i % 2 - 0.5) * 0.15), mat('#ead39b')); g.add(m); }
+    g.add(mesh(new THREE.CylinderGeometry(0.025, 0.02, 0.04, 10).translate(0.1, 0.075, -0.08), mat('#e6463c')));
+    g.add(mesh(new THREE.BoxGeometry(0.01, 0.01, 0.07).translate(0.14, 0.06, -0.06), mat('#3d8de0')));
+    g.userData.seats = [[-0.12, 0.05, 0.1], [0.12, 0.05, 0.12], [0, 0.05, -0.14], [-0.15, 0.05, -0.05]];
+    return g;
+  },
+  playtower(w, d, H, c) {
+    const g = new THREE.Group(), top = 0.32;
+    for (const [x, z] of [[-0.15, -0.15], [0.15, -0.15], [-0.15, 0.15], [0.15, 0.15]]) g.add(mesh(new THREE.CylinderGeometry(0.016, 0.016, top + 0.22, 8).translate(x, (top + 0.22) / 2, z), mat(WHITE)));
+    g.add(mesh(new THREE.BoxGeometry(0.36, 0.03, 0.36).translate(0, top, 0), mat(c)));
+    g.add(mesh(new THREE.ConeGeometry(0.28, 0.2, 4).rotateY(Math.PI / 4).translate(0, top + 0.32, 0), mat('#e2457d')));
+    // A little slide down one side and a climbing net up the other.
+    const s = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.012, 0.42), mat('#22b2bf')); s.rotation.x = 0.7; s.position.set(0, top / 2, 0.32); s.castShadow = true; g.add(s);
+    for (let i = 0; i < 5; i++) g.add(mesh(new THREE.BoxGeometry(0.2, 0.006, 0.006).translate(0, 0.05 + i * 0.06, -0.19 - i * 0.03), mat('#3d405b'), false));
+    for (const x of [-0.1, 0, 0.1]) { const rope = mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.36, 4), mat('#3d405b'), false); rope.rotation.x = 0.45; rope.position.set(x, top / 2, -0.25); g.add(rope); }
+    const k = miniKid(); k.position.set(0.05, top + 0.015, 0); k.scale.setScalar(0.72); g.add(k);
+    return g;
+  },
+  zipline(w, d, H, c) {
+    const g = new THREE.Group(), L = Math.max(w, d) - 0.2, inner = new THREE.Group(), hi = 0.55, lo = 0.4;
+    for (const [x, hh] of [[-L / 2, hi], [L / 2, lo]]) { inner.add(mesh(new THREE.CylinderGeometry(0.02, 0.025, hh, 8).translate(x, hh / 2, 0), mat(c))); inner.add(mesh(new THREE.BoxGeometry(0.16, 0.025, 0.16).translate(x, 0.0125, 0), mat('#d2cdc4'))); }
+    const cable = mesh(new THREE.CylinderGeometry(0.003, 0.003, Math.hypot(L, hi - lo), 4), mat('#3d405b'), false);
+    cable.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(L, lo - hi, 0).normalize()); cable.position.set(0, (hi + lo) / 2, 0); inner.add(cable);
+    const rider = new THREE.Group(); rider.add(mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.16, 4).translate(0, -0.08, 0), mat('#3d405b'), false));
+    const k = miniKid(); k.position.set(0, -0.36, 0); k.scale.setScalar(0.75); rider.add(k);
+    rider.userData.zip = { x0: -L / 2 + 0.05, x1: L / 2 - 0.05, y0: hi - 0.02, y1: lo - 0.02, period: 3.2 };
+    inner.add(rider);
+    if (d > w) inner.rotation.y = -Math.PI / 2;
+    g.add(inner); return g;
+  },
+  ramp(w, d, H, c) {
+    // A gentle ramp rising along the long side, with glass sides and a landing at the top.
+    const L = Math.max(w, d) - 2 * GAP, W = Math.min(w, d) - 0.24, g = new THREE.Group(), inner = new THREE.Group(), land = 0.3;
+    const run = L - land, ang = Math.atan2(H, run), len = Math.hypot(run, H);
+    const deck = mesh(new THREE.BoxGeometry(len, 0.05, W), mat(c)); deck.rotation.z = ang; deck.position.set(-L / 2 + run / 2, H / 2 - 0.01, 0); inner.add(deck);
+    inner.add(mesh(new THREE.BoxGeometry(land, 0.05, W).translate(L / 2 - land / 2, H - 0.025, 0), mat(c)));
+    if (H > 0.3) for (const fx of [-L / 2 + run * 0.5, L / 2 - land / 2]) inner.add(mesh(new THREE.BoxGeometry(0.05, fx > 0 ? H : H / 2, 0.05).translate(fx, (fx > 0 ? H : H / 2) / 2, 0), mat(WHITE)));
+    for (const s of [-1, 1]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.1, 0.01), glass()); rail.rotation.z = ang; rail.position.set(-L / 2 + run / 2, H / 2 + 0.06, s * (W / 2 - 0.005)); rail.raycast = () => {}; inner.add(rail);
+      const hand = mesh(new THREE.BoxGeometry(len, 0.012, 0.025), mat(WHITE), false); hand.rotation.z = ang; hand.position.set(-L / 2 + run / 2, H / 2 + 0.115, s * (W / 2 - 0.01)); inner.add(hand);
+    }
+    if (d > w) inner.rotation.y = -Math.PI / 2;
+    g.add(inner);
+    g.userData.walk = { w: d > w ? W - 0.1 : L - 0.1, d: d > w ? L - 0.1 : W - 0.1, y: 0.03 };
+    return g;
+  },
   terraces(w, d, H, c) {
     // Tree terraces: rings of seats stepping up round a big tree (after MVRDV's Back to the Roots).
     const g = new THREE.Group(), R = Math.min(w, d) / 2 - GAP, tiers = 3, step = (R - 0.32) / tiers, seats = [];
@@ -516,6 +631,32 @@ Object.assign(BUILD, {
     for (let i = 0; i < Math.round(L * 3); i++) { const f = mesh(new THREE.SphereGeometry(0.025, 6, 4), mat(['#e2457d', '#f7c22e', '#f5a3c7'][i % 3]), false); f.position.set((r2() - 0.5) * (W - 0.2), 0.2, (r2() - 0.5) * (L - 0.2)); frame.add(f); }
     if (w > d) frame.rotation.y = Math.PI / 2;
     g.add(frame);
+    return g;
+  },
+  glassdome(w, d, H, c) {
+    // A round glass dome full of plants, with white ribs.
+    const g = new THREE.Group(), R = Math.min(w, d) / 2 - GAP - 0.02;
+    g.add(mesh(new THREE.CylinderGeometry(R, R + 0.02, 0.06, 32).translate(0, 0.03, 0), mat(WHITE)));
+    g.add(mesh(new THREE.SphereGeometry(R, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 0.06, 0), mat('#d8eef6', { transparent: true, opacity: 0.35, depthWrite: false }), false));
+    for (let i = 0; i < 8; i++) { const rib = mesh(new THREE.TorusGeometry(R, 0.008, 5, 24, Math.PI), mat(WHITE), false); rib.rotation.y = (i / 8) * Math.PI; rib.position.y = 0.06; g.add(rib); }
+    const ring = mesh(new THREE.TorusGeometry(R * 0.72, 0.008, 5, 32).rotateX(Math.PI / 2).translate(0, 0.06 + R * 0.69, 0), mat(WHITE), false); g.add(ring);
+    const r2 = seeded(w * 7 + d);
+    for (let i = 0; i < Math.round(R * 14); i++) { const a = r2() * Math.PI * 2, rr = r2() * R * 0.7, p = mesh(new THREE.SphereGeometry(0.05 + r2() * 0.05, 8, 6), mat(TREE_GREENS[i % TREE_GREENS.length])); p.position.set(Math.cos(a) * rr, 0.1 + r2() * 0.08, Math.sin(a) * rr); g.add(p); }
+    const palm = roundTree(Math.min(0.25, R * 0.35), TREE_GREENS[3]); palm.position.y = 0.06; g.add(palm);
+    return g;
+  },
+  glassvault(w, d, H, c) {
+    // A glass tunnel greenhouse: a barrel of glass with white hoops.
+    const L = Math.max(w, d) - 2 * GAP, W = Math.min(w, d) - 2 * GAP, r = W / 2, g = new THREE.Group(), inner = new THREE.Group();
+    inner.add(mesh(new THREE.BoxGeometry(L, 0.05, W).translate(0, 0.025, 0), mat(WHITE)));
+    const shell = mesh(new THREE.CylinderGeometry(r, r, L, 28, 1, true, -Math.PI / 2, Math.PI).rotateZ(Math.PI / 2).rotateX(Math.PI / 2).translate(0, 0.05, 0), mat('#d8eef6', { transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }), false);
+    inner.add(shell);
+    const hoops = Math.max(3, Math.round(L * 4));
+    for (let i = 0; i <= hoops; i++) { const hp = mesh(new THREE.TorusGeometry(r, 0.008, 5, 20, Math.PI), mat(WHITE), false); hp.rotation.y = Math.PI / 2; hp.position.set(-L / 2 + (L * i) / hoops, 0.05, 0); inner.add(hp); }
+    const r2 = seeded(w * 11 + d);
+    for (let i = 0; i < Math.round(L * 8); i++) { const p = mesh(new THREE.SphereGeometry(0.05 + r2() * 0.04, 8, 6), mat(TREE_GREENS[i % TREE_GREENS.length])); p.position.set((r2() - 0.5) * (L - 0.15), 0.1 + r2() * 0.06, (r2() - 0.5) * (W - 0.3)); inner.add(p); }
+    if (d > w) inner.rotation.y = Math.PI / 2;
+    g.add(inner);
     return g;
   },
   treehouse(w, d, H, c) {

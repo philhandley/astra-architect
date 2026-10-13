@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PROGRAMMES, SHAPES, PALETTE, SURFACES, NO_SURFACE, LEVEL, MAX_SIZE, MAX_LEVELS, TRAY, colourHex } from './catalogue.js';
 import { GRID, square } from './site.js';
 import { buildPiece, disposePiece, ghostMaterial } from './shapes.js';
-import { cutRoom, outline, CUTTABLE, storeyFloor } from './inside.js';
+import { cutRoom, outline, CUTTABLE, storeyFloor, SINGLE_SPACE } from './inside.js';
 import { SchoolDay, Trails, PERIODS } from './day.js';
 import { startWalk } from './walk.js';
 import { Crowd } from './crowd.js';
@@ -98,14 +98,18 @@ export function mountSite(root, world, model, siteView, thumbs) {
     const spans = b.level <= L && L < b.level + b.h;
     if (!spans || !CUTTABLE.has(b.shape)) { const g = makeGroup(b); return { g }; }
     const floorY = storeyFloor(b, L);
-    const room = cutRoom(b, colourHex(b.colour), floorY, S.cutH);
+    const top = S.walkMode ? (SINGLE_SPACE.has(b.type) ? b.h * LEVEL : LEVEL) : 0;
+    const room = cutRoom(b, colourHex(b.colour), floorY, S.cutH, S.walkMode ? { walk: true, top, boxH: b.h * LEVEL } : {});
+    if (S.walkMode) for (const [ax, az, bx, bz] of room.segments) walls.push([ax + b.x + b.w / 2, az + b.z + b.d / 2, bx + b.x + b.w / 2, bz + b.z + b.d / 2]);
     const g = room.group;
     plinth(b, g, null);
     g.position.set(b.x + b.w / 2, yOf(b), b.z + b.d / 2);
     g.traverse(o => { o.userData.boxId = b.id; });
     return { g, room };
   }
+  const walls = [];          // wall lines on the floor being walked (for bumping into)
   function redraw() {
+    walls.length = 0;
     for (const g of pieces.values()) { design.remove(g); disposePiece(g); }
     pieces.clear();
     const zones = [];
@@ -194,6 +198,10 @@ export function mountSite(root, world, model, siteView, thumbs) {
     for (const g of pieces.values()) g.traverse(o => {
       if (o.userData.spin) o.rotation.z += dt * o.userData.spin;
       if (o.userData.yspin) o.rotation.y += dt * o.userData.yspin;
+      if (o.userData.swing) o.rotation.x = Math.sin(t * o.userData.swing.speed) * o.userData.swing.amp;
+      if (o.userData.rock) o.rotation.z = Math.sin(t * o.userData.rock.speed) * o.userData.rock.amp;
+      const zp = o.userData.zip;
+      if (zp) { const k = (t % (zp.period * 2)) / zp.period, u = k < 1 ? k * k : Math.max(0, 1 - (k - 1) * 1.6); o.position.set(zp.x0 + (zp.x1 - zp.x0) * u, zp.y0 + (zp.y1 - zp.y0) * u, 0); }
       const sl = o.userData.slide;
       if (sl) {
         const k = ((t + (o.parent?.id || 0) * 0.37) % (sl.period + sl.pause)) / sl.period;
@@ -252,7 +260,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
   function proposal(t) {
     const b = model.make(S.tool, t.x, t.z, t.level);
     // Stairs put next to a building grow to reach its roof (so you can get to the first and second floors).
-    if (b.type === 'stairs' && b.level === 0) {
+    if ((b.type === 'stairs' || b.type === 'ramp') && b.level === 0) {
       let top = 0;
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { let l = 0; while (model.at(b.x + dx, b.z + dz, l)) l++; top = Math.max(top, l); }
       if (top >= 1) b.h = Math.min(MAX_LEVELS, top);
@@ -605,10 +613,10 @@ export function mountSite(root, world, model, siteView, thumbs) {
   function startWalking() {
     if (S.day) stopDay();
     select(null); S.tool = null; drawTray();
-    S.cutH = 0.12; S.floor = 0;
+    S.walkMode = true; S.floor = 0;
     setInside(true, { quiet: true });
     ui.hidden = true;
-    S.walking = startWalk({ world, model, root, yOf, setFloor: l => { S.floor = l; redraw(); }, onExit: () => { S.walking = null; ui.hidden = false; S.cutH = undefined; setInside(false, { quiet: true }); } });
+    S.walking = startWalk({ world, model, root, yOf, crowd, walls: () => walls, setFloor: l => { S.floor = l; redraw(); }, onExit: () => { S.walking = null; ui.hidden = false; S.walkMode = false; setInside(false, { quiet: true }); } });
   }
 
   function handleTap(x, y) {

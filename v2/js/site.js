@@ -139,7 +139,7 @@ export function groundAt(wx, wz) {
   return v * EXAG / GRID.k;
 }
 
-const ZONE_COL = { m: '#cfe39c', b: '#f0e2c0', f: '#a8cc83', c: '#d4d0c6', w: '#93cbd9', p: '#93cbd9', r: '#93cbd9' };
+export const ZONE_COL = { m: '#cfe39c', b: '#f0e2c0', f: '#a8cc83', c: '#d4d0c6', w: '#93cbd9', p: '#93cbd9', r: '#93cbd9' };
 
 export function buildSite(world, view = {}) {
   // Building again (the site grew): clear away the old one first.

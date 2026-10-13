@@ -176,7 +176,8 @@ const BUILD = {
     const W = w - 2 * GAP - t, D = d - 2 * GAP - t;       // the centre line of the band
     const path = loopPath(W, D, Math.min(W, D) / 2);
     const g = new THREE.Group();
-    g.add(mesh(sweepHouses(path, t, H, true, col ? REC : 0), mat(c)));
+    const [body, roofs] = sweepHouses(path, t, H, true, col ? REC : 0);
+    g.add(mesh(body, mat(c)), mesh(roofs, mat(shade(c, 0.86))));
     const Wi = w - 2 * GAP - 2 * t, Di = d - 2 * GAP - 2 * t;
     if (col) colonnade(g, Wi + 0.08, Di + 0.08);
     if (w >= 3 && d >= 3) courtyard(g, Wi, Di, o.id);
@@ -200,7 +201,7 @@ const BUILD = {
     const R = Math.min(w, d) - GAP - 0.45, t = 0.85, pts = [];
     const cx = -w / 2 + GAP, cz = -d / 2 + GAP;
     for (let i = 0; i <= 24; i++) { const a = (i / 24) * Math.PI / 2; pts.push(new THREE.Vector2(cx + Math.cos(a) * R, cz + Math.sin(a) * R)); }
-    const g = new THREE.Group(); g.add(mesh(sweepHouses(pts, t, H, false), mat(c))); return g;
+    const g = new THREE.Group(), [body, roofs] = sweepHouses(pts, t, H, false); g.add(mesh(body, mat(c)), mesh(roofs, mat(shade(c, 0.86)))); return g;
   },
   arch(w, d, H, c) {
     const L = Math.max(w, d) - 2 * GAP - 0.03, W = Math.min(w, d) - 2 * GAP - 0.03;
@@ -234,38 +235,44 @@ const BUILD = {
     // Where children sit on the steps.
     const r = seeded(o.id || 1), spots = [];
     for (let i = 0; i < Math.min(14, n * 3); i++) {
-      const k = Math.floor(r() * n), along = -L / 2 + (L * (k + 0.5)) / n, across = (r() - 0.5) * W * 0.8, y = (H * (k + 1)) / n;
+      const k = Math.floor(r() * n), along = -L / 2 + (L * (k + 0.5)) / n, across = (r() - 0.5) * W * 0.8, y = (H * k) / n;     // (step k's top)
       spots.push(w >= d ? [along, y, across] : [across, y, along]);
     }
     g.userData.seats = spots;
     const cols = ['#f7c22e', '#e2457d', '#22b2bf', '#a3d140', '#f28b30', '#ffffff'];
     for (let i = 0; i < Math.min(8, n * 2); i++) {
-      const k = Math.floor(r() * n), along = -L / 2 + (L * (k + 0.5)) / n, across = (r() - 0.5) * W * 0.8, y = (H * (k + 1)) / n;
-      const cu = mesh(new RoundedBoxGeometry(0.11, 0.035, 0.1, 2, 0.014), mat(cols[i % cols.length])); cu.position.set(w >= d ? along : across, y + 0.03, w >= d ? across : along); cu.raycast = () => {}; g.add(cu);
+      const k = 1 + Math.floor(r() * (n - 1)), along = -L / 2 + (L * (k + 0.5)) / n, across = (r() - 0.5) * W * 0.8, y = (H * k) / n;
+      const cu = mesh(new RoundedBoxGeometry(0.11, 0.035, 0.1, 2, 0.014), mat(cols[i % cols.length])); cu.position.set(w >= d ? along : across, y + 0.0175, w >= d ? across : along); cu.raycast = () => {}; g.add(cu);
     }
     return g;
   },
   stairs(w, d, H, c) {
-    // Chunky zigzag stairs: one walled flight per storey, back and forth along the long side, landings at each turn.
+    // Chunky switchback stairs: a flight up one side, a landing, a flight back up the other side, and so on.
+    // Each flight is one solid piece (stepped on top, a smooth sloping underside), with a solid wall on the
+    // outside and a wall down the middle between the two sides; slim posts hold up the landings.
     const L = Math.max(w, d) - 2 * GAP, W = Math.min(w, d) - 2 * GAP, n = Math.max(1, Math.round(H / LEVEL));
-    const land = 0.2, run = L - 2 * land, lw = W / 2 - 0.02, steps = 7, parts = [];
+    const land = Math.min(0.2, L * 0.2), run = L - 2 * land, steps = 7, rise = LEVEL / steps, thick = 0.06, spine = 0.03, lw = (W - spine) / 2, wall = 0.024, rail = 0.12;
+    const flat = [], box = (sx, sy, sz, x, y, z) => flat.push(new THREE.BoxGeometry(sx, sy, sz).translate(x, y, z));
+    const solid = (pts, len, z) => { const s = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y))); flat.push(new THREE.ExtrudeGeometry(s, { depth: len, bevelEnabled: false }).translate(0, 0, z - len / 2)); };
     for (let k = 0; k < n; k++) {
-      const y0 = k * LEVEL, rise = LEVEL, back = k % 2 === 1, side = (back ? 1 : -1) * (W / 4);
-      const lo = k === 0 ? 0 : y0 - 0.08;
-      const pts = [[-run / 2, lo]];
-      for (let i = 0; i < steps; i++) { const x0 = -run / 2 + (run * i) / steps, x1 = -run / 2 + (run * (i + 1)) / steps, y = y0 + (rise * (i + 1)) / steps; pts.push([x0, y], [x1, y]); }
-      pts.push([run / 2, y0 + rise - 0.08]);
-      if (k === 0) pts.push([run / 2 - run * 0.25, lo]);
-      const flight = prism(pts, lw);
-      const wallP = [[-run / 2, lo - 0.01], [run / 2, y0 + rise - 0.1], [run / 2, y0 + rise + 0.14], [-run / 2, y0 + 0.14]];
-      const w1 = prism(wallP, 0.035).translate(0, 0, lw / 2), w2 = prism(wallP, 0.035).translate(0, 0, -lw / 2);
-      for (const g of [flight, w1, w2]) { if (back) g.rotateY(Math.PI); g.translate(0, 0, side); parts.push(g); }
-      // Landing at the top of the flight, with a little wall round its end.
-      const lx = (back ? -1 : 1) * (L / 2 - land / 2);
-      parts.push(new THREE.BoxGeometry(land, 0.08, W).translate(lx, y0 + rise - 0.04, 0));
-      parts.push(new THREE.BoxGeometry(0.035, 0.22, W).translate(lx + (back ? -1 : 1) * (land / 2 - 0.017), y0 + rise + 0.07, 0));
+      const y0 = k * LEVEL, dir = k % 2 ? -1 : 1, side = k % 2 ? 1 : -1, zc = side * (spine / 2 + lw / 2), X = x => x * dir;
+      const pts = [[X(-run / 2), y0]];
+      for (let i = 0; i < steps; i++) { const y = y0 + rise * (i + 1); pts.push([X(-run / 2 + (run * i) / steps), y], [X(-run / 2 + (run * (i + 1)) / steps), y]); }
+      if (k === 0) pts.push([X(run / 2), 0]); else pts.push([X(run / 2), y0 + LEVEL - thick], [X(-run / 2), y0 - thick]);
+      solid(pts, lw, zc);
+      // The solid wall on the outside of the flight.
+      const lo0 = k === 0 ? 0 : y0 - thick, lo1 = k === 0 ? 0 : y0 + LEVEL - thick;
+      solid([[X(-run / 2), lo0], [X(run / 2), lo1], [X(run / 2), y0 + LEVEL + rail], [X(-run / 2), y0 + rail]], wall, side * (W / 2 - wall / 2));
+      // The landing at the top, across both sides, with a low wall round it and two posts under its corners.
+      const lx = dir * (run / 2 + land / 2), top = y0 + LEVEL;
+      box(land, thick, W, lx, top - thick / 2, 0);
+      box(wall, rail + thick, W, dir * (L / 2 - wall / 2), top - thick + (rail + thick) / 2, 0);
+      for (const s of [-1, 1]) box(land, rail + thick, wall, lx, top - thick + (rail + thick) / 2, s * (W / 2 - wall / 2));
+      for (const s of [-1, 1]) flat.push(new THREE.CylinderGeometry(0.018, 0.018, top - thick, 10).translate(dir * (L / 2 - 0.04), (top - thick) / 2, s * (W / 2 - 0.04)));
     }
-    const geo = mergeGeometries(parts.map(p => (p.index ? p.toNonIndexed() : p)).map(p => { p.deleteAttribute('uv'); return p; }));
+    // The wall down the middle, from the ground to a rail above the top flight.
+    box(run, H + rail, spine, 0, (H + rail) / 2, 0);
+    const geo = mergeGeometries(flat.map(p => (p.index ? p.toNonIndexed() : p)).map(p => { if (p.attributes.uv) p.deleteAttribute('uv'); return p; }));
     if (d > w) geo.rotateY(Math.PI / 2);
     const g = new THREE.Group(); g.add(mesh(geo, mat(c))); return g;
   },
@@ -343,13 +350,15 @@ const BUILD = {
     return g;
   },
   garden(w, d, H, c, o) {
+    // A lawn on the ground, with a low stone edge, trees and flowers.
     const W = w - 2 * GAP, D = d - 2 * GAP, g = new THREE.Group();
-    g.add(mesh(new RoundedBoxGeometry(W, 0.14, D, 2, 0.03).translate(0, 0.07, 0), mat(WHITE)));
-    const lawn = mesh(new RoundedBoxGeometry(W - 0.08, 0.03, D - 0.08, 1, 0.01).translate(0, 0.15, 0), mat('#8fcf5b')); g.add(lawn);
+    const edge = roundedRect(W, D, 0.06); edge.holes.push(roundedRect(W - 0.06, D - 0.06, 0.04));
+    g.add(mesh(new THREE.ExtrudeGeometry(edge, { depth: 0.035, bevelEnabled: false }).rotateX(-Math.PI / 2), mat('#e9e4d8')));
+    g.add(mesh(new THREE.ExtrudeGeometry(roundedRect(W - 0.06, D - 0.06, 0.04), { depth: 0.02, bevelEnabled: false }).rotateX(-Math.PI / 2), mat('#8fcf5b')));
     const r = seeded(o.id || 3);
-    for (let i = 0; i < Math.max(1, Math.round(w * d)); i++) { const t = roundTree(0.17 + r() * 0.06, TREE_GREENS[i % TREE_GREENS.length]); t.position.set((r() - 0.5) * (W - 0.4), 0.16, (r() - 0.5) * (D - 0.4)); g.add(t); }
+    for (let i = 0; i < Math.max(1, Math.round(w * d)); i++) { const t = roundTree(0.17 + r() * 0.06, TREE_GREENS[i % TREE_GREENS.length]); t.position.set((r() - 0.5) * (W - 0.4), 0.02, (r() - 0.5) * (D - 0.4)); g.add(t); }
     const flowers = ['#f5a3c7', '#f7c22e', '#ffffff', '#e2457d'];
-    for (let i = 0; i < 10 * w * d; i++) { const f = mesh(new THREE.SphereGeometry(0.025, 6, 4), mat(flowers[i % 4]), false); f.position.set((r() - 0.5) * (W - 0.14), 0.18, (r() - 0.5) * (D - 0.14)); g.add(f); }
+    for (let i = 0; i < 10 * w * d; i++) { const f = mesh(new THREE.SphereGeometry(0.025, 6, 4), mat(flowers[i % 4]), false); f.position.set((r() - 0.5) * (W - 0.14), 0.04, (r() - 0.5) * (D - 0.14)); g.add(f); }
     return g;
   },
   tree(w, d, H, c, o) {
@@ -377,6 +386,17 @@ const BUILD = {
     return g;
   },
 };
+
+// A greenhouse floor: green planting with brown rows of soil running along it (W across, L along).
+function beds(g, W, L, y = 0, alongX = false) {
+  const base = mesh(new THREE.BoxGeometry(alongX ? W - 0.04 : W - 0.04, 0.012, alongX ? L - 0.04 : L - 0.04).translate(0, y + 0.006, 0), mat('#8fcf5b'), false);
+  g.add(base);
+  const across = alongX ? L : W, n = Math.max(2, Math.round(across / 0.16));
+  for (let i = 1; i < n; i++) {
+    const o = -across / 2 + (across * i) / n, strip = alongX ? new THREE.BoxGeometry(W - 0.12, 0.006, 0.03).translate(0, y + 0.014, o) : new THREE.BoxGeometry(0.03, 0.006, L - 0.12).translate(o, y + 0.014, 0);
+    g.add(mesh(strip, mat('#9b6b43'), false));
+  }
+}
 
 // ---------- surfaces for walls ----------
 const texCache = new Map();
@@ -653,6 +673,7 @@ Object.assign(BUILD, {
       }
     }
     frame.add(mesh(new THREE.BoxGeometry(0.015, 0.015, L).translate(0, H + r, 0), mat(WHITE), false));
+    beds(frame, W, L);
     // Plants inside.
     const r2 = seeded(w * 13 + d);
     for (let i = 0; i < Math.round(L * 6); i++) { const p = mesh(new THREE.SphereGeometry(0.06 + r2() * 0.05, 8, 6), mat(TREE_GREENS[i % TREE_GREENS.length])); p.position.set((r2() - 0.5) * (W - 0.2), 0.08 + r2() * 0.1, (r2() - 0.5) * (L - 0.2)); frame.add(p); }
@@ -665,6 +686,8 @@ Object.assign(BUILD, {
     // A round glass dome full of plants, with white ribs.
     const g = new THREE.Group(), R = Math.min(w, d) / 2 - GAP - 0.02;
     g.add(mesh(new THREE.CylinderGeometry(R, R + 0.02, 0.06, 32).translate(0, 0.03, 0), mat(WHITE)));
+    g.add(mesh(new THREE.CylinderGeometry(R - 0.03, R - 0.03, 0.012, 40).translate(0, 0.066, 0), mat('#8fcf5b'), false));
+    for (let i = 1; i <= 3; i++) { const rr = (R - 0.04) * i / 3.4; g.add(mesh(new THREE.RingGeometry(rr - 0.022, rr, 40).rotateX(-Math.PI / 2).translate(0, 0.073, 0), mat('#9b6b43'), false)); }
     g.add(mesh(new THREE.SphereGeometry(R, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 0.06, 0), mat('#d8eef6', { transparent: true, opacity: 0.35, depthWrite: false }), false));
     for (let i = 0; i < 8; i++) { const rib = mesh(new THREE.TorusGeometry(R, 0.008, 5, 24, Math.PI), mat(WHITE), false); rib.rotation.y = (i / 8) * Math.PI; rib.position.y = 0.06; g.add(rib); }
     const ring = mesh(new THREE.TorusGeometry(R * 0.72, 0.008, 5, 32).rotateX(Math.PI / 2).translate(0, 0.06 + R * 0.69, 0), mat(WHITE), false); g.add(ring);
@@ -677,6 +700,7 @@ Object.assign(BUILD, {
     // A glass tunnel greenhouse: a barrel of glass with white hoops.
     const L = Math.max(w, d) - 2 * GAP, W = Math.min(w, d) - 2 * GAP, r = W / 2, g = new THREE.Group(), inner = new THREE.Group();
     inner.add(mesh(new THREE.BoxGeometry(L, 0.05, W).translate(0, 0.025, 0), mat(WHITE)));
+    beds(inner, L, W, 0.05, true);
     const shell = mesh(new THREE.CylinderGeometry(r, r, L, 28, 1, true, -Math.PI / 2, Math.PI).rotateZ(Math.PI / 2).rotateX(Math.PI / 2).translate(0, 0.05, 0), mat('#d8eef6', { transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }), false);
     inner.add(shell);
     const hoops = Math.max(3, Math.round(L * 4));
@@ -762,9 +786,10 @@ function loopPath(W, D, r) {
   return s.getSpacedPoints(Math.max(36, Math.round((W + D) * 14))).slice(0, -1).map(p => new THREE.Vector2(p.x, -p.y));
 }
 // Sweep a pointy-roofed house section along a path; a closed loop or an open curve with gable ends.
-// The roof is broken into little houses (alternating heights), like a ring of cottages.
+// Every little house is the same height, so the roof runs on cleanly; every other house has a slightly darker
+// roof, so it still reads as a ring of houses. Returns two geometries: [walls and roofs, the darker roofs].
 function sweepHouses(path, t, H, closed, rec = 0) {
-  const n = path.length, pos = [];
+  const n = path.length, pos = [], alt = [];
   const nrm = i => {
     const a = path[(i - 1 + n) % n], b = path[(i + 1) % n];
     const p = closed ? [a, b] : [path[Math.max(0, i - 1)], path[Math.min(n - 1, i + 1)]];
@@ -773,32 +798,27 @@ function sweepHouses(path, t, H, closed, rec = 0) {
   };
   // Profile across the band (u from inside to outside), with a ridge in the middle.
   // (+u is the courtyard side; with a recess the ground floor steps back there under the floor above.)
-  const prof = (hh, r) => rec > 0
-    ? [[-t / 2, 0], [t / 2 - rec, 0], [t / 2 - rec, SOFFIT], [t / 2, SOFFIT], [t / 2, hh], [0, hh + r * 1.35], [-t / 2, hh]]
-    : [[-t / 2, 0], [t / 2, 0], [t / 2, hh], [0, hh + r * 1.35], [-t / 2, hh]];
+  const P = rec > 0
+    ? [[-t / 2, 0], [t / 2 - rec, 0], [t / 2 - rec, SOFFIT], [t / 2, SOFFIT], [t / 2, H], [0, H + ROOF * 1.35], [-t / 2, H]]
+    : [[-t / 2, 0], [t / 2, 0], [t / 2, H], [0, H + ROOF * 1.35], [-t / 2, H]];
+  const roof = e => P[e][1] >= H - 1e-6 && P[(e + 1) % P.length][1] >= H - 1e-6;
   let len = 0; const acc = [0];
   for (let i = 1; i < (closed ? n + 1 : n); i++) { len += path[i % n].distanceTo(path[i - 1]); acc.push(len); }
-  const houses = Math.max(2, Math.round(len / 0.95));
+  let houses = Math.max(2, Math.round(len / 0.95)); if (closed && houses % 2) houses++;
   const at = (i, u, y) => { const [nx, nz] = nrm(i % n), p = path[i % n]; return [p.x + nx * u, y, p.y + nz * u]; };
-  const quad = (a, b, c2, d2) => pos.push(...a, ...c2, ...b, ...a, ...d2, ...c2);
+  const quad = (list, a, b, c2, d2) => list.push(...a, ...c2, ...b, ...a, ...d2, ...c2);
   const segs = closed ? n : n - 1;
   for (let i = 0; i < segs; i++) {
-    const k = Math.floor((acc[i] / len) * houses), k2 = Math.floor((acc[i + 1] / len) * houses);
-    const hh = H + (k % 2 ? 0.13 : 0), r = ROOF * (k % 2 ? 0.8 : 1);
-    const P = prof(hh, r);
-    for (let e = 1; e < P.length; e++) quad(at(i, P[e][0], P[e][1]), at(i + 1, P[e][0], P[e][1]), at(i + 1, P[(e + 1) % P.length][0], P[(e + 1) % P.length][1]), at(i, P[(e + 1) % P.length][0], P[(e + 1) % P.length][1]));
-    // A gable step where one little house meets the next.
-    if (k2 !== k || (!closed && (i === 0 || i === segs - 1))) {
-      const j = k2 !== k ? i + 1 : (i === 0 ? 0 : i + 1);
-      const hh2 = H + (k2 % 2 ? 0.13 : 0), r2 = ROOF * (k2 % 2 ? 0.8 : 1), Q = prof(Math.max(hh, hh2), Math.max(r, r2));
-      const c0 = Q.map(([u, y]) => at(j, u, y));
-      for (const [a, b, e] of THREE.ShapeUtils.triangulateShape(Q.map(([u, y]) => new THREE.Vector2(u, y)), [])) pos.push(...c0[a], ...c0[b], ...c0[e], ...c0[a], ...c0[e], ...c0[b]);
-    }
+    const k = Math.floor(((acc[i] + acc[i + 1]) / 2 / len) * houses);
+    for (let e = 1; e < P.length; e++) { const f = (e + 1) % P.length; quad(roof(e) && k % 2 ? alt : pos, at(i, ...P[e]), at(i + 1, ...P[e]), at(i + 1, ...P[f]), at(i, ...P[f])); }
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.computeVertexNormals();
-  return geo;
+  // Gable ends on an open curve.
+  if (!closed) for (const j of [0, segs]) {
+    const c0 = P.map(([u, y]) => at(j, u, y));
+    for (const [a, b, e] of THREE.ShapeUtils.triangulateShape(P.map(([u, y]) => new THREE.Vector2(u, y)), [])) pos.push(...c0[a], ...c0[b], ...c0[e], ...c0[a], ...c0[e], ...c0[b]);
+  }
+  const geo = list => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(list, 3)); g.computeVertexNormals(); return g; };
+  return [geo(pos), geo(alt)];
 }
 
 // ---------- thin black outlines, like an architect's drawing ----------

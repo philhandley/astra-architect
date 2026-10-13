@@ -194,11 +194,25 @@ const FEATURES = {
     return seats; } },
   yogamat: { r: 0.07, make(bag, x, z, c, rnd) { const rot = rnd() * 6.28; bag.add(pickC(rnd), new THREE.BoxGeometry(0.06, 0.008, 0.15).rotateY(rot).translate(x, 0.004, z)); return [[x, z]]; } },
   counter: { r: 0.16, make(bag, x, z, c, rnd) { const s = new THREE.Shape(); s.absarc(0, 0, 0.14, 0, Math.PI, false); s.absarc(0, 0, 0.09, Math.PI, 0, true); bag.plan('#fbfaf6', s, 0.09, x, 0, z, rnd() * 6.28); return []; } },
-  // A big round fish tank: blue water in a glass drum with a white rim, and bright fish swimming in it.
+  // A big round fish tank: see-through water on a navy base, sand, seaweed and coral, and fish swimming round.
   tank: { r: 0.12, make(bag, x, z, c, rnd) {
-    bag.cyl('#fbfaf6', 0.105, 0.03, x, 0.015, z, 0.11, 24); bag.cyl('#6fcde6', 0.095, 0.3, x, 0.18, z, 0.095, 24); bag.cyl('#fbfaf6', 0.1, 0.012, x, 0.336, z, 0.1, 24);
-    for (let k = 0; k < 4; k++) { const a = rnd() * 6.28; bag.ball(['#f28b30', '#f7c22e', '#e2457d', '#ffffff'][k], 0.018, x + Math.cos(a) * 0.098, 0.08 + k * 0.06, z + Math.sin(a) * 0.098); }
-    return [[x + 0.15, z], [x - 0.15, z]]; } },
+    bag.cyl('#2e4a8c', 0.105, 0.04, x, 0.02, z, 0.11, 24); bag.cyl('#f0e2c0', 0.088, 0.012, x, 0.046, z, 0.088, 20);
+    bag.cyl(WATER, 0.095, 0.25, x, 0.165, z, 0.095, 28);
+    bag.add('#fbfaf6', new THREE.TorusGeometry(0.095, 0.006, 6, 28).rotateX(Math.PI / 2).translate(x, 0.29, z));
+    weedAt(bag, x + 0.03, 0.052, z - 0.02, rnd); coralAt(bag, x - 0.04, 0.052, z + 0.03, rnd);
+    for (let k = 0; k < 5; k++) { const a = rnd() * 6.28, rr = 0.03 + rnd() * 0.04; fishAt(bag, x + Math.cos(a) * rr, 0.09 + rnd() * 0.17, z + Math.sin(a) * rr, -Math.sin(a), Math.cos(a), 0.012, FISH_COLS[k % FISH_COLS.length]); }
+    return [[x + 0.16, z], [x - 0.16, z], [x, z + 0.16]]; } },
+  // A tank of jellyfish: pink bells with trailing legs in deeper blue water.
+  jelly: { r: 0.12, make(bag, x, z, c, rnd) {
+    bag.cyl('#2e4a8c', 0.105, 0.04, x, 0.02, z, 0.11, 24);
+    bag.cyl('~#8aa6ee', 0.095, 0.25, x, 0.165, z, 0.095, 28);
+    bag.add('#fbfaf6', new THREE.TorusGeometry(0.095, 0.006, 6, 28).rotateX(Math.PI / 2).translate(x, 0.29, z));
+    for (let k = 0; k < 4; k++) {
+      const a = rnd() * 6.28, rr = rnd() * 0.05, jx = x + Math.cos(a) * rr, jz = z + Math.sin(a) * rr, jy = 0.11 + rnd() * 0.14, s = 0.018 + rnd() * 0.01;
+      bag.add('#f5a3c7', new THREE.SphereGeometry(s, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).translate(jx, jy, jz));
+      for (let t = 0; t < 4; t++) { const ta = t * Math.PI / 2 + 0.4; bag.cyl('#fbd3e4', 0.0025, s * 2.2, jx + Math.cos(ta) * s * 0.5, jy - s * 1.1, jz + Math.sin(ta) * s * 0.5, 0.0025, 4); }
+    }
+    return [[x + 0.16, z], [x - 0.16, z]]; } },
   fish: { r: 0.08, make(bag, x, z, c, rnd) { for (let k = 0; k < 3; k++) bag.ball(['#f28b30', '#f7c22e', '#e2457d', '#ffffff'][k % 4], 0.025, x + (rnd() - 0.5) * 0.1, 0.12 + k * 0.08, z + (rnd() - 0.5) * 0.1); return []; } },
 };
 // What goes in each kind of room (piece, how many), by floor area in blocks.
@@ -213,7 +227,7 @@ const PLANS = {
   maker: A => [['kidney', Math.max(1, A)], ['roundTable', A], ['plant', 1]],
   music: A => [['stage', 1], ['beanbag', A + 2], ['plant', 1]],
   yoga: A => [['rug', 1], ['yogamat', 3 + A * 2], ['plant', 2]],
-  aquarium: A => [['tank', Math.max(2, A + 1)], ['rug', 1], ['beanbag', A + 1], ['plant', 1]],
+  aquarium: A => [['tank', A >= 2 ? Math.min(3, A - 1) : 1], ['jelly', A >= 3 ? 1 : 0], ['beanbag', Math.max(1, A - 1)], ['plant', 1]],
   archway: A => [],
   observatory: A => [['rug', 1]],
   pool: A => [['plant', 2], ['beanbag', 2]],
@@ -227,11 +241,107 @@ class Bag {
   cyl(col, r, h, x, y, z, r2 = r, seg = 18) { this.add(col, new THREE.CylinderGeometry(r, r2, h, seg).translate(x, y, z)); }
   // A flat shape (in plan) pushed up from y0 to y0 + h.
   plan(col, shape, h, x, y0, z, rotY = 0) { this.add(col, new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 2, curveSegments: 20 }).rotateX(-Math.PI / 2).rotateY(rotY).translate(x, y0, z)); }
+  // A flat outline in plan ([x, z] points) pushed straight up from y0 by h.
+  prism(col, pts, y0, h) { this.add(col, new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z))), { depth: h, bevelEnabled: false }).rotateX(-Math.PI / 2).translate(0, y0, 0)); }
   tube(col, pts, r) { this.add(col, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, r, 8, false)); }
   meshes() {
     const out = [];
-    for (const [col, list] of this.geos) { const g = mergeGeometries(list.map(x => { const y = x.index ? x.toNonIndexed() : x; y.deleteAttribute('uv'); if (!y.attributes.normal) y.computeVertexNormals(); return y; })); const m = new THREE.Mesh(g, mat(col)); m.castShadow = true; m.receiveShadow = true; out.push(m); }
+    for (const [col, list] of this.geos) {
+      // (A colour starting with ~ is water: see-through, and it casts no shadow.)
+      const water = col[0] === '~', g = mergeGeometries(list.map(x => { const y = x.index ? x.toNonIndexed() : x; y.deleteAttribute('uv'); if (!y.attributes.normal) y.computeVertexNormals(); return y; }));
+      const m = new THREE.Mesh(g, water ? mat(col.slice(1), { transparent: true, opacity: 0.42, depthWrite: false }) : mat(col));
+      m.castShadow = m.receiveShadow = !water; if (water) m.renderOrder = 1;
+      out.push(m);
+    }
     return out;
+  }
+}
+
+// ---------- the aquarium ----------
+// Long glass tanks along the walls (sand, seaweed, coral and fish, on a navy base), and in an arch, a tunnel of
+// water over your head when you walk through it. Heights are from the floor.
+const TANK = { back: WALL + 0.008, depth: 0.09, base: 0.045, top: 0.23 };
+const WATER = '~#5ec4e2', FISH_COLS = ['#f28b30', '#f7c22e', '#e2457d', '#ffffff', '#3d8de0', '#f5a3c7', '#a3d140'];
+const CORAL = ['#f5a3c7', '#e2457d', '#f28b30', '#7c46a8', '#f7c22e'], WEED = ['#3e9a4f', '#5f9a4c', '#7db45a'];
+// A little fish facing along (dx, dz): a squashed ball with a flat tail.
+function fishAt(bag, x, y, z, dx, dz, s, col) {
+  const a = Math.atan2(-dz, dx);
+  bag.add(col, new THREE.SphereGeometry(s, 8, 6).scale(1.7, 1, 0.55).rotateY(a).translate(x, y, z));
+  bag.add(col, new THREE.ConeGeometry(s * 0.8, s * 1.1, 6).rotateZ(-Math.PI / 2).scale(1, 1, 0.35).translate(-s * 2.2, 0, 0).rotateY(a).translate(x, y, z));
+}
+function weedAt(bag, x, y, z, rnd) {
+  for (let i = 0; i < 3; i++) {
+    const hh = 0.06 + rnd() * 0.09;
+    bag.add(WEED[i % 3], new THREE.ConeGeometry(0.007, hh, 5).translate(0, hh / 2, 0).rotateZ((rnd() - 0.5) * 0.5).rotateX((rnd() - 0.5) * 0.4).translate(x + (rnd() - 0.5) * 0.02, y, z + (rnd() - 0.5) * 0.02));
+  }
+}
+function coralAt(bag, x, y, z, rnd) {
+  const c = CORAL[Math.floor(rnd() * CORAL.length)];
+  for (let i = 0; i < 3; i++) bag.ball(c, 0.008 + rnd() * 0.008, x + (rnd() - 0.5) * 0.03, y + i * 0.006, z + (rnd() - 0.5) * 0.02);
+}
+// Split a run of wall where it turns a sharp corner, and leave out the doors; tanks fill what is left.
+function tankStretches(run, ops) {
+  const blocked = [], n = run.n, cut = 0.16;
+  if (!run.closed) blocked.push([-1, cut], [run.len - cut, run.len + 1]);
+  for (let i = 1; i < n.length; i++) if (n[i - 1][0] * n[i][0] + n[i - 1][1] * n[i][1] < 0.85) blocked.push([run.s[i] - cut, run.s[i] + cut]);
+  if (run.closed && n[0][0] * n[n.length - 1][0] + n[0][1] * n[n.length - 1][1] < 0.85) blocked.push([-1, cut], [run.len - cut, run.len + 1]);
+  for (const o of ops) if (o.door) blocked.push([o.s0 - 0.05, o.s1 + 0.05]);
+  blocked.sort((a, b) => a[0] - b[0]);
+  const out = []; let at = 0;
+  for (const [a, b] of blocked) { if (a - at > 0.18) out.push([at, a]); at = Math.max(at, b); }
+  if (run.len - at > 0.18) out.push([at, run.len]);
+  return out;
+}
+function wallTanks(bag, b, k, o, rnd) {
+  const runs = wallRuns(b, k), ops = openings(b, k, runs), seats = [];
+  const longX = o.W >= o.D;
+  runs.forEach((run, ri) => {
+    if (!run.outer || run.colonnade) return;
+    // (An arch's short ends are where you walk in and out.)
+    if (b.shape === 'arch' && o.kind === 'rr') { const [p, q] = [run.pts[0], run.pts[run.pts.length - 1]]; if (Math.abs(longX ? q[0] - p[0] : q[1] - p[1]) < 1e-3) return; }
+    for (const [a, c] of tankStretches(run, ops.filter(op => op.run === ri))) {
+      // Points along the stretch (every corner of the run in between), with the way out averaged at each.
+      const us = [a, ...run.s.filter(s => s > a + 1e-4 && s < c - 1e-4), c];
+      const at = u => {
+        const p = runAt(run, u), i = run.s.indexOf(u);
+        if (i > 0 && i < run.n.length) { const nx = run.n[i - 1][0] + run.n[i][0], nz = run.n[i - 1][1] + run.n[i][1], l = Math.hypot(nx, nz) || 1; return { ...p, nx: nx / l, nz: nz / l }; }
+        return p;
+      };
+      const band = (o0, o1) => { const pts = us.map(u => { const p = at(u); return [p.x - p.nx * o0, p.z - p.nz * o0]; }); return [...pts, ...us.slice().reverse().map(u => { const p = at(u); return [p.x - p.nx * o1, p.z - p.nz * o1]; })]; };
+      const B = TANK.back, F = TANK.back + TANK.depth;
+      bag.prism('#2e4a8c', band(B - 0.004, F + 0.006), 0, TANK.base);
+      bag.prism('#f0e2c0', band(B + 0.004, F - 0.004), TANK.base, 0.016);
+      bag.prism(WATER, band(B, F), TANK.base, TANK.top - TANK.base);
+      bag.prism('#fbfaf6', band(B - 0.002, B + 0.01), TANK.top, 0.01);
+      bag.prism('#fbfaf6', band(F - 0.01, F + 0.002), TANK.top, 0.01);
+      // What lives in it.
+      for (let u = a + 0.04; u < c - 0.03; u += 0.055) {
+        const p = runAt(run, u), mid = B + TANK.depth / 2, j = (rnd() - 0.5) * 0.04;
+        const x = p.x - p.nx * (mid + j), z = p.z - p.nz * (mid + j), r = rnd(), y0 = TANK.base + 0.016;
+        if (r < 0.4) weedAt(bag, x, y0, z, rnd); else if (r < 0.65) coralAt(bag, x, y0, z, rnd);
+        else if (r < 0.75) bag.add('#b9b4aa', new THREE.SphereGeometry(0.016, 7, 5).scale(1.4, 0.7, 1).translate(x, y0, z));
+        if (rnd() < 0.7) { const sg = rnd() < 0.5 ? 1 : -1; fishAt(bag, p.x - p.nx * (mid + (rnd() - 0.5) * 0.04), y0 + 0.04 + rnd() * 0.12, p.z - p.nz * (mid + (rnd() - 0.5) * 0.04), p.dx * sg, p.dz * sg, 0.011 + rnd() * 0.005, FISH_COLS[Math.floor(rnd() * FISH_COLS.length)]); }
+        if (rnd() < 0.08) for (let i = 0; i < 4; i++) bag.add('#ffffff', new THREE.SphereGeometry(0.004 + i * 0.001, 5, 4).translate(x, y0 + 0.05 + i * 0.035, z));
+      }
+      // Places to stand and look.
+      for (let u = a + 0.12; u < c - 0.08; u += 0.3) { const p = runAt(run, u), x = p.x - p.nx * (F + 0.07), z = p.z - p.nz * (F + 0.07); if (o.inside(x, z, 0.04)) seats.push([x, z]); }
+    }
+  });
+  return seats;
+}
+// The walk-through tunnel: an arch of water from the top of one wall of tanks to the other, fish swimming over you.
+function waterTunnel(bag, o, top, rnd) {
+  const longX = o.W >= o.D, L = (longX ? o.W : o.D) - 0.12, half = (longX ? o.D : o.W) / 2 - TANK.back - TANK.depth;
+  const y0 = TANK.top + 0.01, a = half, c = Math.max(0.12, top - 0.03 - y0), t = 0.05, n = 28, sh = new THREE.Shape();
+  for (let i = 0; i <= n; i++) { const q = (i / n) * Math.PI; i ? sh.lineTo(a * Math.cos(q), y0 + c * Math.sin(q)) : sh.moveTo(a, y0); }
+  for (let i = n; i >= 0; i--) { const q = (i / n) * Math.PI; sh.lineTo((a - t) * Math.cos(q), y0 + (c - t) * Math.sin(q)); }
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: L, bevelEnabled: false, curveSegments: 8 }).translate(0, 0, -L / 2);
+  if (longX) geo.rotateY(Math.PI / 2);
+  bag.add(WATER, geo);
+  for (let i = 0; i < Math.round(L * 16); i++) {
+    const q = (0.12 + rnd() * 0.76) * Math.PI, u = (a - t / 2) * Math.cos(q), y = y0 + (c - t / 2) * Math.sin(q), w = (rnd() - 0.5) * (L - 0.1), sg = rnd() < 0.5 ? 1 : -1;
+    const col = FISH_COLS[Math.floor(rnd() * FISH_COLS.length)];
+    if (longX) fishAt(bag, w, y, -u, sg, 0, 0.011, col); else fishAt(bag, u, y, w, 0, sg, 0.011, col);
   }
 }
 
@@ -265,14 +375,19 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
   // Furniture: playful pieces placed loosely round the room (not in rows), so it feels like a happy place.
   const bag = new Bag(), seats = [];
   const area = Math.max(1, Math.round(b.w * b.d * (o.kind === 'ring' ? 0.6 : o.kind === 'arc' ? 0.5 : 1)));
-  const plan = (PLANS[b.type] || PLANS.classroom)(area);
+  const aqua = b.type === 'aquarium', plan = aqua && b.shape === 'arch' ? [] : (PLANS[b.type] || PLANS.classroom)(area);
   const placed = [], rnd = seededRnd(b.id * 97 + (b.x + 1) * 13 + (b.z + 1) * 7);
+  // An aquarium: tanks along the walls, and in an arch, a tunnel of water overhead when you walk through.
+  if (aqua) {
+    for (const s of wallTanks(bag, b, k, o, rnd)) seats.push(s);
+    if (opts.walk && b.shape === 'arch' && o.kind === 'rr') waterTunnel(bag, o, opts.top, rnd);
+  }
   for (const [kind, count] of plan) {
     const F = FEATURES[kind];
     for (let n = 0; n < count; n++) {
       for (let tries = 0; tries < 60; tries++) {
         const x = (rnd() - 0.5) * (b.w - 0.1), z = (rnd() - 0.5) * (b.d - 0.1);
-        if (!o.inside(x, z, WALL + F.r + 0.02)) continue;
+        if (!o.inside(x, z, WALL + (aqua ? 0.11 : 0) + F.r + 0.02)) continue;
         if (b.type === 'pool' && o.kind === 'rr' && Math.abs(x) < (o.W - 0.2) / 2 && Math.abs(z) < (o.D - 0.2) / 2) continue;
         if (placed.some(p => Math.hypot(p.x - x, p.z - z) < p.r + F.r + 0.03)) continue;
         placed.push({ x, z, r: F.r });

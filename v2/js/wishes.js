@@ -59,7 +59,7 @@ export function mountWishes(root, model, { button, celebrate }) {
   let stars = (() => { try { return +localStorage.getItem(KEY + '-stars') || 0; } catch (e) { return 0; } })();
   const paintSheet = () => {
     sheet.querySelector('.wishes').innerHTML = WISHES.map(card).join(''); sheet.querySelector('.stickers').innerHTML = STICKERS.map(card).join('');
-    sheet.querySelector('.cm-stars').innerHTML = stars ? emo('⭐').repeat(Math.min(stars, 20)) + `<span>${stars} for changing your mind after a Big Question</span>` : '<span>Answer a Big Question with Nova, talk about it together, and earn a star if you change your mind.</span>';
+    sheet.querySelector('.cm-stars').innerHTML = stars ? emo('⭐').repeat(Math.min(stars, 20)) + `<span>${stars} for changing your mind after a Big Question</span>` : '<span>Tap the Conundrum circle and its Big Question button, talk about it together, and earn a star if you change your mind.</span>';
   };
   sheet.addEventListener('click', e => {
     if (e.target === sheet || e.target.closest('.close')) { sfx.tap(); sheet.hidden = true; return; }

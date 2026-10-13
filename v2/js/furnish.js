@@ -362,7 +362,6 @@ export const FEATURES = {
       for (let t = 0; t < 4; t++) { const ta = t * Math.PI / 2 + 0.4; bag.cyl('#fbd3e4', 0.0025, s * 2.2, jx + Math.cos(ta) * s * 0.5, jy - s * 1.1, jz + Math.sin(ta) * s * 0.5, 0.0025, 4); }
     }
     return [[x + 0.16, z], [x - 0.16, z]]; } },
-  fish: { r: 0.08, make(bag, x, z, c, rnd) { for (let k = 0; k < 3; k++) bag.ball(['#f28b30', '#f7c22e', '#e2457d', '#ffffff'][k % 4], 0.025, x + (rnd() - 0.5) * 0.1, 0.12 + k * 0.08, z + (rnd() - 0.5) * 0.1); return []; } },
 
   roundTable: { r: 0.13, make: (bag, x, z, c, rnd) => roundTableAt(bag, x, z, rnd) },
   lunchTable: { r: 0.13, make: (bag, x, z, c, rnd) => roundTableAt(bag, x, z, rnd, true) },
@@ -392,13 +391,6 @@ export const FEATURES = {
     return [[x, z]]; } },
   beanbag: { r: 0.06, make(bag, x, z, c, rnd) { bag.ball(pickC(rnd), 0.05, x, 0, z); return [[x, z]]; } },
   plant: { r: 0.05, make(bag, x, z, c, rnd) { bag.cyl('#fbfaf6', 0.028, 0.05, x, 0.025, z, 0.022, 10); bag.sphere(LEAF[Math.floor(rnd() * 3)], 0.05, x, 0.1, z, 10); return []; } },
-  sofa: { r: 0.2, make(bag, x, z, c, rnd) {
-    // A wavy sofa that snakes across the room.
-    const rot = rnd() * 6.28, col = pickC(rnd), pts = [], seats = [];
-    for (let i = 0; i <= 10; i++) { const u = (i / 10 - 0.5) * 0.36, v = Math.sin(i / 10 * Math.PI * 2) * 0.05; pts.push(new THREE.Vector3(x + Math.cos(rot) * u - Math.sin(rot) * v, 0.035, z + Math.sin(rot) * u + Math.cos(rot) * v)); }
-    bag.tube(col, pts, 0.035, 32, 8);
-    for (let i = 1; i < 10; i += 3) seats.push([pts[i].x, pts[i].z]);
-    return seats; } },
   tree: { r: 0.16, make(bag, x, z, c, rnd) {
     // An indoor tree with a round bench.
     bag.cyl('#9b7b5c', 0.02, 0.22, x, 0.11, z, 0.026, 8); bag.sphere('#7db45a', 0.1, x, 0.27, z, 12);
@@ -420,7 +412,6 @@ export const FEATURES = {
       }
     }
     return []; } },
-  mats: { r: 0.1, make(bag, x, z, c, rnd) { bag.add('#3d8de0', new THREE.BoxGeometry(0.1, 0.014, 0.17).rotateY(rnd() * 6.28).translate(x, 0.007, z)); return [[x, z]]; } },
   hoop: { r: 0.08, make(bag, x, z) { bag.cyl('#fbfaf6', 0.008, 0.36, x, 0.18, z, 0.008, 6); bag.box('#ffffff', 0.12, 0.08, 0.008, x, 0.36, z); bag.add('#f28b30', new THREE.TorusGeometry(0.035, 0.005, 6, 14).rotateX(Math.PI / 2).translate(x, 0.33, z + 0.04)); return []; } },
   trampoline: { r: 0.16, make(bag, x, z, c, rnd) { bag.cyl('#3d8de0', 0.15, 0.03, x, 0.03, z, 0.15, 24); bag.cyl('#26272d', 0.13, 0.032, x, 0.032, z, 0.13, 24); for (let i = 0; i < 6; i++) { const a = (i / 6) * 6.28; bag.cyl(STEEL, 0.005, 0.02, x + Math.cos(a) * 0.14, 0.01, z + Math.sin(a) * 0.14, 0.005, 6); } return []; } },
   // An easel with a painting on it, a jar of brushes on its ledge.
@@ -443,7 +434,6 @@ export const FEATURES = {
     const seats = []; for (let i = 0; i < 6; i++) { const a = Math.PI * (0.15 + i * 0.14), sx = x + Math.cos(a) * 0.2, sz = z + Math.sin(a) * 0.2; seats.push([sx, sz]); }
     return seats; } },
   yogamat: { r: 0.07, make(bag, x, z, c, rnd) { const rot = rnd() * 6.28; bag.add(pickC(rnd), new THREE.BoxGeometry(0.06, 0.008, 0.15).rotateY(rot).translate(x, 0.004, z)); return [[x, z]]; } },
-  counter: { r: 0.16, make(bag, x, z, c, rnd) { const s = new THREE.Shape(); s.absarc(0, 0, 0.14, 0, Math.PI, false); s.absarc(0, 0, 0.09, Math.PI, 0, true); bag.plan('#fbfaf6', s, 0.09, x, 0, z, rnd() * 6.28); return []; } },
 
   // ---- the maker workshop ----
   // A bench with two 3D printers, each printing a little rocket; their print heads slide to and fro.
@@ -649,7 +639,7 @@ export const FEATURES = {
       s.add('^' + col, new THREE.SphereGeometry(0.046, 14, 10, Math.PI / 2 + 0.95, Math.PI * 2 - 1.9, 0, Math.PI).scale(1, 1.3, 1).translate(0.008, 0.11, 0));
       s.ball(PAPER, 0.03, 0.008, 0.06, 0.004); s.ball(pickC(rnd), 0.014, -0.006, 0.08, -0.018);
     });
-    return [at(m, 0.008, 0.005)]; } },
+    return []; } },
   // A bubble tube: a tall column of water with bubbles rising, lit up, on a soft mat.
   bubbletube: { r: 0.06, make(bag, x, z, c, rnd) {
     bag.cyl(pickC(rnd), 0.055, 0.008, x, 0.004, z);
@@ -730,7 +720,7 @@ export const FEATURES = {
   // The telescope: a big white tube on a dark pier in the middle of the room, tilted up at the sky (towards the slit in
   // the dome), with a round step to stand on, and a navy star carpet round it to lie back on and look up.
   telescope: { r: 0.18, centre: true, make(bag, x, z, c, rnd) {
-    const carpet = new THREE.Shape(); carpet.absarc(0, 0, 0.36, 0, Math.PI * 2, false); const hole = new THREE.Path(); hole.absarc(0, 0, 0.17, 0, Math.PI * 2, true); carpet.holes.push(hole);
+    const carpet = new THREE.Shape(); carpet.absarc(0, 0, 0.36, 0, Math.PI * 2, false); const hole = new THREE.Path(); hole.absarc(0, 0, 0.173, 0, Math.PI * 2, true); carpet.holes.push(hole);
     bag.slab(NAVY, carpet, 0.004, x, 0, z, 0, 28);
     for (let i = 0; i < 16; i++) { const a = rnd() * 6.28, rr = 0.2 + rnd() * 0.14; bag.floor('#f7c22e', new THREE.ShapeGeometry(star(0.008 + rnd() * 0.006)), x + Math.cos(a) * rr, 0.0045, z + Math.sin(a) * rr, rnd() * 6); }
     bag.floor('#e8e4da', new THREE.RingGeometry(0.014, 0.024, 12, 1, 0, Math.PI), x - 0.25, 0.0046, z + 0.12, 0.8);

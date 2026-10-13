@@ -741,7 +741,9 @@ Object.assign(BUILD, {
     const rk = new THREE.Group(); rk.position.set(0.12, 0.1, 0);
     rk.add(mesh(new THREE.CylinderGeometry(0.13, 0.15, 1.2, 20).translate(0, 0.72, 0), mat(WHITE)));
     rk.add(mesh(new THREE.ConeGeometry(0.13, 0.36, 20).translate(0, 1.5, 0), mat(c)));
-    rk.add(mesh(new THREE.CylinderGeometry(0.155, 0.17, 0.12, 20).translate(0, 0.06, 0), mat('#3d405b')));
+    // The base of the rocket wears a black-and-white dazzle pattern, like the roll patterns on real rockets.
+    const bw = canvasTex('rocketbase', (gc, s) => SURF.dazzle.draw(gc, s, '#23252b'), 256); bw.repeat.set(3, 1);
+    rk.add(mesh(new THREE.CylinderGeometry(0.155, 0.17, 0.12, 20).translate(0, 0.06, 0), mat('#ffffff', { map: bw })));
     const win = mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 16).rotateX(Math.PI / 2).translate(0, 1.05, 0.135), mat('#7fd0ea')); rk.add(win);
     for (let i = 0; i < 3; i++) { const fin = mesh(new THREE.BoxGeometry(0.02, 0.26, 0.16).translate(0, 0.2, 0.2), mat(c)); fin.rotation.y = (i * Math.PI * 2) / 3; rk.add(fin); }
     rk.userData.rocket = true;

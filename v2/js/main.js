@@ -45,6 +45,7 @@ async function boot() {
         <button class="ab" data-a="photo" type="button">${icon('camera')} Photo</button>
         <button class="ab" data-a="finn" type="button">${icon('blocks')} Finn's model</button>
         <button class="ab" data-a="clear" type="button">${icon('leaf')} Empty site</button>
+        <button class="ab" data-a="reset" type="button">${icon('undo')} Reset site</button>
         <button class="ab round" data-a="speech" type="button" aria-label="Read aloud">${icon('speaker')}</button>
         <button class="ab round" data-a="sound" type="button" aria-label="Sounds">${icon('music')}</button>
       </div>
@@ -92,6 +93,7 @@ async function boot() {
       model.snapshot(); model.boxes = FINNS_MODEL.map((b, i) => ({ ...b, id: i + 1, x: b.x + model.pad.w, z: b.z + model.pad.n })); model.nextId = FINNS_MODEL.length + 1; model.changed({ loaded: true });
       location.hash = '#site'; site.select(null); site.frameSite(); sfx.whoosh(); say('Here is your model from the table, on the site. Tap a block to change it.');
     }
+    if (a === 'reset') { sfx.tap(); location.hash = '#site'; setTimeout(() => site.resetSite(), 60); }
     if (a === 'clear') { if (!model.boxes.length || confirm('Start with an empty site? (Undo brings it back.)')) { model.clear(); site.select(null); sfx.whoosh(); } }
   });
   paint();

@@ -545,6 +545,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
   // buildings stay where they are on the land.
   function resize(dx, dz) {
     for (const b of model.boxes) { b.x += dx; b.z += dz; }
+    if (dx || dz) model.history = [];   // (old undo steps were at the old positions)
     model.grown = model.grown.map(([x, z]) => [x + dx, z + dz]);
     makeSite(model.pad);
     buildSite(world, siteView);
@@ -561,15 +562,29 @@ export function mountSite(root, world, model, siteView, thumbs) {
     sfx.grow(); say(model.pad[side] >= MAX_PAD ? 'More land! That side is as big as it can be now.' : 'More land!');
   }
   growbar.querySelector('.done').addEventListener('click', () => { sfx.tap(); stopGrow(); });
-  growbar.querySelector('.reset').addEventListener('click', () => {
-    sfx.tap();
-    const p = model.pad, inOld = (x, z) => x >= p.w && z >= p.n && x < GRID.w - p.e && z < GRID.d - p.s;
-    if (model.boxes.some(b => model.squares(b).some(([x, z]) => !inOld(x, z)))) { sfx.no(); toast('Move the rooms off the new land first.'); say('Move the rooms off the new land first.'); return; }
+  growbar.querySelector('.reset').addEventListener('click', () => { sfx.tap(); resetSite(); });
+  // Put the land back exactly as Finn painted it: no extra land, and no forest cleared away. Rooms standing on
+  // land that goes (and anything resting on them) are taken away; everything else stays where it is.
+  function resetSite() {
+    if (S.day) stopDay();
+    const p = model.pad, grown = new Set(model.grown.map(([x, z]) => `${x},${z}`));
+    const goes = (x, z) => x < p.w || z < p.n || x >= GRID.w - p.e || z >= GRID.d - p.s || grown.has(`${x},${z}`);
+    const off = new Map();
+    for (const b of model.boxes) if (b.level === 0 && model.squares(b).some(([x, z]) => goes(x, z))) { off.set(b.id, b); for (const [id, t] of model.above(b)) off.set(id, t); }
+    const sure = off.size
+      ? `Put the site back as it was? ${off.size} room${off.size > 1 ? 's' : ''} on the extra land will be taken away.`
+      : 'Put the site back as it was, with all its trees and hills?';
+    say(sure);
+    if (!confirm(sure)) return;
+    model.boxes = model.boxes.filter(b => !off.has(b.id));
+    model.history = [];                 // (undo can't go back across a change of site)
+    model.grown = [];
     const dx = -p.w, dz = -p.n;
     model.pad = { w: 0, e: 0, n: 0, s: 0 };
+    select(null);
     resize(dx, dz);
-    say('The site is back to how it was.');
-  });
+    sfx.whoosh(); say('The site is back to how it was.');
+  }
   // Land added in an earlier visit comes back.
   if (model.grown.length) { growSquares(model.grown); siteView.regrow(); }
 
@@ -801,7 +816,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
   frameSite(true);
   setTool(null);
   return {
-    S, select, setTool, redraw, frameSite, setInside, tap: handleTap, crowd, hooks, startDay,
+    S, select, setTool, redraw, frameSite, setInside, tap: handleTap, crowd, hooks, startDay, resetSite,
     // Everyone cheers and confetti flies (a wish has come true).
     celebrate() {
       for (const b of model.boxes) crowd.cheer(b.id);

@@ -50,18 +50,27 @@ export class Bag {
     return out;
   }
   part(obj) { this.parts.push(obj); return obj; }
+  // Everything of a plain colour becomes one mesh, coloured per vertex (one draw call for the whole room's
+  // furniture); water, glowing and two-sided things get a mesh per colour.
   meshes() {
-    const out = [];
+    const out = [], plain = [], c = new THREE.Color();
     for (const [col, list] of this.geos) {
       // (A colour starting with ~ is water: see-through, and it casts no shadow. One starting with * glows; one
       // starting with ^ is seen from both sides, for open shells.)
       const water = col[0] === '~', glow = col[0] === '*', both = col[0] === '^', hex = water || glow || both ? col.slice(1) : col;
-      const g = mergeGeometries(list.map(x => { const y = x.index ? x.toNonIndexed() : x; if (y.attributes.uv) y.deleteAttribute('uv'); if (!y.attributes.normal) y.computeVertexNormals(); return y; }));
+      const prepped = list.map(x => { const y = x.index ? x.toNonIndexed() : x; if (y.attributes.uv) y.deleteAttribute('uv'); if (!y.attributes.normal) y.computeVertexNormals(); return y; });
+      if (!water && !glow && !both) {
+        c.set(hex);
+        for (const y of prepped) { const n = y.attributes.position.count, arr = new Float32Array(n * 3); for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; } y.setAttribute('color', new THREE.BufferAttribute(arr, 3)); plain.push(y); }
+        continue;
+      }
+      const g = mergeGeometries(prepped);
       const m = new THREE.Mesh(g, water ? mat(hex, { transparent: true, opacity: 0.42, depthWrite: false }) : glow ? mat(hex, { emissive: hex, emissiveIntensity: 0.6 }) : both ? mat(hex, { side: THREE.DoubleSide }) : mat(hex));
       m.castShadow = m.receiveShadow = !water; if (water) m.renderOrder = 1;
       m.userData.noInk = true;
       out.push(m);
     }
+    if (plain.length) { const m = new THREE.Mesh(mergeGeometries(plain), mat('#ffffff', { vertexColors: true })); m.castShadow = m.receiveShadow = true; m.userData.noInk = true; out.push(m); }
     return out;
   }
 }

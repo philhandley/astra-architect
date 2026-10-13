@@ -19,7 +19,7 @@ function panel(list, x, y, z, nx, nz, w, h, d, out = 0) {
   list.push(new THREE.BoxGeometry(w, h, d).translate(0, 0, out).rotateY(Math.atan2(nx, nz)).translate(x, y, z));
 }
 function disc(list, p, y, r, d, out) {
-  list.push(new THREE.CylinderGeometry(r, r, d, 22).rotateX(Math.PI / 2).translate(0, 0, out).rotateY(Math.atan2(p.nx, p.nz)).translate(p.x, y, p.z));
+  list.push(new THREE.CylinderGeometry(r, r, d, 14).rotateX(Math.PI / 2).translate(0, 0, out).rotateY(Math.atan2(p.nx, p.nz)).translate(p.x, y, p.z));
 }
 
 // One window: glass on the wall, a frame round it (deep and brightly coloured for big windows), and glazing bars.
@@ -38,7 +38,7 @@ function rectWindow(L, run, o, yb) {
 }
 // A flat shape (in the wall's plane) pushed out from the wall face.
 function plate(list, p, y, shape, d, out) {
-  list.push(new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: false, curveSegments: 20 }).translate(0, 0, out - d / 2).rotateY(Math.atan2(p.nx, p.nz)).translate(p.x, y, p.z));
+  list.push(new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: false, curveSegments: 10 }).translate(0, 0, out - d / 2).rotateY(Math.atan2(p.nx, p.nz)).translate(p.x, y, p.z));
 }
 const circle = r => { const s = new THREE.Path(); s.absarc(0, 0, r, 0, Math.PI * 2, true); return s; };
 function roundWindow(L, run, o, yb) {

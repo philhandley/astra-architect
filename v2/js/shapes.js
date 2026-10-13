@@ -45,7 +45,7 @@ function roundedRect(W, D, r) {
   return s;
 }
 function upExtrude(shape, H) {
-  const g = new THREE.ExtrudeGeometry(shape, { depth: H, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 1, curveSegments: 28 });
+  const g = new THREE.ExtrudeGeometry(shape, { depth: H, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 1, curveSegments: 16 });
   g.rotateX(-Math.PI / 2);
   return g;
 }
@@ -354,9 +354,10 @@ const BUILD = {
     for (const k of [0.03, 0.27, 0.5, 0.73, 0.97]) {
       const Wk = W - 0.06 - 2 * band * k, Dk = D - 0.06 - 2 * band * k, rk = Math.min(W, D) / 2 - band * k;
       const ring = roundedRect(Wk + 0.012, Dk + 0.012, rk + 0.006); ring.holes.push(roundedRect(Wk - 0.012, Dk - 0.012, Math.max(0.03, rk - 0.006)));
-      strips.push(new THREE.ExtrudeGeometry(ring, { depth: 0.004, bevelEnabled: false, curveSegments: 40 }).rotateX(-Math.PI / 2).translate(0, 0.085, 0));
+      const flat = new THREE.ShapeGeometry(ring, 14).rotateX(-Math.PI / 2); if (flat.attributes.normal.getY(0) < 0) flat.rotateX(Math.PI);      // (face up, whichever way the outline winds)
+      strips.push(flat.translate(0, 0.1015, 0));       // (the track's top, bevel and all, is at 0.1)
     }
-    strips.push(W >= D ? new THREE.BoxGeometry(0.02, 0.004, band).translate(0, 0.087, D / 2 - 0.03 - band / 2) : new THREE.BoxGeometry(band, 0.004, 0.02).translate(W / 2 - 0.03 - band / 2, 0.087, 0));
+    strips.push(W >= D ? new THREE.BoxGeometry(0.02, 0.004, band).translate(0, 0.1, D / 2 - 0.03 - band / 2) : new THREE.BoxGeometry(band, 0.004, 0.02).translate(W / 2 - 0.03 - band / 2, 0.1, 0));
     const lanes = mesh(mergeGeometries(strips.map(s => { const n = s.index ? s.toNonIndexed() : s; n.deleteAttribute('uv'); return n; })), mat(WHITE), false); lanes.userData.noInk = true; g.add(lanes);
     // A football pitch on the infield, kept well inside the track: brighter grass, white markings, a goal at
     // each end and a flag at each corner.
@@ -386,15 +387,42 @@ const BUILD = {
     return g;
   },
   garden(w, d, H, c, o) {
-    // A lawn on the ground, with a low stone edge, trees and flowers.
-    const W = w - 2 * GAP, D = d - 2 * GAP, g = new THREE.Group();
+    // A school garden: a lawn with a low stone edge, a raised vegetable bed, a bug hotel, stepping stones, a
+    // watering can, flowers and a tree. Small things of one colour are merged into one mesh.
+    const W = w - 2 * GAP, D = d - 2 * GAP, g = new THREE.Group(), bits = new Map(), r = seeded(o.id || 3);
+    const add = (col, geo) => { if (!bits.has(col)) bits.set(col, []); bits.get(col).push(geo); };
     const edge = roundedRect(W, D, 0.06); edge.holes.push(roundedRect(W - 0.06, D - 0.06, 0.04));
     g.add(mesh(new THREE.ExtrudeGeometry(edge, { depth: 0.035, bevelEnabled: false }).rotateX(-Math.PI / 2), mat('#e9e4d8')));
     g.add(mesh(new THREE.ExtrudeGeometry(roundedRect(W - 0.06, D - 0.06, 0.04), { depth: 0.02, bevelEnabled: false }).rotateX(-Math.PI / 2), mat('#8fcf5b')));
-    const r = seeded(o.id || 3);
-    for (let i = 0; i < Math.max(1, Math.round(w * d)); i++) { const t = roundTree(0.17 + r() * 0.06, TREE_GREENS[i % TREE_GREENS.length]); t.position.set((r() - 0.5) * (W - 0.4), 0.02, (r() - 0.5) * (D - 0.4)); g.add(t); }
+    const long = W >= D, hx = W / 2 - 0.08, hz = D / 2 - 0.08, flip = r() < 0.5 ? 1 : -1;
+    // The tree in one corner (more trees in a big garden).
+    for (let i = 0; i < Math.max(1, Math.round(w * d / 2)); i++) { const t = roundTree(0.17 + r() * 0.06, TREE_GREENS[i % TREE_GREENS.length]); t.position.set(i ? (r() - 0.5) * (W - 0.4) : -flip * (hx - 0.12), 0.02, i ? (r() - 0.5) * (D - 0.4) : -(hz - 0.12)); g.add(t); }
+    // Raised vegetable beds along the far side: cabbages, carrots and lettuces in rows.
+    const beds = Math.max(1, Math.floor(Math.max(w, d) / 1.5));
+    for (let b = 0; b < beds; b++) {
+      const bl = Math.min(0.42, (long ? W : D) / beds - 0.12), bw = 0.16, cx = long ? -W / 2 + (b + 0.5) * W / beds + flip * 0.05 : hx - bw / 2, cz = long ? hz - bw / 2 : -D / 2 + (b + 0.5) * D / beds;
+      const sx = long ? bl : bw, sz = long ? bw : bl;
+      add('#b5875a', new THREE.BoxGeometry(sx, 0.05, sz).translate(cx, 0.045, cz)); add('#6b4a32', new THREE.BoxGeometry(sx - 0.02, 0.004, sz - 0.02).translate(cx, 0.071, cz));
+      for (let row = 0; row < 3; row++) for (let k = 0; k < 5; k++) {
+        const u = -0.4 + k * 0.2, v = (row - 1) * 0.045, px = cx + (long ? u * (bl - 0.04) : v), pz = cz + (long ? v : u * (bl - 0.04));
+        if (row === 0) add('#7db45a', new THREE.SphereGeometry(0.018, 7, 5).scale(1, 0.75, 1).translate(px, 0.083, pz));
+        else if (row === 1) { add('#f28b30', new THREE.ConeGeometry(0.008, 0.012, 6).rotateX(Math.PI).translate(px, 0.076, pz)); add('#5f9a4c', new THREE.ConeGeometry(0.01, 0.026, 5).translate(px, 0.093, pz)); }
+        else add('#a3d140', new THREE.SphereGeometry(0.014, 7, 5).scale(1, 0.6, 1).translate(px, 0.079, pz));
+      }
+    }
+    // A bug hotel: a little wooden house stuffed with logs and canes.
+    const bx = flip * (hx - 0.07), bz = -(hz - 0.06);
+    add('#b5875a', new THREE.BoxGeometry(0.1, 0.11, 0.06).translate(bx, 0.075, bz));
+    for (const sg of [-1, 1]) add('#8a5a3b', new THREE.BoxGeometry(0.075, 0.006, 0.07).rotateZ(-sg * 0.6).translate(bx + sg * 0.028, 0.148, bz));
+    for (let i = 0; i < 9; i++) { const ux = (i % 3 - 1) * 0.03, uy = Math.floor(i / 3) * 0.032; add(i % 2 ? '#e8cfa4' : '#c99a6b', new THREE.CircleGeometry(0.012, 8).translate(bx + ux, 0.04 + uy, bz + 0.0305)); add('#4a3426', new THREE.CircleGeometry(0.004, 6).translate(bx + ux, 0.04 + uy, bz + 0.031)); }
+    // Stepping stones across the lawn, and a watering can beside them.
+    for (let i = 0; i < 4; i++) { const t = i / 3; add('#cfcac0', new THREE.CylinderGeometry(0.032, 0.034, 0.008, 9).translate(-flip * (hx - 0.1) + flip * t * (2 * hx - 0.3) * 0.6, 0.022, hz - 0.08 - t * 0.12 - (long ? 0.18 : 0))); }
+    const wx = flip * 0.1, wz = 0.12;
+    add('#3d8de0', new THREE.CylinderGeometry(0.022, 0.024, 0.04, 10).translate(wx, 0.04, wz)); add('#3d8de0', new THREE.CylinderGeometry(0.004, 0.005, 0.05, 6).rotateZ(-0.9).translate(wx + 0.035, 0.05, wz)); add('#3d8de0', new THREE.TorusGeometry(0.016, 0.003, 4, 10, Math.PI).translate(wx - 0.004, 0.06, wz));
+    // Flowers dotted round the lawn.
     const flowers = ['#f5a3c7', '#f7c22e', '#ffffff', '#e2457d'];
-    for (let i = 0; i < 10 * w * d; i++) { const f = mesh(new THREE.SphereGeometry(0.025, 6, 4), mat(flowers[i % 4]), false); f.position.set((r() - 0.5) * (W - 0.14), 0.04, (r() - 0.5) * (D - 0.14)); g.add(f); }
+    for (let i = 0; i < 9 * w * d; i++) { const fx = (r() - 0.5) * (W - 0.14), fz = (r() - 0.5) * (D - 0.14); if (Math.abs(fz - (hz - 0.08)) < 0.1 || Math.hypot(fx - bx, fz - bz) < 0.1) continue; add(flowers[i % 4], new THREE.SphereGeometry(0.022, 6, 4).translate(fx, 0.04, fz)); add('#5f9a4c', new THREE.CylinderGeometry(0.002, 0.002, 0.02, 3).translate(fx, 0.03, fz)); }
+    for (const [col, list] of bits) g.add(mesh(mergeGeometries(list.map(x => { const y = x.index ? x.toNonIndexed() : x; if (y.attributes.uv) y.deleteAttribute('uv'); return y; })), mat(col), col !== '#4a3426'));
     return g;
   },
   tree(w, d, H, c, o) {
@@ -645,6 +673,13 @@ Object.assign(BUILD, {
     for (let i = 0; i < 4; i++) { const m = mesh(new THREE.SphereGeometry(0.05 + i * 0.012, 10, 6).scale(1, 0.4, 1).translate((i - 1.5) * 0.15, 0.05, (i % 2 - 0.5) * 0.15), mat('#ead39b')); g.add(m); }
     g.add(mesh(new THREE.CylinderGeometry(0.025, 0.02, 0.04, 10).translate(0.1, 0.075, -0.08), mat('#e6463c')));
     g.add(mesh(new THREE.BoxGeometry(0.01, 0.01, 0.07).translate(0.14, 0.06, -0.06), mat('#3d8de0')));
+    // A sandcastle with four towers and a flag.
+    const castle = [new THREE.BoxGeometry(0.08, 0.035, 0.08).translate(-0.12, 0.07, -0.1)];
+    for (const [tx, tz] of [[-0.04, -0.04], [0.04, -0.04], [-0.04, 0.04], [0.04, 0.04]]) castle.push(new THREE.CylinderGeometry(0.017, 0.019, 0.06, 8).translate(-0.12 + tx, 0.082, -0.1 + tz), new THREE.ConeGeometry(0.019, 0.022, 8).translate(-0.12 + tx, 0.123, -0.1 + tz));
+    g.add(mesh(mergeGeometries(castle.map(x => (x.index ? x.toNonIndexed() : x))), mat('#e3c88a')));
+    g.add(mesh(new THREE.CylinderGeometry(0.0015, 0.0015, 0.06, 4).translate(-0.08, 0.16, -0.06), mat(WHITE), false));
+    g.add(mesh(new THREE.BoxGeometry(0.03, 0.018, 0.002).translate(-0.065, 0.18, -0.06), mat('#e6463c'), false));
+    g.add(mesh(new THREE.CylinderGeometry(0.02, 0.016, 0.034, 10).translate(0.16, 0.069, 0.16), mat('#f7c22e')));
     g.userData.seats = [[-0.12, 0.05, 0.1], [0.12, 0.05, 0.12], [0, 0.05, -0.14], [-0.15, 0.05, -0.05]];
     return g;
   },
@@ -903,6 +938,20 @@ Object.assign(BUILD, {
     const shell = mesh(new THREE.CylinderGeometry(L / 2, L / 2, H * 1.6, 32, 1, true, Math.PI / 2, Math.PI).translate(0, 0.16 + H * 0.8, 0), mat(c, { side: THREE.DoubleSide }));
     shell.scale.z = W / L; inner.add(shell);
     for (let i = 0; i < 5; i++) { const lamp = mesh(new THREE.SphereGeometry(0.03, 8, 6), mat('#f7c22e', { emissive: '#f7c22e', emissiveIntensity: 0.6 }), false); lamp.position.set(-L / 2 + 0.2 + i * (L - 0.4) / 4, 0.2, W / 2 - 0.04); inner.add(lamp); }
+    // Red curtains at the two ends of the shell, held back with gold ties.
+    for (const s of [-1, 1]) {
+      inner.add(mesh(new THREE.BoxGeometry(0.08, H * 1.5, 0.03).translate(s * (L / 2 - 0.06), 0.16 + H * 0.75, -0.03), mat('#c8323c')));
+      inner.add(mesh(new THREE.BoxGeometry(0.09, 0.02, 0.036).translate(s * (L / 2 - 0.06), 0.16 + H * 0.5, -0.03), mat('#e8c547'), false));
+    }
+    // A string of bulbs along the top of the shell.
+    const bulbs = [];
+    for (let i = 1; i < 12; i++) { const th = Math.PI / 2 + (i / 12) * Math.PI; bulbs.push(new THREE.SphereGeometry(0.018, 6, 4).translate((L / 2) * Math.sin(th) * 0.97, 0.16 + H * 1.6 - 0.02, (W / 2) * Math.cos(th) * 0.97)); }
+    inner.add(mesh(mergeGeometries(bulbs.map(x => (x.index ? x.toNonIndexed() : x))), mat('#fff1b8', { emissive: '#ffe08a', emissiveIntensity: 0.7 }), false));
+    // A microphone at the front, and two steps up at the side.
+    inner.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.2, 5).translate(0.1, 0.26, W / 4), mat('#c9ccd3'), false));
+    inner.add(mesh(new THREE.SphereGeometry(0.014, 8, 6).translate(0.1, 0.37, W / 4), mat('#3d405b'), false));
+    inner.add(mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.012, 10).translate(0.1, 0.166, W / 4), mat('#3d405b'), false));
+    for (let i = 0; i < 2; i++) inner.add(mesh(new THREE.BoxGeometry(0.16, 0.05 + i * 0.05, 0.08).translate(L / 2 - 0.2, 0.025 + i * 0.025, W / 2 + 0.04 + (1 - i) * 0.07), mat('#c9a46f')));
     if (d > w) inner.rotation.y = Math.PI / 2;
     g.add(inner);
     return g;
@@ -917,6 +966,11 @@ Object.assign(BUILD, {
       g.add(mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.08, 12).translate(x, 0.08, z), mat(i % 2 ? c : '#f28b30')));
       seats.push([x * 1.12, 0.04, z * 1.12]);
     }
+    // A big yellow question mark set in the floor in the middle.
+    const qm = R * 0.12, qy = 0.0455, turn = g => g.rotateY(Math.PI / 4);      // (turned to read from the usual view)
+    g.add(mesh(turn(new THREE.RingGeometry(qm * 0.55, qm, 18, 1, -Math.PI / 2, Math.PI * 1.35).translate(0, qm * 0.55, 0).rotateX(-Math.PI / 2)).translate(0, qy, 0), mat('#f7c22e'), false));
+    g.add(mesh(turn(new THREE.PlaneGeometry(qm * 0.45, qm * 0.6).translate(-qm * 0.225 + qm * 0.06, -qm * 0.25, 0).rotateX(-Math.PI / 2)).translate(0, qy, 0), mat('#f7c22e'), false));
+    g.add(mesh(turn(new THREE.CircleGeometry(qm * 0.26, 12).translate(-qm * 0.165, -qm * 0.95, 0).rotateX(-Math.PI / 2)).translate(0, qy, 0), mat('#f7c22e'), false));
     // Two banners: two sides of a big question.
     for (const [x, col] of [[-R * 0.95, '#3d8de0'], [R * 0.95, '#f28b30']]) { g.add(mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.5, 6).translate(x, 0.25, 0), mat(WHITE))); g.add(mesh(new THREE.BoxGeometry(0.02, 0.18, 0.2).translate(x, 0.4, 0.1), mat(col))); }
     g.userData.seats = seats;
@@ -932,6 +986,15 @@ Object.assign(BUILD, {
     const vane = mesh(new THREE.ConeGeometry(0.03, 0.14, 8).rotateZ(-Math.PI / 2).translate(0.05, 0.86, 0), mat('#f7c22e')); g.add(vane);
     const box = mesh(new RoundedBoxGeometry(0.22, 0.18, 0.18, 2, 0.02).translate(0, 0.35, 0.12), mat(WHITE)); g.add(box);
     g.add(mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.04, 20).translate(0, 0.02, 0), mat('#cfcac0')));
+    // A little solar panel on the pole, a rain gauge on the base and a striped windsock on a short pole.
+    g.add(mesh(new THREE.BoxGeometry(0.16, 0.01, 0.12).rotateX(0.6).translate(0, 0.62, -0.06), mat('#2e4a8c')));
+    g.add(mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.09, 12).translate(-0.12, 0.085, -0.06), mat('#bfe4f3', { transparent: true, opacity: 0.55, depthWrite: false }), false));
+    g.add(mesh(new THREE.CylinderGeometry(0.03, 0.022, 0.03, 12, 1, true).translate(-0.12, 0.145, -0.06), mat(WHITE, { side: THREE.DoubleSide }), false));
+    g.add(mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.5, 6).translate(0.3, 0.25, 0.1), mat(WHITE)));
+    const sock = new THREE.Group(); sock.position.set(0.3, 0.48, 0.1);
+    for (let i = 0; i < 4; i++) sock.add(mesh(new THREE.CylinderGeometry(0.03 - i * 0.005, 0.025 - i * 0.005, 0.04, 10, 1, true).rotateZ(Math.PI / 2).translate(0.02 + i * 0.04, 0, 0), mat(i % 2 ? WHITE : '#f28b30', { side: THREE.DoubleSide }), false));
+    sock.userData.wave = { axis: 'y', base: 0.6, amp: 0.5, speed: 0.4, phase: 0 };
+    g.add(sock);
     return g;
   },
 });
@@ -947,18 +1010,21 @@ export function colonnade(g, Wc, Dc, hgt = SOFFIT) {
 export function courtyard(g, Wi, Di, id = 1, y = 0) {
   const r = Math.min(Wi, Di) / 2; if (r < 0.2) return;
   const cy = new THREE.Group(); cy.position.y = y; cy.userData.keep = true; g.add(cy);
-  const lawn = new THREE.ExtrudeGeometry(roundedRect(Wi - 0.08, Di - 0.08, r - 0.04), { depth: 0.02, bevelEnabled: false, curveSegments: 32 }).rotateX(-Math.PI / 2);
+  const lawn = new THREE.ExtrudeGeometry(roundedRect(Wi - 0.08, Di - 0.08, r - 0.04), { depth: 0.02, bevelEnabled: false, curveSegments: 14 }).rotateX(-Math.PI / 2);
   const lawnM = mesh(lawn, mat('#9bd06a'), false); lawnM.userData.keep = true; cy.add(lawnM);
   const tr = roundTree(Math.min(0.42, r * 0.5), TREE_GREENS[2]); tr.position.y = 0.02; tr.traverse(o => { o.userData.keep = true; }); cy.add(tr);
-  const br = Math.min(0.3, r * 0.42), bench = mesh(new THREE.TorusGeometry(br, 0.028, 8, 36).rotateX(Math.PI / 2).translate(0, 0.05, 0), mat(WHITE)); bench.userData.keep = true; cy.add(bench);
+  const br = Math.min(0.3, r * 0.42), bench = mesh(new THREE.TorusGeometry(br, 0.028, 6, 30).rotateX(Math.PI / 2).translate(0, 0.05, 0), mat(WHITE)); bench.userData.keep = true; cy.add(bench);
   const rr = seeded(id * 5 + 11), flowers = ['#f5a3c7', '#f7c22e', '#ffffff', '#e2457d'];
-  for (let i = 0; i < Math.round(r * 30); i++) { const a = rr() * Math.PI * 2, d = br + 0.08 + rr() * (r - br - 0.16); const f = mesh(new THREE.SphereGeometry(0.022, 6, 4), mat(flowers[i % 4]), false); f.position.set(Math.cos(a) * d * (Wi / (2 * r)), 0.04, Math.sin(a) * d * (Di / (2 * r))); f.raycast = () => {}; f.userData.keep = true; cy.add(f); }
+  // Flowers: one mesh per colour.
+  const fl = flowers.map(() => []);
+  for (let i = 0; i < Math.round(r * 30); i++) { const a = rr() * Math.PI * 2, d = br + 0.08 + rr() * (r - br - 0.16); fl[i % 4].push(new THREE.SphereGeometry(0.022, 6, 4).translate(Math.cos(a) * d * (Wi / (2 * r)), 0.04, Math.sin(a) * d * (Di / (2 * r)))); }
+  fl.forEach((list, k) => { if (!list.length) return; const f = mesh(mergeGeometries(list.map(x => { x.deleteAttribute('uv'); return x; })), mat(flowers[k]), false); f.raycast = () => {}; f.userData.keep = true; cy.add(f); });
 }
 // The paved walkway under a colonnade: from the stepped-back wall to just under the edge of the lawn.
 export function walkway(g, Wi, Di, rec) {
   const r = Math.min(Wi, Di) / 2, sh = roundedRect(Wi + 2 * rec + 0.02, Di + 2 * rec + 0.02, r + rec + 0.01);
   sh.holes.push(roundedRect(Math.max(0.1, Wi - 0.12), Math.max(0.1, Di - 0.12), Math.max(0.05, r - 0.06)));
-  g.add(mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: false, curveSegments: 32 }).rotateX(-Math.PI / 2), mat('#efebe2')));
+  g.add(mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: false, curveSegments: 14 }).rotateX(-Math.PI / 2), mat('#efebe2')));
 }
 // The centre line of a rounded-rectangle loop (a circle when square), as points.
 function loopPath(W, D, r) {

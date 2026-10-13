@@ -36,7 +36,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     <div class="daybar" hidden></div>
     <div class="growbar" hidden><button class="fbtn reset" type="button">${icon('undo')}<span>Start again</span></button><button class="fbtn ok done" type="button">${icon('done')}<span>Done</span></button></div>
     <div class="selbar" hidden></div>
-    <div class="hint"></div>
+    <div class="hint"><span class="hint-text"></span><button class="hint-say" type="button" aria-label="Hear this">${icon('speaker')}</button></div>
   </div>`);
   root.appendChild(ui);
   const trayIn = ui.querySelector('.tray-in'), selbar = ui.querySelector('.selbar'), hint = ui.querySelector('.hint'), floorsEl = ui.querySelector('.floors');
@@ -46,6 +46,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
   world.scene.add(design);
   const pieces = new Map();                 // box id -> Group
   const S = { tool: null, selected: null, drag: null, inside: false, floor: 0, day: false, walking: null, cutH: undefined };
+  const hooks = {};          // set by the app: dayDone(periods) after a whole school day, bigQuestion()
   const crowd = new Crowd(world);
   const trails = new Trails(world);
 
@@ -73,7 +74,9 @@ export function mountSite(root, world, model, siteView, thumbs) {
     if (id) { sfx.tap(); say(`${PROGRAMMES[id].name}. Tap the grid to build it.`); }
     defaultHint();
   }
-  function setHint(html) { hint.innerHTML = html; }
+  const hintText = hint.querySelector('.hint-text');
+  function setHint(html) { hintText.innerHTML = html; hint.hidden = !html; }
+  hint.querySelector('.hint-say').addEventListener('click', () => { sfx.tap(); say(hintText.textContent); });
   function defaultHint() {
     if (S.inside) return setHint('Inside the school! Choose a floor at the bottom.');
     if (S.tool) return setHint(`${emo(PROGRAMMES[S.tool].emoji)} Tap a square to build a ${esc(PROGRAMMES[S.tool].name.toLowerCase())}. Tap on top of a room to stack it.`);
@@ -381,8 +384,9 @@ export function mountSite(root, world, model, siteView, thumbs) {
     const info = h(`<div class="selname">${emo(P.emoji)}<div><b>${esc(P.name)}</b><span>${b.w} × ${b.d} block${b.w * b.d > 1 ? 's' : ''}${b.h > 1 ? `, ${b.h} storeys` : ''}</span></div></div>`);
     info.addEventListener('click', () => say(`${P.name}. ${P.say}`));
     selbar.append(info);
-    const btn = (ic, label, fn, cls = '') => { const x = h(`<button class="selbtn ${cls}" type="button">${icon(ic)}<span>${esc(label)}</span></button>`); x.addEventListener('click', e => { e.stopPropagation(); fn(x); }); selbar.append(x); return x; };
+    const btn = (ic, label, fn, cls = '') => { const x = h(`<button class="selbtn ${cls}" type="button">${icon(ic)}<span>${esc(label)}</span></button>`); x.addEventListener('click', e => { e.stopPropagation(); if (!['Shape', 'Turn', 'Launch!', 'Big Question'].includes(label)) say(label); fn(x); }); selbar.append(x); return x; };
     if (b.shape === 'rocket') btn('rocket', 'Launch!', () => launch(b), 'go');
+    if (b.type === 'circle') btn('talk', 'Big Question', () => { select(null); hooks.bigQuestion?.(); }, 'go');
     if (P.shapes.length > 1) btn('shape', 'Shape', () => nextShape(b));
     btn('colour', 'Colour', x => swatches(b, x));
     if (WINDOWED.has(b.shape) && b.surface !== 'glass') btn('windows', 'Windows', x => windowsPick(b, x));
@@ -706,7 +710,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
   }
 
   // ---------- the school day ----------
-  const day = new SchoolDay({ world, model, crowd, yOf, seatsOf: id => seatsById.get(id), layer: ui.querySelector('.bubbles'), onPeriod: (i, P) => drawDaybar(i, P), onEnd: () => endDay() });
+  const day = new SchoolDay({ world, model, crowd, yOf, seatsOf: id => seatsById.get(id), layer: ui.querySelector('.bubbles'), onPeriod: (i, P) => drawDaybar(i, P), onEnd: () => { endDay(); setTimeout(() => hooks.dayDone?.(PERIODS), 900); } });
   function startDay() {
     if (!model.boxes.some(b => ['classroom', 'ringhouse', 'treehouse'].includes(b.type))) { sfx.no(); toast('Build a classroom first!'); say('Build a classroom first, so the children have somewhere to learn.'); return; }
     if (S.walking) return;
@@ -759,8 +763,9 @@ export function mountSite(root, world, model, siteView, thumbs) {
 
   // ---------- side buttons ----------
   ui.querySelector('.side').addEventListener('click', e => {
-    const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+    const el = e.target.closest('[data-a]'), a = el?.dataset.a; if (!a) return;
     sfx.tap();
+    if (['undo', 'left', 'right', 'in', 'out', 'home', 'print'].includes(a)) say(el.querySelector('span')?.textContent || '');
     if (a === 'undo') { if (!model.undo()) toast('Nothing to undo'); }
     if (a === 'inside') { if (S.day) stopDay(); else setInside(!S.inside); }
     if (a === 'day') { if (S.day) stopDay(); else startDay(); }
@@ -785,7 +790,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
   frameSite(true);
   setTool(null);
   return {
-    S, select, setTool, redraw, frameSite, setInside, tap: handleTap, crowd,
+    S, select, setTool, redraw, frameSite, setInside, tap: handleTap, crowd, hooks, startDay,
     // Everyone cheers and confetti flies (a wish has come true).
     celebrate() {
       for (const b of model.boxes) crowd.cheer(b.id);

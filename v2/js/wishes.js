@@ -31,6 +31,7 @@ export const STICKERS = [
   { id: 'stars', emoji: '🔭', name: 'Somewhere to see the stars', check: m => m.boxes.some(b => b.type === 'observatory') },
   { id: 'tall', emoji: '🏢', name: 'A building three storeys high', check: m => m.boxes.some(b => BUILDINGS.has(b.type) && b.level + b.h >= 3) },
   { id: 'rainbow', emoji: '🌈', name: 'Five different colours', check: m => new Set(m.boxes.filter(b => BUILDINGS.has(b.type)).map(b => b.colour)).size >= 5 },
+  { id: 'day', emoji: '🔔', name: 'Watch a whole school day', check: () => false },
 ];
 const ALL = [...WISHES, ...STICKERS];
 const KEY = 'astraarch2-wishes';
@@ -50,10 +51,16 @@ export function mountWishes(root, model, { button, celebrate }) {
     <div class="wish-list wishes"></div>
     <h3>${emo('🧭')} Explorer stickers</h3>
     <div class="wish-list stickers"></div>
+    <h3>${emo('⭐')} Changed-Mind stars</h3>
+    <p class="cm-stars"></p>
   </div></div>`);
   root.append(sheet);
   const card = w => `<button class="wish ${done.has(w.id) ? 'done' : ''}" type="button" data-w="${w.id}">${emo(w.emoji, 'emo big')}<span>${esc(w.name)}</span><i>${done.has(w.id) ? emo('⭐') : ''}</i></button>`;
-  const paintSheet = () => { sheet.querySelector('.wishes').innerHTML = WISHES.map(card).join(''); sheet.querySelector('.stickers').innerHTML = STICKERS.map(card).join(''); };
+  let stars = (() => { try { return +localStorage.getItem(KEY + '-stars') || 0; } catch (e) { return 0; } })();
+  const paintSheet = () => {
+    sheet.querySelector('.wishes').innerHTML = WISHES.map(card).join(''); sheet.querySelector('.stickers').innerHTML = STICKERS.map(card).join('');
+    sheet.querySelector('.cm-stars').innerHTML = stars ? emo('⭐').repeat(Math.min(stars, 20)) + `<span>${stars} for changing your mind after a Big Question</span>` : '<span>Answer a Big Question with Nova, talk about it together, and earn a star if you change your mind.</span>';
+  };
   sheet.addEventListener('click', e => {
     if (e.target === sheet || e.target.closest('.close')) { sfx.tap(); sheet.hidden = true; return; }
     const id = e.target.closest('[data-w]')?.dataset.w; if (!id) return;
@@ -85,5 +92,11 @@ export function mountWishes(root, model, { button, celebrate }) {
   // On first opening, what is already built counts without a fuss.
   done = load() || now(); save(); paintButton();
   model.onChange(w => { if (!w.style) setTimeout(update, 450); });
-  return { update, open: () => button.click() };
+  return {
+    update, open: () => button.click(),
+    isDone: id => done.has(id),
+    // Something done that the design itself can't show (like watching a whole school day).
+    award(id) { if (done.has(id)) return; done.add(id); save(); paintButton(); const w = ALL.find(x => x.id === id); if (w) hooray([w]); },
+    addStar() { stars++; try { localStorage.setItem(KEY + '-stars', stars); } catch (e) { /* ignore */ } },
+  };
 }

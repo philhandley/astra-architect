@@ -8,6 +8,7 @@ import { mountRooms, trayThumbs } from './rooms.js';
 import { h, emo, say, hush, sfx, toast, speechOn, setSpeech, soundOn, setSound } from './ui.js';
 import { icon, MARK } from './icons.js';
 import { mountWishes } from './wishes.js';
+import { mountGuide } from './guide.js';
 
 // Finn's wooden-block model from the photos: green classrooms along the beach, orange bars round the meadow,
 // a blue pool in the middle, a ring of green curves and an orange drum by the waterfall.
@@ -61,7 +62,10 @@ async function boot() {
   const site = mountSite(overlay, world, model, siteView, thumbs);
   const rooms = mountRooms(roomsHost, model, { thumbs, onBuild: id => { location.hash = '#site'; setTimeout(() => site.setTool(id), 50); } });
   model.onChange(w => { if (w.style) site.refreshTray(); });
-  mountWishes(shell.querySelector('.stage'), model, { button: shell.querySelector('.wishbtn'), celebrate: () => { if (location.hash !== '#rooms') site.celebrate(); } });
+  const wishes = mountWishes(shell.querySelector('.stage'), model, { button: shell.querySelector('.wishbtn'), celebrate: () => { if (location.hash !== '#rooms') site.celebrate(); } });
+  const guide = mountGuide(overlay, model, { site, wishes });
+  site.hooks.dayDone = periods => guide.debrief(periods);
+  site.hooks.bigQuestion = () => guide.bigQuestion();
 
   function route() {
     const r = location.hash === '#rooms' ? 'rooms' : 'site';
@@ -93,7 +97,7 @@ async function boot() {
   paint();
   route();
   if (!model.boxes.length) setTimeout(() => say('Welcome to your site! Choose a room on the left, then tap the grid to build it.'), 800);
-  window.__v2 = { world, model, site, rooms, siteView };   // testing aid
+  window.__v2 = { world, model, site, rooms, siteView, guide, wishes };   // testing aid
   if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') navigator.serviceWorker.register('../sw.js', { scope: '../' }).catch(() => {});
 }
 boot();

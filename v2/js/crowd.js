@@ -6,7 +6,7 @@
 // ink line shares the matrices of its part. Each hairstyle (and the bag) lists only the children who have it, so
 // nobody draws hair they aren't wearing.
 import * as THREE from 'three';
-import { HIP, SHOULDER, LEG_X, ARM_X, SIT_DROP, SWIM_DROP, kidParts, kidLook, HAIR_PART, HATS, EXTRAS, INKED, toon, KID_LINE, inkOf } from './kid.js';
+import { HIP, SHOULDER, LEG_X, ARM_X, SIT_DROP, SWIM_DROP, kidParts, kidLook, HAIR_PART, HATS, EXTRAS, INKED, drawn, toon, KID_LINE, inkOf } from './kid.js';
 
 const MAX = 800;
 export function seeded(seed) {
@@ -26,10 +26,10 @@ export class Crowd {
     // name: [geometry, colour (null = each child's own), shares matrices with, casts a shadow]; the ink line goes on
     // the parts in INKED (kid.js). Each hairstyle and each extra (hood, skirt, headphones, bag) has its own list.
     const SPEC = {
-      torso: [P.torso, null, null, true], band: [P.band, null, 'torso'], head: [P.head, null, 'torso', true], eyes: [P.eyes, '#23252b', 'torso'],
+      torso: [P.torso, null, null, true], head: [P.head, null, 'torso', true], ...(drawn('eyes') ? { eyes: [P.eyes, '#2a2523', 'torso'] } : {}),
       ...Object.fromEntries(HAIR_PART.map(h => [h, [P[h], null, null]])),
-      ...Object.fromEntries(EXTRAS.map(x => [x, [P[x], null, null]])),
-      legL: [P.leg, null, null], legR: [P.leg, null, null], shoeL: [P.shoe, null, 'legL'], shoeR: [P.shoe, null, 'legR'], soleL: [P.sole, '#fbfaf6', 'legL'], soleR: [P.sole, '#fbfaf6', 'legR'],
+      ...Object.fromEntries(EXTRAS.map(x => [x, [P[x], null, null, x === 'coat']])),
+      legL: [P.leg, null, null], legR: [P.leg, null, null], shoeL: [P.shoe, null, 'legL'], shoeR: [P.shoe, null, 'legR'],
       armL: [P.arm, null, null], armR: [P.arm, null, null], handL: [P.hand, null, 'armL'], handR: [P.hand, null, 'armR'],
     };
     const inked = name => INKED.has(name.replace(/[LR]$/, ''));
@@ -47,8 +47,8 @@ export class Crowd {
       }
     }
     // Which colour each instanced part takes from the child's look.
-    this.colourOf = { torso: 'top', band: 'accent', hood: 'top', skirt: 'skirt', armL: 'sleeve', armR: 'sleeve', legL: 'shorts', legR: 'shorts', shoeL: 'shoes', shoeR: 'shoes',
-      head: 'skin', handL: 'skin', handR: 'skin', phones: 'hat', bag: 'bag', ...Object.fromEntries(HAIR_PART.map(h => [h, HATS.has(h) ? 'hat' : 'hair'])) };
+    this.colourOf = { torso: 'top', coat: 'top', skirt: 'skirt', collar: 'collar', stripes: 'stripes', armL: 'sleeve', armR: 'sleeve', legL: 'shorts', legR: 'shorts', shoeL: 'shoes', shoeR: 'shoes',
+      head: 'skin', handL: 'skin', handR: 'skin', bag: 'bag', ...Object.fromEntries(HAIR_PART.map(h => [h, HATS.has(h) ? 'hat' : 'hair'])) };
     this.people = [];
     this.near = null;                 // in walk mode: hide anyone right next to the camera
     this.onStep = null;               // called with (x, z) as people walk between rooms (to wear paths)

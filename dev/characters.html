@@ -45,7 +45,7 @@ function stage(bg) {
 const STY = { current: ['bob', 'quiff', 'puff', 'cap', 'bunches', 'pony'] };
 function kid(style, n, pose, swing) {
   if (style === 'current') { const k = miniKid(pose === 'sit' ? 'sit' : 'stand'); return k; }
-  const S = STYLES[style], L = look(n, S.hairs); L.hatRoll = (n * 0.61) % 1;
+  const S = STYLES[style], L = look(n, S.hairs, S.palette); L.hatRoll = (n * 0.61) % 1;
   return figure(style, L, pose === 'sit' ? [-1.45, -0.5, 0.1] : [0, 0, 0.1], swing || 0);
 }
 function closeUp(style) {
@@ -81,7 +81,7 @@ ROWS.forEach((style, r) => {
   (q.get('group') ? group : tiny)(style); ctx.drawImage(renderer.domElement, PW, r * PH, PW, PH);
   ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(0, r * PH, PW * 2, 26);
   ctx.fillStyle = '#222'; ctx.font = '600 16px system-ui';
-  ctx.fillText(style === 'current' ? 'Now: picture-book toys' : `${STYLES[style].name} (~${triangles(style)} triangles each)`, 10, r * PH + 18);
+  ctx.fillText(style === 'current' ? 'Now in the app: scale-figure kids (round 2)' : `${STYLES[style].name} (~${triangles(style)} triangles each)`, 10, r * PH + 18);
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeRect(0, r * PH, PW * 2, PH);
 });
 window.__shot = async name => { const blob = await new Promise(r => out.toBlob(r, 'image/jpeg', 0.9)); return (await fetch('/__shot/' + name, { method: 'PUT', body: blob })).status; };

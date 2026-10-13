@@ -26,10 +26,10 @@ const OUT = [
 export const SKIN = ['#f6d7bf', '#e7b892', '#c98c62', '#9a6544', '#6e4630'];
 export const HAIR = ['#3b2a20', '#1f1b18', '#b5652e', '#e3b65a', '#6b4128', '#2a2320'];
 export const HATS = ['#e6463c', '#22b2bf', '#f4c23d', '#3d8de0', '#26272d', '#e2457d'];
-export function look(n, styles) {
+export function look(n, styles, palette) {
   let h = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b) >>> 0; h = (h ^ (h >>> 13)) >>> 0; h = Math.imul(h, 0xc2b2ae35) >>> 0; h = (h ^ (h >>> 16)) >>> 0;
-  const o = OUT[h % OUT.length];
-  return { ...o, skin: SKIN[(h >>> 4) % SKIN.length], hair: HAIR[(h >>> 8) % HAIR.length], style: styles[(h >>> 12) % styles.length], hat: HATS[(h >>> 16) % HATS.length], bag: (h >>> 20) % 3 === 0 ? HATS[(h >>> 22) % HATS.length] : null, sole: '#fbfaf6' };
+  const muted = palette === 'muted' || palette === 'fresh', P = palette === 'fresh' ? FRESH : muted ? MUTED : OUT, HH = palette === 'fresh' ? FRESH_HATS : muted ? MUTED_HATS : HATS, o = P[h % P.length];
+  return { ...o, skin: SKIN[(h >>> 4) % SKIN.length], hair: HAIR[(h >>> 8) % HAIR.length], style: styles[(h >>> 12) % styles.length], hat: HH[(h >>> 16) % HH.length], bag: (h >>> 20) % 3 === 0 ? HH[(h >>> 22) % HH.length] : null, sole: muted ? '#efe9dc' : '#fbfaf6' };
 }
 
 // ---------- materials ----------
@@ -38,6 +38,7 @@ const RAMP2 = (() => { const t = new THREE.DataTexture(new Uint8Array([150, 255]
 const cache = new Map();
 export function material(kind, hex) {
   const k = kind + hex;
+  if (!cache.has(k) && kind === 'flatbright') cache.set(k, new THREE.MeshLambertMaterial({ color: hex, emissive: hex, emissiveIntensity: 0.32 }));
   if (!cache.has(k)) cache.set(k, kind === 'toon' ? new THREE.MeshToonMaterial({ color: hex, gradientMap: RAMP }) : kind === 'toon2' ? new THREE.MeshToonMaterial({ color: hex, gradientMap: RAMP2 }) : kind === 'flat' ? new THREE.MeshLambertMaterial({ color: hex, flatShading: true }) : new THREE.MeshLambertMaterial({ color: hex }));
   return cache.get(k);
 }
@@ -146,13 +147,19 @@ export function figure(style, L, pose = [0, 0, 0.1], swing = 0) {
   };
   const mono = S.mono;
   add(P.torso, L.top); add(P.head, mono ? '#e9e4da' : L.skin); if (P.face) add(P.face, '#23252b', g, 0);
-  const hatKind = S.hat && Object.keys(S.hat).find((k, i) => ((L.hatRoll ?? 0.5) + i * 0.37) % 1 < S.hat[k]);
+  const hatRoll = S.palette === 'fresh' ? ((L.hatRoll ?? 0.5) * 13.7 + 0.53) % 1 : (L.hatRoll ?? 0.5);
+  const hatKind = S.hat && Object.keys(S.hat).find((k, i) => (hatRoll + i * 0.37) % 1 < S.hat[k]);
   if (hatKind === 'capHat' || hatKind === 'beanie') add(P[hatKind], L.hat);
-  else { add(P[L.style] || P[S.hairs[0]], mono ? '#9a958c' : L.hair); if (hatKind === 'phones') add(P.phones, L.hat); }
+  else if (hatKind && P[hatKind] && hatKind !== 'phones') add(P[hatKind], L.hat);
+  else { add(P[L.style] || P[S.hairs[0]], mono ? '#9a958c' : S.hatHair ? L.hat : L.hair); if (hatKind === 'phones') add(P.phones, L.hat); }
   if (L.bag && P.bag) add(P.bag, L.bag);
   if (S.extras?.band) add(P.band, L[S.extras.band], g, 0);
+  if (S.extras?.shoulders) add(P.shoulders, L.top, g, 0);
+  const coatOn = S.extras?.coat && ((L.hatRoll ?? 0.5) * 5.3 + 0.1) % 1 < S.extras.coat; if (coatOn) add(P.coat, L.top);
   if (S.extras?.hood && ((L.hatRoll ?? 0.5) * 7.3) % 1 < S.extras.hood) add(P.hood, L.top);
-  if (S.extras?.skirt && ((L.hatRoll ?? 0.5) * 3.7 + 0.2) % 1 < S.extras.skirt) add(P.skirt, L.accent === '#fbfaf6' ? L.legs : L.accent);
+  if (S.extras?.skirt && !(S.extras?.coat && ((L.hatRoll ?? 0.5) * 5.3 + 0.1) % 1 < S.extras.coat) && ((L.hatRoll ?? 0.5) * 3.7 + 0.2) % 1 < S.extras.skirt) add(P.skirt, L.accent === '#fbfaf6' ? L.legs : L.accent);
+  if (S.extras?.stripes && ((L.hatRoll ?? 0.5) * 17.3 + 0.7) % 1 < S.extras.stripes) add(P.stripes, L.top === '#efe9dc' ? '#2f3e5c' : '#efe9dc', g, 0);
+  if (S.extras?.collar && ((L.hatRoll ?? 0.5) * 9.1 + 0.4) % 1 < S.extras.collar) add(P.collar, L.top === '#efe9dc' ? L.accent : '#f6f2ea', g, 0);
   for (const s of [-1, 1]) {
     const leg = new THREE.Group(); leg.position.set(s * S.LEG_X, S.HIP, 0); leg.rotation.x = pose[0] + swing * s;
     add(P.leg, mono ? '#d8d3c8' : L.legs, leg); add(P.shoe, mono ? '#9a958c' : L.shoes, leg); if (P.sole) add(P.sole, L.sole, leg, 0); g.add(leg);
@@ -240,3 +247,159 @@ function crew3({ name, ink = 0.0016 }) {
     parts: { torso, band, hood, skirt, head, face, ...hairs, capBack, beanie, phones, bag, leg, shoe, sole, arm, hand }, hairs: Object.keys(hairs), hat: { capBack: 0.14, beanie: 0.1, phones: 0.1 }, extras: { band: 'accent', hood: 0.45, skirt: 0.3 } };
 }
 STYLES.crew3 = crew3({ name: 'Crew, pass 3' });
+
+// ---------- pass 6: research-led directions ----------
+// Architects' scale figures (realistic proportions, faceless, restrained colour), Monument Valley (one bold
+// garment shape, a signature hat, no face), Untitled Goose Game (flat storybook colour, faceless villagers) and
+// Sprite Fright's "chunkification" (big simple shapes, nothing fragile). Muted, architectural colours.
+export const MUTED = [
+  { top: '#c8664a', sleeve: '#c8664a', legs: '#3c3f45', shoes: '#efe9dc', accent: '#efe9dc' },
+  { top: '#9bb39a', sleeve: '#9bb39a', legs: '#2f3e5c', shoes: '#efe9dc', accent: '#2f3e5c' },
+  { top: '#d9a441', sleeve: '#d9a441', legs: '#2f3e5c', shoes: '#3c3f45', accent: '#2f3e5c' },
+  { top: '#2f3e5c', sleeve: '#2f3e5c', legs: '#cbb894', shoes: '#efe9dc', accent: '#d99a9a' },
+  { top: '#d99a9a', sleeve: '#d99a9a', legs: '#efe9dc', shoes: '#3c3f45', accent: '#3c3f45' },
+  { top: '#efe9dc', sleeve: '#efe9dc', legs: '#4f8a8b', shoes: '#3c3f45', accent: '#4f8a8b' },
+  { top: '#4f8a8b', sleeve: '#4f8a8b', legs: '#3c3f45', shoes: '#efe9dc', accent: '#d9a441' },
+  { top: '#3c3f45', sleeve: '#3c3f45', legs: '#c8664a', shoes: '#efe9dc', accent: '#c8664a' },
+  { top: '#e3c9a8', sleeve: '#e3c9a8', legs: '#6b4a3a', shoes: '#3c3f45', accent: '#6b4a3a' },
+];
+export const MUTED_HATS = ['#d9a441', '#c8664a', '#2f3e5c', '#9bb39a', '#efe9dc', '#3c3f45'];
+const smooth = (geo) => { geo.computeVertexNormals(); return geo; };
+
+// E: scale-figure children. About five and a half heads tall, no faces, simple solid hair, a straight-cut top,
+// slim trousers and flat shoes; soft light, no outline.
+STYLES.scale = (() => {
+  const HIP = 0.09, SHOULDER = 0.15, LEG_X = 0.0115, ARM_X = 0.028, R = 0.03, HY = 0.19;
+  const torso = lathe([[0, 0.084], [0.024, 0.084], [0.025, 0.12], [0.023, 0.143], [0.015, 0.155], [0, 0.156]], 12).scale(1.15, 1, 0.74);
+  const coat = new THREE.CylinderGeometry(0.026, 0.032, 0.052, 12, 1, true).scale(1.12, 1, 0.78).translate(0, 0.08, 0);
+  const head = join([new THREE.SphereGeometry(R, 14, 10).scale(0.94, 1.1, 1).translate(0, HY, 0), new THREE.CylinderGeometry(0.0075, 0.0085, 0.02, 8).translate(0, 0.164, 0)]);
+  const hs = (r, a1, tilt) => cap(r, 0, a1, 14, 7).rotateX(tilt).translate(0, HY + 0.003, -0.001);
+  const hairs = {
+    short: hs(R * 1.04, Math.PI * 0.42, -0.45),
+    bob: join([hs(R * 1.08, Math.PI * 0.6, -0.5), new THREE.CylinderGeometry(R * 1.08, R * 1.08, R * 0.7, 14, 1, true, 0.9, Math.PI * 2 - 1.8).translate(0, HY - R * 0.28, 0)]),
+    pony: join([hs(R * 1.05, Math.PI * 0.5, -0.45), new THREE.CapsuleGeometry(R * 0.24, R * 0.9, 2, 7).rotateX(0.45).translate(0, HY - R * 0.1, -R * 1.12)]),
+    bun: join([hs(R * 1.05, Math.PI * 0.5, -0.45), new THREE.SphereGeometry(R * 0.42, 9, 7).translate(0, HY + R * 0.95, -R * 0.45)]),
+  };
+  const bucket = join([cap(R * 1.12, 0, Math.PI * 0.5, 14, 6).translate(0, HY + 0.006, 0), new THREE.CylinderGeometry(R * 1.12, R * 1.55, R * 0.35, 16, 1, true).translate(0, HY + 0.0, 0)]);
+  const leg = new THREE.CylinderGeometry(0.0098, 0.0088, 0.082, 9).translate(0, -0.041, 0);
+  const shoe = new THREE.BoxGeometry(0.019, 0.011, 0.034).translate(0, -0.0855, 0.007);
+  const arm = new THREE.CylinderGeometry(0.0082, 0.0074, 0.06, 8).translate(0, -0.03, 0);
+  const hand = new THREE.SphereGeometry(0.0078, 8, 6).translate(0, -0.064, 0);
+  return { name: 'E. Scale-figure kids', HIP, SHOULDER, LEG_X, ARM_X, mat: 'lambert', ink: 0, palette: 'muted', parts: { torso, coat, head, ...hairs, bucket, leg, shoe, arm, hand }, hairs: Object.keys(hairs), hat: { bucket: 0.2 }, extras: { coat: 0.35 } };
+})();
+
+// F: village. Chunky, flat storybook colour, no faces: a raincoat or a smock, wellies, a bucket hat or a beret.
+STYLES.village = (() => {
+  const HIP = 0.074, SHOULDER = 0.14, LEG_X = 0.014, ARM_X = 0.034, R = 0.036, HY = 0.186;
+  const torso = new THREE.CylinderGeometry(0.02, 0.036, 0.085, 14).scale(1.1, 1, 0.82).translate(0, 0.106, 0);
+  const shoulders = new THREE.SphereGeometry(0.0205, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.1 * 1.0, 0.5, 0.82).translate(0, 0.148, 0);
+  const head = join([new THREE.SphereGeometry(R, 16, 12).scale(1, 1.08, 0.96).translate(0, HY, 0), new THREE.CylinderGeometry(0.009, 0.01, 0.02, 8).translate(0, 0.155, 0)]);
+  const hs = (r, a1, tilt) => cap(r, 0, a1, 16, 8).rotateX(tilt).translate(0, HY + 0.003, -0.001);
+  const hairs = {
+    crop: hs(R * 1.04, Math.PI * 0.42, -0.45),
+    plaits: join([hs(R * 1.05, Math.PI * 0.5, -0.45), ...[-1, 1].map(s => new THREE.CapsuleGeometry(R * 0.2, R * 0.9, 2, 7).translate(s * R * 0.85, HY - R * 0.55, -R * 0.2))]),
+    mop: join([hs(R * 1.1, Math.PI * 0.55, -0.5), new THREE.SphereGeometry(R * 1.05, 14, 8).scale(1.05, 0.7, 1.05).translate(0, HY + R * 0.45, -R * 0.08)]),
+  };
+  const bucket = join([cap(R * 1.1, 0, Math.PI * 0.5, 16, 6).translate(0, HY + 0.008, 0), new THREE.CylinderGeometry(R * 1.1, R * 1.6, R * 0.4, 18, 1, true).translate(0, HY + 0.002, 0)]);
+  const beret = new THREE.SphereGeometry(R * 1.12, 16, 6).scale(1.15, 0.38, 1.15).rotateZ(0.2).translate(R * 0.12, HY + R * 0.82, 0);
+  const leg = new THREE.CylinderGeometry(0.011, 0.011, 0.05, 10).translate(0, -0.025, 0);
+  const shoe = new THREE.CylinderGeometry(0.0128, 0.0135, 0.03, 10).translate(0, -0.06, 0.002);
+  const sole = new THREE.BoxGeometry(0.026, 0.006, 0.036).translate(0, -0.0745, 0.004);
+  const arm = new THREE.CylinderGeometry(0.0095, 0.0105, 0.05, 10).translate(0, -0.025, 0);
+  const hand = new THREE.SphereGeometry(0.0095, 8, 6).translate(0, -0.056, 0);
+  return { name: 'F. Village (flat storybook colour, faceless)', HIP, SHOULDER, LEG_X, ARM_X, mat: 'flatbright', ink: 0, palette: 'muted', parts: { torso, shoulders, head, ...hairs, bucket, beret, leg, shoe, sole, arm, hand }, hairs: Object.keys(hairs), hat: { bucket: 0.22, beret: 0.18 }, extras: { shoulders: 'top' } };
+})();
+
+// G: Monument kids. One bold garment shape (an A-line coat from the shoulders to the knees), a ball of a head
+// with no face, and a signature hat (pointed, round or flat-topped); pale colours with one strong one.
+STYLES.monument = (() => {
+  const HIP = 0.07, SHOULDER = 0.145, LEG_X = 0.011, ARM_X = 0.02, R = 0.031, HY = 0.18;
+  const torso = new THREE.CylinderGeometry(0.014, 0.036, 0.094, 16).scale(1.05, 1, 0.9).translate(0, 0.104, 0);
+  const head = new THREE.SphereGeometry(R, 16, 12).translate(0, HY, 0);
+  const hairs = {
+    point: join([new THREE.ConeGeometry(R * 0.95, R * 1.7, 16).translate(0, HY + R * 1.25, 0), new THREE.CylinderGeometry(R * 1.35, R * 1.35, 0.003, 18).translate(0, HY + R * 0.42, 0)]),
+    dome: cap(R * 1.06, 0, Math.PI * 0.5, 16, 8).translate(0, HY + 0.002, 0),
+    flat: join([new THREE.CylinderGeometry(R * 0.85, R * 0.95, R * 0.8, 16).translate(0, HY + R * 1.05, 0), new THREE.CylinderGeometry(R * 1.4, R * 1.4, 0.003, 18).translate(0, HY + R * 0.65, 0)]),
+  };
+  const leg = new THREE.CylinderGeometry(0.0072, 0.0072, 0.06, 8).translate(0, -0.03, 0);
+  const shoe = new THREE.SphereGeometry(0.009, 8, 6).scale(1, 0.7, 1.4).translate(0, -0.062, 0.004);
+  const arm = new THREE.CylinderGeometry(0.0062, 0.0062, 0.06, 8).translate(0, -0.03, 0);
+  const hand = new THREE.SphereGeometry(0.0068, 8, 6).translate(0, -0.063, 0);
+  return { name: 'G. Monument kids', HIP, SHOULDER, LEG_X, ARM_X, mat: 'lambert', ink: 0, palette: 'muted', headTone: 'skin', parts: { torso, head, ...hairs, leg, shoe, arm, hand }, hairs: Object.keys(hairs), hatHair: true };
+})();
+
+// H: today's Crew with the muted colours, eyes only (no brows or smile) and no outline.
+STYLES.crewMuted = (() => {
+  const S = crew3({ name: 'H. Crew, muted, eyes only, no line', ink: 0 });
+  const R = 0.0335, HY = 0.189;
+  const pill = x => new THREE.SphereGeometry(0.0026, 5, 4).scale(1, 1.75, 0.8).translate(x, HY + 0.002, R * 0.975);
+  S.parts.face = join([pill(-0.011), pill(0.011)]);
+  S.mat = 'lambert'; S.palette = 'muted'; S.extras = { band: 'accent', hood: 0.45, skirt: 0.25 };
+  return S;
+})();
+
+// ---------- pass 7: scale-figure kids, developed ----------
+// Squarer shoulders, a few garment shapes (A-line coats, skirts, white collars), rounded sneakers, slim backpacks,
+// smoother hair (curls, an afro, a side parting, a bob, a bun, a ponytail) and hats (bucket hats, beanies).
+function scale2({ name, ink = 0, dots = false }) {
+  const HIP = 0.088, SHOULDER = 0.149, LEG_X = 0.0118, ARM_X = 0.0285, R = 0.0305, HY = 0.19;
+  const torso = lathe([[0, 0.083], [0.0245, 0.083], [0.0258, 0.118], [0.026, 0.139], [0.0215, 0.152], [0.01, 0.157], [0, 0.157]], 14).scale(1.16, 1, 0.74);
+  const coat = new THREE.CylinderGeometry(0.0262, 0.034, 0.06, 14, 1, true).scale(1.16, 1, 0.78).translate(0, 0.075, 0);
+  const skirt = new THREE.CylinderGeometry(0.026, 0.036, 0.03, 14, 1, true).scale(1.14, 1, 0.82).translate(0, 0.072, 0);
+  const collar = new THREE.TorusGeometry(0.0115, 0.0032, 5, 14).rotateX(Math.PI / 2).scale(1.15, 1, 0.9).translate(0, 0.156, 0.001);
+  const head = join([new THREE.SphereGeometry(R, 14, 10).scale(0.94, 1.1, 1).translate(0, HY, 0), new THREE.CylinderGeometry(0.0076, 0.0086, 0.02, 8).translate(0, 0.164, 0)]);
+  const eyes = join([-1, 1].map(s => new THREE.SphereGeometry(0.0021, 5, 4).scale(1, 1.3, 0.6).translate(s * 0.0095, HY + 0.002, R * 0.985)));
+  const hs = (r, a1, tilt) => cap(r, 0, a1, 14, 7).rotateX(tilt).translate(0, HY + 0.003, -0.001);
+  const hairs = {
+    short: hs(R * 1.04, Math.PI * 0.42, -0.45),
+    side: join([hs(R * 1.05, Math.PI * 0.43, -0.45), new THREE.SphereGeometry(R * 0.7, 10, 6).scale(1.35, 0.42, 1).rotateZ(0.32).translate(-R * 0.25, HY + R * 0.82, R * 0.28)]),
+    bob: join([hs(R * 1.08, Math.PI * 0.6, -0.5), new THREE.CylinderGeometry(R * 1.08, R * 1.1, R * 0.75, 14, 1, true, 0.9, Math.PI * 2 - 1.8).translate(0, HY - R * 0.3, 0)]),
+    pony: join([hs(R * 1.05, Math.PI * 0.5, -0.45), new THREE.CapsuleGeometry(R * 0.24, R * 0.9, 2, 7).rotateX(0.45).translate(0, HY - R * 0.1, -R * 1.12)]),
+    bun: join([hs(R * 1.05, Math.PI * 0.5, -0.45), new THREE.SphereGeometry(R * 0.42, 9, 7).translate(0, HY + R * 0.95, -R * 0.45)]),
+    curls: join([hs(R * 1.05, Math.PI * 0.5, -0.4), new THREE.SphereGeometry(R * 1.12, 14, 8).scale(1.05, 0.62, 1.05).translate(0, HY + R * 0.55, -R * 0.05)]),
+    afro: join([hs(R * 1.04, Math.PI * 0.5, -0.4), new THREE.SphereGeometry(R * 1.32, 14, 9).scale(1, 0.92, 1).translate(0, HY + R * 0.45, -R * 0.1)]),
+  };
+  const bucket = join([cap(R * 1.12, 0, Math.PI * 0.5, 14, 6).translate(0, HY + 0.006, 0), new THREE.CylinderGeometry(R * 1.12, R * 1.55, R * 0.35, 16, 1, true).translate(0, HY + 0.0, 0)]);
+  const beanie = join([cap(R * 1.14, 0, Math.PI * 0.5, 14, 7).rotateX(-0.12).translate(0, HY + 0.004, 0), new THREE.CylinderGeometry(R * 1.15, R * 1.15, R * 0.32, 14).rotateX(-0.12).translate(0, HY + 0.006, 0.0)]);
+  const bag = new RoundedBoxGeometry(0.034, 0.044, 0.014, 1, 0.005).translate(0, 0.122, -0.026);
+  const leg = new THREE.CylinderGeometry(0.0098, 0.0088, 0.08, 9).translate(0, -0.04, 0);
+  const shoe = new RoundedBoxGeometry(0.0195, 0.012, 0.035, 2, 0.0045).translate(0, -0.0835, 0.007);
+  const arm = new THREE.CylinderGeometry(0.0083, 0.0075, 0.06, 8).translate(0, -0.03, 0);
+  const hand = new THREE.SphereGeometry(0.0078, 8, 6).translate(0, -0.064, 0);
+  const parts = { torso, coat, skirt, collar, head, ...hairs, bucket, beanie, bag, leg, shoe, arm, hand };
+  if (dots) parts.face = eyes;
+  return { name, HIP, SHOULDER, LEG_X, ARM_X, mat: 'lambert', ink, palette: 'muted', parts, hairs: Object.keys(hairs), hat: { bucket: 0.14, beanie: 0.12 },
+    inkOnly: ['torso', 'coat', 'skirt', 'head', 'bag', 'leg', 'shoe', 'arm', 'bucket', 'beanie', ...Object.keys(hairs)], extras: { coat: 0.3, skirt: 0.25, collar: 0.4 } };
+}
+STYLES.scale2 = scale2({ name: 'Pass 7: scale kids, faceless, no line' });
+STYLES.scale2line = scale2({ name: 'Pass 7: scale kids, faceless, thin line', ink: 0.0014 });
+STYLES.scale2dots = scale2({ name: 'Pass 7: scale kids, two dot eyes', dots: true });
+
+// ---------- pass 8: scale kids, refined ----------
+// Fresher colours mixed with the muted ones (cobalt, tomato, grass, sunflower beside terracotta, sage, navy, sand),
+// rarer hats, Breton-stripe tops on some, a slightly smaller head.
+export const FRESH = [
+  { top: '#3b6fb6', sleeve: '#3b6fb6', legs: '#efe9dc', shoes: '#3c3f45', accent: '#efe9dc' },
+  { top: '#e0573d', sleeve: '#e0573d', legs: '#2f3e5c', shoes: '#efe9dc', accent: '#2f3e5c' },
+  { top: '#5f9e6e', sleeve: '#5f9e6e', legs: '#3c3f45', shoes: '#efe9dc', accent: '#efe9dc' },
+  { top: '#e8b84a', sleeve: '#e8b84a', legs: '#2f3e5c', shoes: '#efe9dc', accent: '#2f3e5c' },
+  { top: '#efe9dc', sleeve: '#efe9dc', legs: '#3b6fb6', shoes: '#3c3f45', accent: '#3b6fb6' },
+  { top: '#c8664a', sleeve: '#c8664a', legs: '#3c3f45', shoes: '#efe9dc', accent: '#efe9dc' },
+  { top: '#9bb39a', sleeve: '#9bb39a', legs: '#2f3e5c', shoes: '#efe9dc', accent: '#2f3e5c' },
+  { top: '#2f3e5c', sleeve: '#2f3e5c', legs: '#cbb894', shoes: '#efe9dc', accent: '#efe9dc' },
+  { top: '#d99a9a', sleeve: '#d99a9a', legs: '#3c3f45', shoes: '#efe9dc', accent: '#3c3f45' },
+  { top: '#4f8a8b', sleeve: '#4f8a8b', legs: '#efe9dc', shoes: '#3c3f45', accent: '#efe9dc' },
+  { top: '#3c3f45', sleeve: '#3c3f45', legs: '#e0573d', shoes: '#efe9dc', accent: '#e8b84a' },
+  { top: '#e3c9a8', sleeve: '#e3c9a8', legs: '#6b4a3a', shoes: '#3c3f45', accent: '#6b4a3a' },
+];
+export const FRESH_HATS = ['#e8b84a', '#e0573d', '#3b6fb6', '#2f3e5c', '#efe9dc', '#5f9e6e'];
+function scale3({ name }) {
+  const S = scale2({ name });
+  const R = 0.0295, HY = 0.189;
+  S.parts.head = join([new THREE.SphereGeometry(R, 14, 10).scale(0.95, 1.1, 1).translate(0, HY, 0), new THREE.CylinderGeometry(0.0076, 0.0086, 0.022, 8).translate(0, 0.163, 0)]);
+  // Breton stripes: three thin bands round the top, a hair proud of it.
+  S.parts.stripes = join([0.097, 0.111, 0.125].map(y => lathe([[0.0265, y], [0.0265, y + 0.0055]], 14).scale(1.16, 1, 0.74)));
+  S.palette = 'fresh'; S.hat = { bucket: 0.09, beanie: 0.08 }; S.extras = { ...S.extras, stripes: 0.22 };
+  return S;
+}
+STYLES.scale3 = scale3({ name: 'Pass 8: scale kids, fresher colours, stripes' });

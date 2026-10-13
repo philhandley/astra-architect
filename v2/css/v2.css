@@ -166,3 +166,6 @@ svg.ic.big { width: 34px; height: 34px; }
 .wroom img { width: 30px; height: 30px; }
 .wroom small { font-weight: 500; color: var(--ink-2); }
 .walk-tip { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); background: rgba(255,255,255,.95); border-radius: 999px; padding: 10px 20px; font-size: 15px; font-weight: 500; box-shadow: var(--shadow); pointer-events: none !important; }
+.pmodes { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--paper-2); }
+.pmode { appearance: none; border: 0; cursor: pointer; height: 42px; padding: 0 16px; border-radius: 999px; background: transparent; font: inherit; font-size: 15px; font-weight: 700; color: #4a4d55; }
+.pmode.on { background: #fff; color: #1f2126; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }

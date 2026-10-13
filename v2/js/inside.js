@@ -290,7 +290,7 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
     }
   }
   if ((b.type === 'classroom') && o.kind === 'rr') bag.box('#2f3a33', Math.min(0.5, o.W * 0.5), 0.12, 0.012, 0, 0.18, -o.D / 2 + WALL + 0.01);
-  for (const mm of bag.meshes()) { mm.position.y = floorY + 0.02; g.add(mm); }
+  for (const mm of bag.meshes()) { mm.position.y = floorY + 0.02; mm.userData.noInk = true; g.add(mm); }
   return { group: g, seats: seats.map(([x, z]) => [x, floorY + 0.02, z]), inside: o.inside, floorY: floorY + 0.02, segments };
 }
 

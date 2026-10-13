@@ -101,6 +101,6 @@ export function contactShadow(box) {
     BLOB.geo.userData.shared = true; BLOB.mat.userData.shared = true;
   }
   const m = new THREE.Mesh(BLOB.geo, BLOB.mat);
-  m.scale.set(box.w / 0.6, 1, box.d / 0.6); m.position.y = 0.006; m.renderOrder = 1; m.raycast = () => {};
+  m.scale.set(box.w / 0.6, 1, box.d / 0.6); m.position.y = 0.006; m.renderOrder = 1; m.raycast = () => {}; m.userData.noInk = true;
   return m;
 }

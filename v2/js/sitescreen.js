@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PROGRAMMES, SHAPES, PALETTE, SURFACES, NO_SURFACE, LEVEL, MAX_SIZE, MAX_LEVELS, TRAY, colourHex } from './catalogue.js';
 import { GRID, square } from './site.js';
-import { buildPiece, disposePiece, ghostMaterial } from './shapes.js';
+import { buildPiece, disposePiece, ghostMaterial, addInk, INK } from './shapes.js';
 import { cutRoom, outline, CUTTABLE, storeyFloor, SINGLE_SPACE } from './inside.js';
 import { SchoolDay, Trails, PERIODS } from './day.js';
 import { startWalk } from './walk.js';
@@ -103,6 +103,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     if (S.walkMode) for (const [ax, az, bx, bz] of room.segments) walls.push([ax + b.x + b.w / 2, az + b.z + b.d / 2, bx + b.x + b.w / 2, bz + b.z + b.d / 2]);
     const g = room.group;
     plinth(b, g, null);
+    addInk(g);
     g.position.set(b.x + b.w / 2, yOf(b), b.z + b.d / 2);
     g.traverse(o => { o.userData.boxId = b.id; });
     return { g, room };
@@ -147,6 +148,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     }
     if (!pave.length) return;
     yardMesh = new THREE.Mesh(mergeGeometries(pave.map(g => { g.deleteAttribute('uv'); return g; })), new THREE.MeshLambertMaterial({ color: '#f1ece2' }));
+    yardMesh.userData.landscape = true;
     yardMesh.receiveShadow = true; yardMesh.raycast = () => {};
     design.add(yardMesh);
   }
@@ -192,6 +194,8 @@ export function mountSite(root, world, model, siteView, thumbs) {
     const fn = dt => { t += dt; const k = Math.min(1, t / 0.36); const s = k < 0.6 ? 0.25 + (k / 0.6) * 0.9 : 1.15 - ((k - 0.6) / 0.4) * 0.15; g.scale.set(s, s, s); if (k >= 1) { g.scale.set(1, 1, 1); world.updaters.delete(fn); } };
     world.updaters.add(fn);
   }
+  // Outlines are crisp close up and softer when the whole site is in view.
+  world.updaters.add(() => { const c = world.camera; INK.opacity = c.isPerspectiveCamera ? 0.5 : Math.min(0.85, Math.max(0.35, 0.2 + c.zoom * 0.3)); });
   // Wind turbines turn; children whizz down helter-skelters.
   world.updaters.add(dt => {
     const t = performance.now() / 1000;

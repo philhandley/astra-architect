@@ -760,6 +760,39 @@ function sweepHouses(path, t, H, closed) {
   return geo;
 }
 
+// ---------- thin black outlines, like an architect's drawing ----------
+// One shared line material (its opacity eases off when the whole site is in view, so it never looks scribbly).
+export const INK = new THREE.LineBasicMaterial({ color: '#1f2126', transparent: true, opacity: 0.85 });
+INK.userData.shared = true;
+const edgeCache = new WeakMap();
+const MOVES = ['spin', 'yspin', 'swing', 'rock', 'zip', 'slide'];
+// Draw the creases and rims of every solid mesh in a piece (not glass, people or anything marked noInk).
+// Lines for parts that sit still are merged into one line object per group; moving parts carry their own.
+export function addInk(root, angle = 33) {
+  const meshes = [], groups = new Map();
+  root.traverse(o => { if (o.isMesh && !o.isInstancedMesh) meshes.push(o); });
+  for (const o of meshes) {
+    if (o.userData.people || o.parent?.userData.people || o.userData.noInk) continue;
+    const ms = Array.isArray(o.material) ? o.material : [o.material];
+    if (ms.some(m => !m || m.transparent || m.isSpriteMaterial || m.userData?.ghost)) continue;
+    const shared = !!o.geometry.userData.shared;
+    let e = shared ? edgeCache.get(o.geometry) : null;
+    if (!e) { e = new THREE.EdgesGeometry(o.geometry, angle); if (shared) { e.userData.shared = true; edgeCache.set(o.geometry, e); } }
+    if (!e.attributes.position.count) continue;
+    if (MOVES.some(k => o.userData[k])) { const L = new THREE.LineSegments(e, INK); L.raycast = () => {}; L.userData.ink = true; o.add(L); continue; }
+    o.updateMatrix();
+    const c = e.clone(); c.userData = {}; c.applyMatrix4(o.matrix);
+    if (!shared) e.dispose();
+    if (!groups.has(o.parent)) groups.set(o.parent, []);
+    groups.get(o.parent).push(c);
+  }
+  for (const [parent, gs] of groups) {
+    const merged = gs.length === 1 ? gs[0] : mergeGeometries(gs);
+    if (gs.length > 1) for (const x of gs) x.dispose();
+    const L = new THREE.LineSegments(merged, INK); L.raycast = () => {}; L.userData.ink = true; parent.add(L);
+  }
+}
+
 // Build a programme piece. box = { shape, w, d, h, colour (hex), id }, opts = { open, ghost }
 export function buildPiece(box, opts = {}) {
   const H = box.h * LEVEL;
@@ -770,6 +803,7 @@ export function buildPiece(box, opts = {}) {
   if (!opts.ghost) {
     addFacade(g, box, H);
     if (opts.open && (box.shape === 'box' || box.shape === 'drum')) addTerrace(g, box, H);
+    addInk(g);
     if ((box.level || 0) === 0 && !['tree', 'turbine', 'weather', 'circle', 'track', 'garden', 'pool', 'bridge', 'canopy'].includes(box.shape)) g.add(contactShadow(box));
   }
   if (opts.ghost) g.traverse(o => { if (o.isMesh) { o.material = opts.ghost; o.castShadow = false; } });

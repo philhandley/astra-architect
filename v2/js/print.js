@@ -1,4 +1,4 @@
-// Drawings to print: a black-and-white axonometric of the whole site and a floor plan for each floor,
+// Drawings to print: an axonometric of the whole site (white model, coloured buildings or full colour) and a floor plan for each floor,
 // with room names, a north arrow and a scale bar (one square = one block, about 8 metres).
 import * as THREE from 'three';
 import { PROGRAMMES, LEVEL } from './catalogue.js';
@@ -6,12 +6,15 @@ import { GRID, square, site } from './site.js';
 import { outline } from './inside.js';
 import { icon } from './icons.js';
 import { h, esc, sfx, say } from './ui.js';
+import { INK } from './shapes.js';
 
 const FLOOR_NAMES = ['Ground floor', 'First floor', 'Second floor', 'Third floor'];
 
 export async function openPrint(world, model, siteView, { design, crowd, handles }) {
   say('Making your drawings.');
-  const axo = renderAxo(world, siteView, design, handles);
+  const axos = {};
+  const axoFor = mode => (axos[mode] = axos[mode] || renderAxo(world, siteView, design, handles, mode));
+  const axo = axoFor('white');
   const top = Math.min(3, Math.max(0, ...model.boxes.map(b => b.level + b.h - 1)));
   const plans = [];
   for (let l = 0; l <= top; l++) plans.push({ name: FLOOR_NAMES[l], url: drawPlan(model, siteView, l) });
@@ -19,34 +22,54 @@ export async function openPrint(world, model, siteView, { design, crowd, handles
   const sheet = h(`<div class="print-sheet">
     <div class="print-bar no-print">
       <b>Your drawings</b>
+      <div class="pmodes" role="group" aria-label="Colours">
+        <button class="pmode on" type="button" data-mode="white">White model</button>
+        <button class="pmode" type="button" data-mode="colour">Colour buildings</button>
+        <button class="pmode" type="button" data-mode="full">Full colour</button>
+      </div>
       <button class="pbtn go" type="button">${icon('print')} Print</button>
       <button class="pbtn close" type="button">${icon('close')} Close</button>
     </div>
-    <section class="page"><header><h1>Finn's Dream School</h1><span>Axonometric drawing · ${esc(date)}</span></header><img src="${axo}" alt="Axonometric drawing of the school"></section>
+    <section class="page"><header><h1>Finn's Dream School</h1><span>Axonometric drawing · ${esc(date)}</span></header><img class="axo" src="${axo}" alt="Axonometric drawing of the school"></section>
     ${plans.map(p => `<section class="page"><header><h1>Finn's Dream School</h1><span>${esc(p.name)} plan · ${esc(date)}</span></header><img src="${p.url}" alt="${esc(p.name)} plan"></section>`).join('')}
   </div>`);
   document.body.appendChild(sheet);
   sheet.querySelector('.go').addEventListener('click', () => { sfx.tap(); window.print(); });
+  const SAY = { white: 'A white model, like an architect\'s card model.', colour: 'Coloured buildings on a white site.', full: 'Everything in colour.' };
+  for (const b of sheet.querySelectorAll('.pmode')) b.addEventListener('click', () => {
+    sfx.tap(); say(SAY[b.dataset.mode]);
+    for (const x of sheet.querySelectorAll('.pmode')) x.classList.toggle('on', x === b);
+    sheet.querySelector('.axo').src = axoFor(b.dataset.mode);
+  });
   sheet.querySelector('.close').addEventListener('click', () => { sfx.tap(); sheet.remove(); });
 }
 
-// ---------- the black-and-white axonometric ----------
-function renderAxo(world, siteView, design, handles) {
+// ---------- the axonometric ----------
+// mode: 'white' (a white card model), 'colour' (coloured buildings and children on a white site), 'full' (as on screen).
+function renderAxo(world, siteView, design, handles, mode = 'white') {
   const r = world.renderer, scene = world.scene, cam = world.camera, ctl = world.controls;
   const saved = { bg: scene.background, size: r.getSize(new THREE.Vector2()), pr: r.getPixelRatio(), zoom: cam.zoom, pos: cam.position.clone(), target: ctl.target.clone(), hv: handles.visible,
     l: cam.left, rt: cam.right, t: cam.top, b: cam.bottom };
   const white = new THREE.MeshLambertMaterial({ color: '#ffffff' }), pale = new THREE.MeshLambertMaterial({ color: '#eef1f2' });
-  const swapped = [], edges = [];
+  const glass = new THREE.MeshLambertMaterial({ color: '#ffffff', transparent: true, opacity: 0.35, depthWrite: false }), sea = new THREE.MeshBasicMaterial({ color: '#dbe8ee' });       // unlit, so the sun cannot bleach it white
+  const swapped = [], edges = [], hidden = [];
+  const inDesign = new Set(); design.traverse(o => { if (!o.userData.landscape) inDesign.add(o); });
   scene.traverse(o => {
-    if (!o.isMesh || o === world.__skip) return;
+    if (!o.isMesh || o === world.__skip || mode === 'full') return;
     if (o.material && o.material.isSpriteMaterial) return;
     const isPeople = !!o.userData.people || !!o.parent?.userData.people;
+    if (mode === 'colour' && (isPeople || inDesign.has(o))) return;
+    const see = !o.userData.noInk && (Array.isArray(o.material) ? o.material : [o.material]).some(m => m && m.transparent);
+    if (see && !inDesign.has(o)) { if (o.visible) { o.visible = false; hidden.push(o); } return; }
     swapped.push([o, o.material, o.instanceColor || null]);
     if (o.isInstancedMesh) o.instanceColor = null;
-    o.material = o === siteView.water || isPeople ? pale : white;
+    o.material = see && inDesign.has(o) ? glass : o === siteView.water ? sea : isPeople ? pale : white;
   });
+  const inkWas = INK.opacity; INK.opacity = 1;
+  // Glass gets a fine outline here (the pieces already carry outlines for everything solid).
   design.traverse(o => {
-    if (!o.isMesh || o.isInstancedMesh || o.userData.people) return;
+    if (!o.isMesh || o.isInstancedMesh || o.userData.people || o.userData.noInk) return;
+    if (!(Array.isArray(o.material) ? o.material : [o.material]).some(m => m === glass || (m && m.transparent && mode !== 'white'))) return;
     const e = new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 28), new THREE.LineBasicMaterial({ color: '#1d1f24' }));
     o.add(e); edges.push(e);
   });
@@ -66,8 +89,9 @@ function renderAxo(world, siteView, design, handles) {
   const url = r.domElement.toDataURL('image/png');
   // Put everything back.
   for (const [o, m, ic] of swapped) { o.material = m; if (ic) o.instanceColor = ic; }
+  for (const o of hidden) o.visible = true;
   for (const e of edges) { e.parent.remove(e); e.geometry.dispose(); e.material.dispose(); }
-  white.dispose(); pale.dispose();
+  white.dispose(); pale.dispose(); glass.dispose(); sea.dispose(); INK.opacity = inkWas;
   scene.background = saved.bg;
   r.setPixelRatio(saved.pr); r.setSize(saved.size.x, saved.size.y, false);
   cam.left = saved.l; cam.right = saved.rt; cam.top = saved.t; cam.bottom = saved.b; cam.zoom = saved.zoom;

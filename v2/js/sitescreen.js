@@ -500,7 +500,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     const fn = dt => {
       t += dt;
       rk.position.y = base + (t < 0.8 ? 0 : Math.pow(t - 0.8, 2) * 1.6);
-      rk.rotation.y += dt * 0.6;
+      const fl = rk.userData.flame; if (fl) { fl.visible = t > 0.3; fl.scale.set(1 + Math.sin(t * 41) * 0.15, (t < 0.8 ? 0.6 : 1) + Math.sin(t * 29) * 0.25, 1 + Math.sin(t * 37) * 0.15); }
       if (t > 0.3 && t < 4.5 && Math.random() < 0.6) {
         const p = new THREE.Mesh(new THREE.SphereGeometry(0.08 + Math.random() * 0.06, 8, 6), new THREE.MeshLambertMaterial({ color: '#ffffff', transparent: true, opacity: 0.9 }));
         p.position.set(rk.position.x + (Math.random() - 0.5) * 0.15, rk.position.y + 0.02, rk.position.z + (Math.random() - 0.5) * 0.15);
@@ -508,7 +508,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
         g.add(p); puffs.push(p);
       }
       for (const p of puffs) { p.position.addScaledVector(p.userData.v, dt); p.scale.multiplyScalar(1 + dt * 1.4); p.material.opacity = Math.max(0, p.material.opacity - dt * 0.35); }
-      if (t > 6.5) { rk.visible = false; rk.userData.flying = false; for (const p of puffs) { g.remove(p); p.geometry.dispose(); p.material.dispose(); } world.updaters.delete(fn); toast('Off it goes! A new rocket will come in a minute.'); }
+      if (t > 6.5) { rk.visible = false; rk.userData.flying = false; if (rk.userData.flame) rk.userData.flame.visible = false; for (const p of puffs) { g.remove(p); p.geometry.dispose(); p.material.dispose(); } world.updaters.delete(fn); toast('Off it goes! A new rocket will come in a minute.'); }
     };
     world.updaters.add(fn);
     gone.set(b.id, { timer: setTimeout(() => nextRocket(b.id), ROCKET_WAIT), until: Date.now() + ROCKET_WAIT });
@@ -526,7 +526,8 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     const fn = dt => {
       t += dt;
       const e = Math.min(1, t / 3.2), s = 1 - Math.pow(1 - e, 3);        // eases in to land softly
-      rk.position.y = base + from * (1 - s); rk.rotation.y += dt * 0.5;
+      rk.position.y = base + from * (1 - s);
+      const fl = rk.userData.flame; if (fl) { fl.visible = e < 1; fl.scale.set(0.7 + Math.sin(t * 41) * 0.1, 0.5 + Math.sin(t * 29) * 0.15, 0.7 + Math.sin(t * 37) * 0.1); }
       if (e >= 1) { rk.position.y = base; rk.userData.flying = false; world.updaters.delete(fn); gone.delete(id); updateLaunch(); sfx.cheer(); confetti(new THREE.Vector3(b.x + b.w / 2, yOf(b) + 0.4, b.z + b.d / 2)); say('A new rocket is ready on the launch pad!'); if (S.selected === id) drawSelbar(b); }
     };
     world.updaters.add(fn);

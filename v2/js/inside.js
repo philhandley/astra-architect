@@ -424,7 +424,6 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
     for (let i = 1; i < lanes; i++) { const off = -Math.min(BW, BD) / 2 + (Math.min(BW, BD) * i) / lanes; bag.box('#ffffff', long ? BW - 0.1 : 0.012, 0.004, long ? 0.012 : BD - 0.1, long ? 0 : off, 0.02, long ? off : 0); }
     swim = { w: BW - 0.12, d: BD - 0.12, y: floorY + 0.03 };
   }
-  if ((b.type === 'classroom') && o.kind === 'rr') bag.box('#2f3a33', Math.min(0.5, o.W * 0.5), 0.12, 0.012, 0, 0.18, -o.D / 2 + WALL + 0.01);
   for (const mm of bag.meshes()) { mm.position.y = floorY + 0.02; mm.userData.noInk = true; g.add(mm); }
   return { group: g, seats: seats.map(([x, z]) => [x, floorY + 0.02, z]), inside: o.inside, floorY: floorY + 0.02, segments, swim };
 }

@@ -698,7 +698,9 @@ Object.assign(BUILD, {
     const top = mesh(new THREE.PlaneGeometry(pw, pd).rotateX(-Math.PI / 2).translate(0, 0.101, 0), mat('#ffffff', { map: paint }), false); top.userData.noInk = true; g.add(top);
     // The launch mount: a dark ring the booster stands on, on a plain circle of the pad.
     g.add(mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.004, 32).translate(rx, 0.104, 0), mat('#3d4149'), false));
-    g.add(mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.1, 24).translate(rx, 0.15, 0), mat(dark)));
+    const ring = new THREE.Shape(); ring.absarc(0, 0, 0.22, 0, Math.PI * 2, false); ring.holes.push((() => { const hole = new THREE.Path(); hole.absarc(0, 0, 0.165, 0, Math.PI * 2, true); return hole; })());
+    g.add(mesh(new THREE.ExtrudeGeometry(ring, { depth: 0.06, bevelEnabled: false, curveSegments: 24 }).rotateX(-Math.PI / 2).translate(rx, 0.14, 0), mat(dark)));
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; g.add(mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.04, 6).translate(rx + Math.cos(a) * 0.195, 0.12, Math.sin(a) * 0.195), mat(dark))); }
     // The fence: white posts and two rails, open at the front.
     const posts = [], rails = [], fy = 0.1, ph = 0.09;
     const run = (x0, z0, x1, z1, gap) => {
@@ -721,6 +723,8 @@ Object.assign(BUILD, {
     g.add(mesh(new THREE.BoxGeometry(0.2, 0.14, 0.26).translate(gx, armY, gz), mat(dark)));
     const armL = rx + 0.14 - (gx + 0.1);
     for (const s of [-1, 1]) { g.add(mesh(new THREE.BoxGeometry(armL, 0.05, 0.05).translate(gx + 0.1 + armL / 2, armY, gz + s * 0.21), mat(dark))); g.add(mesh(new THREE.BoxGeometry(0.1, 0.054, 0.054).translate(gx + 0.1 + armL - 0.05, armY, gz + s * 0.21), mat(c))); }
+    g.add(mesh(new THREE.BoxGeometry(0.14, 0.1, 0.18).translate(gx, 1.56, gz), mat(dark)));
+    g.add(mesh(new THREE.BoxGeometry(rx - 0.15 - (gx + 0.07), 0.035, 0.05).translate((gx + 0.07 + rx - 0.15) / 2, 1.56, gz), mat(dark)));
     g.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.18, 5).translate(gx, gh + 0.19, gz), mat(WHITE), false));
     g.add(mesh(new THREE.BoxGeometry(0.1, 0.06, 0.01).translate(gx + 0.055, gh + 0.25, gz), mat(c), false));
     // The rocket: a stainless booster with grid fins, and the ship on top with its pointed nose, four flaps and a
@@ -728,12 +732,21 @@ Object.assign(BUILD, {
     const rk = new THREE.Group(); rk.position.set(rx, 0.2, 0);
     rk.add(mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.95, 24).translate(0, 0.475, 0), mat(steel)));
     rk.add(mesh(new THREE.CylinderGeometry(0.156, 0.156, 0.07, 24).translate(0, 0.035, 0), mat(dark)));
+    for (let i = 0; i < 7; i++) { const a = (i / 6) * Math.PI * 2, rr = i < 6 ? 0.095 : 0; rk.add(mesh(new THREE.CylinderGeometry(0.028, 0.02, 0.05, 10).translate(Math.cos(a) * rr, -0.025, Math.sin(a) * rr), mat('#5b6069'))); }
+    for (let y = 0.2; y < 0.9; y += 0.18) rk.add(mesh(new THREE.CylinderGeometry(0.151, 0.151, 0.012, 24).translate(0, y, 0), mat('#c3c7cc'), false));
+    // The flame: two cones that flicker while the rocket flies (and brakes to land), hidden on the pad.
+    const flame = new THREE.Group();
+    flame.add(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.6, 12).rotateX(Math.PI).translate(0, -0.3, 0), new THREE.MeshBasicMaterial({ color: '#ff8a3d', transparent: true, opacity: 0.85 })));
+    flame.add(new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.4, 12).rotateX(Math.PI).translate(0, -0.2, 0), new THREE.MeshBasicMaterial({ color: '#ffe48a', transparent: true, opacity: 0.95 })));
+    flame.position.y = -0.04; flame.visible = false; flame.traverse(o => { o.userData.noInk = true; o.raycast = () => {}; }); rk.add(flame); rk.userData.flame = flame;
     for (let i = 0; i < 4; i++) { const fin = mesh(new THREE.BoxGeometry(0.1, 0.07, 0.014).translate(0, 0.9, 0.165), mat('#5b6069')); fin.rotation.y = Math.PI / 4 + (i * Math.PI) / 2; rk.add(fin); }
     rk.add(mesh(new THREE.CylinderGeometry(0.152, 0.152, 0.025, 24).translate(0, 0.96, 0), mat(dark)));
     rk.add(mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.72, 24).translate(0, 1.33, 0), mat(steel)));
-    const nose = []; for (let i = 0; i <= 10; i++) { const t2 = i / 10; nose.push(new THREE.Vector2(0.15 * Math.pow(Math.cos(t2 * Math.PI / 2), 0.7) + (i === 10 ? 0.0001 : 0), 1.69 + t2 * 0.42)); }
+    const nose = [], noseT = []; for (let i = 0; i <= 12; i++) { const t2 = i / 12, r2 = 0.15 * Math.pow(Math.cos(t2 * Math.PI / 2), 0.55); nose.push(new THREE.Vector2(r2 + (i === 12 ? 0.0001 : 0), 1.69 + t2 * 0.48)); noseT.push(new THREE.Vector2(r2 + 0.004, 1.69 + t2 * 0.48)); }
     rk.add(mesh(new THREE.LatheGeometry(nose, 24), mat(steel)));
-    rk.add(mesh(new THREE.CylinderGeometry(0.154, 0.154, 0.72, 16, 1, true, 0, Math.PI).translate(0, 1.33, 0), mat(dark, { side: THREE.DoubleSide })));
+    // Black heat-shield tiles down one side of the ship, running up the nose to the tip.
+    rk.add(mesh(new THREE.CylinderGeometry(0.154, 0.154, 0.72, 16, 1, true, Math.PI / 4, Math.PI).translate(0, 1.33, 0), mat(dark, { side: THREE.DoubleSide })));
+    rk.add(mesh(new THREE.LatheGeometry(noseT, 12, Math.PI / 4, Math.PI), mat(dark, { side: THREE.DoubleSide })));
     for (const s of [-1, 1]) { rk.add(mesh(new THREE.BoxGeometry(0.03, 0.22, 0.15).translate(0, 1.1, s * 0.19), mat(steel))); rk.add(mesh(new THREE.BoxGeometry(0.03, 0.15, 0.1).translate(0, 1.78, s * 0.16), mat(steel))); }
     rk.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.02, 16).rotateX(Math.PI / 2).translate(0, 1.5, 0.145), mat('#7fd0ea')));
     rk.userData.rocket = true;

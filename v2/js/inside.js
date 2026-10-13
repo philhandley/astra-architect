@@ -1,64 +1,31 @@
 // The inside view: a room cut through at one floor, like an architect's cutaway. Light floor, walls cut at
-// half height (white on the cut), and furniture for what the room is for. Returns where people sit and walk.
+// child height (white on the cut) with the same windows and doors as outside, and furniture for what the
+// room is for. Returns where people sit and walk.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LEVEL } from './catalogue.js';
-import { mat, shade } from './shapes.js';
+import { mat, colonnade, courtyard } from './shapes.js';
+import { outline, roundedRect, wallRuns, openings, eachPiece, runAt, TALL, WALL_T } from './plan.js';
+export { outline } from './plan.js';
 
-const GAP = 0.035, WALL = 0.05, CUT = 0.27;
+const WALL = 0.05, CUT = 0.27;
 export const CUTTABLE = new Set(['box', 'house', 'saw', 'vault', 'drum', 'tower', 'ring', 'ringhouse', 'arc', 'arch']);
 // Rooms that are one tall space (the floor stays at the bottom); others are stacked storeys.
-export const SINGLE = new Set(['hall', 'aquarium', 'pool']);
+export const SINGLE = TALL;
 
 const lighten = (hex, f) => '#' + new THREE.Color(hex).lerp(new THREE.Color('#ffffff'), f).getHexString();
-
-function roundedRect(W, D, r) {
-  const s = new THREE.Shape(), x = -W / 2, y = -D / 2;
-  r = Math.max(0.001, Math.min(r, W / 2, D / 2));
-  s.moveTo(x + r, y); s.lineTo(x + W - r, y); s.absarc(x + W - r, y + r, r, -Math.PI / 2, 0, false);
-  s.lineTo(x + W, y + D - r); s.absarc(x + W - r, y + D - r, r, 0, Math.PI / 2, false);
-  s.lineTo(x + r, y + D); s.absarc(x + r, y + D - r, r, Math.PI / 2, Math.PI, false);
-  s.lineTo(x, y + r); s.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
-  return s;
-}
-// Signed "inside" test for a rounded rectangle (local x, z), shrunk by m.
-function inRR(x, z, W, D, r, m = 0) {
-  const hw = W / 2 - m, hd = D / 2 - m, rr = Math.max(0, r - m);
-  if (hw <= 0 || hd <= 0) return false;
-  const qx = Math.abs(x) - (hw - rr), qz = Math.abs(z) - (hd - rr);
-  if (qx <= 0 || qz <= 0) return Math.abs(x) <= hw && Math.abs(z) <= hd;
-  return Math.hypot(qx, qz) <= rr;
-}
-
-// The plan outline of a room shape, with an "inside" test for furniture and people.
-export function outline(b) {
-  const W = b.w - 2 * GAP - 0.03, D = b.d - 2 * GAP - 0.03, s = b.shape;
-  if (['drum', 'tower'].includes(s)) { const r = Math.min(W, D) / 2; return { kind: 'rr', W, D, r, inside: (x, z, m) => inRR(x, z, W, D, r, m) }; }
-  if ((s === 'ring' || s === 'ringhouse') && b.w >= 2 && b.d >= 2) {
-    const t = s === 'ring' ? (b.w >= 3 && b.d >= 3 ? 0.95 : Math.min(W, D) * 0.3) : (b.w >= 3 && b.d >= 3 ? 0.9 : 0.6);
-    const r = Math.min(W, D) / 2, Wi = W - 2 * t, Di = D - 2 * t, ri = Math.max(0.05, r - t);
-    return { kind: 'ring', W, D, r, Wi, Di, ri, inside: (x, z, m) => inRR(x, z, W, D, r, m) && !inRR(x, z, Wi, Di, ri, -m) };
-  }
-  if (s === 'arc') {
-    const one = Math.min(b.w, b.d) < 2;
-    const R = one ? 0.47 : Math.min(b.w, b.d) - GAP - 0.45, t = one ? 0.9 : 0.85, cx = -b.w / 2 + GAP, cz = -b.d / 2 + GAP, R0 = Math.max(0, R - t / 2), R1 = R + t / 2;
-    const rot = b.w === b.d ? (b.rot || 0) : 0, ph = rot * Math.PI / 2, co = Math.cos(ph), si = Math.sin(ph);
-    const un = (x, z) => [x * co + z * si, -x * si + z * co];      // back to the unturned frame
-    return { kind: 'arc', cx, cz, R0, R1, rot, inside: (x, z, m) => { const [u, v] = un(x, z); const dd = Math.hypot(u - cx, v - cz); return dd > R0 + m && dd < R1 - m && u > cx + m && v > cz + m; } };
-  }
-  return { kind: 'rr', W, D, r: 0.04, inside: (x, z, m) => inRR(x, z, W, D, 0.04, m) };
-}
 
 function shapesOf(o) {
   if (o.kind === 'rr') { const f = roundedRect(o.W, o.D, o.r); const w = roundedRect(o.W, o.D, o.r); w.holes.push(roundedRect(o.W - 2 * WALL, o.D - 2 * WALL, o.r - WALL)); return { floor: [f], walls: [w] }; }
   if (o.kind === 'ring') {
-    const f = roundedRect(o.W, o.D, o.r); f.holes.push(roundedRect(o.Wi, o.Di, o.ri));
+    // (The floor runs out under the colonnade too.)
+    const f = roundedRect(o.W, o.D, o.r); f.holes.push(roundedRect(o.fWi, o.fDi, o.fri));
     const w1 = roundedRect(o.W, o.D, o.r); w1.holes.push(roundedRect(o.W - 2 * WALL, o.D - 2 * WALL, o.r - WALL));
     const w2 = roundedRect(o.Wi + 2 * WALL, o.Di + 2 * WALL, o.ri + WALL); w2.holes.push(roundedRect(o.Wi, o.Di, o.ri));
     return { floor: [f], walls: [w1, w2] };
   }
-  // A quarter band, drawn as a polygon.
-  const band = (a, b2) => { const s = new THREE.Shape(), n = 24; for (let i = 0; i <= n; i++) { const t = (i / n) * Math.PI / 2; const p = [o.cx + Math.cos(t) * b2, -(o.cz + Math.sin(t) * b2)]; i ? s.lineTo(...p) : s.moveTo(...p); } for (let i = n; i >= 0; i--) { const t = (i / n) * Math.PI / 2; s.lineTo(o.cx + Math.cos(t) * a, -(o.cz + Math.sin(t) * a)); } return s; };
+  // A quarter band, drawn as a polygon (a quarter of a pie when the inside radius is 0).
+  const band = (a, b2) => { const s = new THREE.Shape(), n = 24; for (let i = 0; i <= n; i++) { const t = (i / n) * Math.PI / 2; const p = [o.cx + Math.cos(t) * b2, -(o.cz + Math.sin(t) * b2)]; i ? s.lineTo(...p) : s.moveTo(...p); } if (a < 0.01) { s.lineTo(o.cx, -o.cz); return s; } for (let i = n; i >= 0; i--) { const t = (i / n) * Math.PI / 2; s.lineTo(o.cx + Math.cos(t) * a, -(o.cz + Math.sin(t) * a)); } return s; };
   const ends = [];
   for (const t of [0, Math.PI / 2]) {
     const s = new THREE.Shape(), c = Math.cos(t), sn = Math.sin(t), nx = -sn, nz = c, k = t ? -1 : 1;
@@ -74,54 +41,77 @@ function slab(shapes, h) {
   return g;
 }
 
-// The outline as closed lines of points (piece-local x, z), turned for curved pieces that face another corner.
-function loopsOf(o) {
-  const xz = s => { const pts = s.getPoints(8).map(p => [p.x, -p.y]); if (pts.length > 2 && Math.hypot(pts[0][0] - pts.at(-1)[0], pts[0][1] - pts.at(-1)[1]) < 1e-4) pts.pop(); return pts; };
-  if (o.kind === 'rr') return [{ pts: xz(roundedRect(o.W, o.D, o.r)), outer: true }];
-  if (o.kind === 'ring') return [{ pts: xz(roundedRect(o.W, o.D, o.r)), outer: true }, { pts: xz(roundedRect(o.Wi, o.Di, o.ri)), outer: false }];
-  const pts = [], n = 16;
-  for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI / 2; pts.push([o.cx + Math.cos(a) * o.R1, o.cz + Math.sin(a) * o.R1]); }
-  for (let i = n; i >= 0; i--) { const a = (i / n) * Math.PI / 2; pts.push([o.cx + Math.cos(a) * Math.max(0.01, o.R0), o.cz + Math.sin(a) * Math.max(0.01, o.R0)]); }
-  const ph = (o.rot || 0) * Math.PI / 2, co = Math.cos(ph), si = Math.sin(ph);
-  return [{ pts: pts.map(([x, z]) => [x * co - z * si, x * si + z * co]), outer: true }];
-}
-function inPoly(pts, x, z) { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, zi] = pts[i], [xj, zj] = pts[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; }
-function walkWalls(o, b, hex, floorY, top) {
-  const T = 0.04, SILL = 0.11, HEAD = 0.36, DOOR = 0.3;
-  const solid = [], glassG = [], segments = [], bays = [];
-  for (const loop of loopsOf(o)) {
-    const P = loop.pts;
-    for (let i = 0; i < P.length; i++) {
-      const [ax, az] = P[i], [bx, bz] = P[(i + 1) % P.length], len = Math.hypot(bx - ax, bz - az);
-      if (len < 0.01) continue;
-      const dx = (bx - ax) / len, dz = (bz - az) / len;
-      // Which side is the room? (Into the shape for the outside wall, out of the hole for a courtyard wall.)
-      let nx = -dz, nz = dx; const mx = (ax + bx) / 2, mz = (az + bz) / 2;
-      const into = inPoly(P, mx + nx * 0.02, mz + nz * 0.02);
-      if (into !== loop.outer) { nx = -nx; nz = -nz; }
-      const k = Math.max(1, Math.round(len / 0.3)), bl = len / k;
-      for (let j = 0; j < k; j++) bays.push({ x: ax + dx * bl * (j + 0.5) + nx * T / 2, z: az + dz * bl * (j + 0.5) + nz * T / 2, dx, dz, len: bl, outer: loop.outer });
+// Walls round one storey, built from the plan: solid wall, with the building's own windows (glass) and its
+// doorway (a gap) cut out, `top` high. With cut on, the top is white, like a drawing's cut line.
+// Returns the walls and, for walking, the lines you bump into.
+// Walls are built as smooth strips that follow the wall (not lots of little boxes), so curved walls stay
+// clean and the outline only shows the real edges. Each strip: outside face, inside face, top, ends.
+class Strips {
+  constructor() { this.side = []; this.top = []; }
+  quad(list, a, b, c, d, n) {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    const flip = (uy * vz - uz * vy) * n[0] + (uz * vx - ux * vz) * n[1] + (ux * vy - uy * vx) * n[2] < 0;
+    if (flip) list.push(...a, ...c, ...b, ...a, ...d, ...c); else list.push(...a, ...b, ...c, ...a, ...c, ...d);
+  }
+  // pts/ns: the outside face line and its way out; the strip is T thick inwards, from y0 to y1.
+  add(pts, ns, T, y0, y1, white) {
+    const O = pts, I = pts.map(([x, z], i) => [x - ns[i][0] * T, z - ns[i][1] * T]), top = white ? this.top : this.side, S = this.side;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [ox0, oz0] = O[i], [ox1, oz1] = O[i + 1], [ix0, iz0] = I[i], [ix1, iz1] = I[i + 1], n = [(ns[i][0] + ns[i + 1][0]) / 2, 0, (ns[i][1] + ns[i + 1][1]) / 2];
+      this.quad(S, [ox0, y0, oz0], [ox1, y0, oz1], [ox1, y1, oz1], [ox0, y1, oz0], n);
+      this.quad(S, [ix0, y0, iz0], [ix1, y0, iz1], [ix1, y1, iz1], [ix0, y1, iz0], [-n[0], 0, -n[2]]);
+      this.quad(top, [ox0, y1, oz0], [ox1, y1, oz1], [ix1, y1, iz1], [ix0, y1, iz0], [0, 1, 0]);
+      this.quad(S, [ox0, y0, oz0], [ox1, y0, oz1], [ix1, y0, iz1], [ix0, y0, iz0], [0, -1, 0]);
     }
+    const end = (i, j) => { const d = [O[i][0] - O[j][0], 0, O[i][1] - O[j][1]]; this.quad(S, [O[i][0], y0, O[i][1]], [I[i][0], y0, I[i][1]], [I[i][0], y1, I[i][1]], [O[i][0], y1, O[i][1]], d); };
+    end(0, 1); end(pts.length - 1, pts.length - 2);
   }
-  // The doorway: the widest bay on the front of the outside wall.
-  let door = null;
-  for (const by of bays) if (by.outer && by.len >= 0.14 && (!door || by.z > door.z + 0.01)) door = by;
-  let w = 0;
-  for (const by of bays) {
-    const a = Math.atan2(by.dx, by.dz), put = (list, y0, y1, th = T) => list.push(new THREE.BoxGeometry(th, y1 - y0, by.len + 0.004).rotateY(a).translate(by.x, floorY + (y0 + y1) / 2, by.z));
-    const seg = [by.x - by.dx * by.len / 2, by.z - by.dz * by.len / 2, by.x + by.dx * by.len / 2, by.z + by.dz * by.len / 2];
-    if (by === door) { put(solid, DOOR, top); continue; }
-    segments.push(seg);
-    if (by.len >= 0.14 && (w++ % 2 === 0)) { put(solid, 0, SILL); put(solid, HEAD, top); put(glassG, SILL, HEAD, 0.006); }
-    else put(solid, 0, top);
+  geometry() {
+    const g = new THREE.BufferGeometry(), all = [...this.side, ...this.top];
+    g.setAttribute('position', new THREE.Float32BufferAttribute(all, 3)); g.computeVertexNormals();
+    g.addGroup(0, this.side.length / 3, 0); g.addGroup(this.side.length / 3, this.top.length / 3, 1);
+    return g;
   }
-  const g = new THREE.Group();
-  const merge = list => mergeGeometries(list.map(x => { x.deleteAttribute('uv'); return x; }));
-  if (solid.length) { const m = new THREE.Mesh(merge(solid), mat(hex, { emissive: hex, emissiveIntensity: 0.28 })); m.castShadow = true; m.receiveShadow = true; g.add(m); }
-  if (glassG.length) g.add(new THREE.Mesh(merge(glassG), mat('#cfeaf5', { transparent: true, opacity: 0.28, depthWrite: false })));
+}
+// The wall line between u0 and u1 along a run: its points and (smoothed) ways out, shifted by `off` outwards.
+function wallLine(run, u0, u1, off = 0) {
+  const pts = [], ns = [], push = (x, z, nx, nz) => { pts.push([x + nx * off, z + nz * off]); ns.push([nx, nz]); };
+  const a = runAt(run, u0); push(a.x, a.z, a.nx, a.nz);
+  for (let i = 1; i < run.pts.length - 1; i++) if (run.s[i] > u0 + 1e-5 && run.s[i] < u1 - 1e-5) {
+    let nx = run.n[i - 1][0] + run.n[i][0], nz = run.n[i - 1][1] + run.n[i][1]; const l = Math.hypot(nx, nz) || 1;
+    push(run.pts[i][0], run.pts[i][1], nx / l, nz / l);
+  }
+  const b = runAt(run, u1); push(b.x, b.z, b.nx, b.nz);
+  return { pts, ns };
+}
+// Walls round one storey, built from the plan: solid wall, with the building's own windows (glass) and its
+// doorway (a gap) left open, `top` high. With cut on, the top is white, like a drawing's cut line.
+// Returns the walls and, for walking, the lines you bump into.
+function buildWalls(b, k, hex, floorY, top, cut) {
+  const runs = wallRuns(b, k), ops = openings(b, k, runs), T = WALL_T;
+  const walls = new Strips(), glass = new Strips(), segments = [];
+  runs.forEach((run, ri) => {
+    const mine = ops.filter(o => o.run === ri);
+    const cuts = [0, run.len];
+    for (const o of mine) for (const s of [o.s0, o.s1]) if (s > 0 && s < run.len) cuts.push(s);
+    cuts.sort((a, b2) => a - b2);
+    for (let i = 0; i < cuts.length - 1; i++) {
+      const u0 = cuts[i], u1 = cuts[i + 1]; if (u1 - u0 < 1e-4) continue;
+      const um = (u0 + u1) / 2, o = mine.find(x => x.s0 <= um && um <= x.s1), line = wallLine(run, u0, u1);
+      const wall = (y0, y1) => { y1 = Math.min(y1, top); if (y1 - y0 > 0.004) walls.add(line.pts, line.ns, T, floorY + y0, floorY + y1, cut && y1 >= top - 1e-4); };
+      if (!o) wall(0, top);
+      else {
+        wall(0, Math.max(0, o.y0)); if (o.y1 < top) wall(o.y1, top);
+        if (!o.door || o.glassDoor) { const gl = wallLine(run, u0, u1, -T / 2 + 0.004); const y0 = Math.max(0, o.y0), y1 = Math.min(top, o.y1); if (y1 - y0 > 0.004) glass.add(gl.pts, gl.ns, 0.008, floorY + y0, floorY + y1, false); }
+      }
+      if (!o || !o.door) eachPiece(run, u0, u1, p => { const cx = p.x - p.nx * T / 2, cz = p.z - p.nz * T / 2; segments.push([cx - p.dx * p.len / 2, cz - p.dz * p.len / 2, cx + p.dx * p.len / 2, cz + p.dz * p.len / 2]); });
+    }
+  });
+  const g = new THREE.Group(), body = cut ? mat(hex) : mat(hex, { emissive: hex, emissiveIntensity: 0.28 });
+  if (walls.side.length) { const m = new THREE.Mesh(walls.geometry(), [body, cut ? mat('#ffffff') : body]); m.castShadow = true; m.receiveShadow = true; g.add(m); }
+  if (glass.side.length) g.add(new THREE.Mesh(glass.geometry(), mat('#bfe4f3', { transparent: true, opacity: 0.4, depthWrite: false })));
   return { group: g, segments };
 }
-
 // ---------- playful furniture ----------
 function seededRnd(seed) { let a = seed >>> 0 || 1; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const FUN = ['#f7c22e', '#e2457d', '#22b2bf', '#a3d140', '#f28b30', '#7c46a8', '#f5a3c7', '#3d8de0'];
@@ -219,20 +209,6 @@ const PLANS = {
   observatory: A => [['rug', 1]],
 };
 
-// (old furniture units, kept for reference by nothing)
-const UNITS = {
-  classroom: (bag, x, z, c) => { bag.box('#fbfaf6', 0.15, 0.085, 0.09, x, 0.043, z - 0.03); bag.box(shade(c, 0.7), 0.07, 0.05, 0.06, x, 0.025, z + 0.06); return [[x, z + 0.07]]; },
-  lunch: (bag, x, z, c) => { bag.box('#fbfaf6', 0.2, 0.08, 0.09, x, 0.04, z); bag.box(shade(c, 0.7), 0.2, 0.04, 0.04, x, 0.02, z - 0.08); bag.box(shade(c, 0.7), 0.2, 0.04, 0.04, x, 0.02, z + 0.08); return [[x - 0.05, z - 0.08], [x + 0.05, z + 0.08]]; },
-  library: (bag, x, z, c, i) => { if (i % 2) { bag.box(lighten(c, 0.2), 0.24, 0.28, 0.07, x, 0.14, z); for (let k = 0; k < 3; k++) bag.box(['#e2457d', '#f7c22e', '#3d8de0'][k], 0.2, 0.05, 0.075, x, 0.05 + k * 0.09, z); return []; } bag.ball(['#f28b30', '#a3d140', '#f5a3c7'][i % 3], 0.075, x, 0.04, z); return [[x, z]]; },
-  art: (bag, x, z, c, i) => { bag.box('#fbfaf6', 0.22, 0.09, 0.18, x, 0.045, z); if (i % 2) { bag.box('#d8b98c', 0.012, 0.22, 0.012, x + 0.13, 0.11, z); bag.box('#ffffff', 0.12, 0.1, 0.01, x + 0.13, 0.16, z - 0.01); } return [[x - 0.07, z + 0.12], [x + 0.07, z + 0.12]]; },
-  music: (bag, x, z, c, i) => { if (i % 3 === 0) { bag.box('#26272d', 0.24, 0.12, 0.1, x, 0.06, z); bag.box('#ffffff', 0.22, 0.012, 0.03, x, 0.125, z + 0.035); return [[x, z + 0.11]]; } if (i % 3 === 1) { bag.cyl('#e6463c', 0.06, 0.06, x - 0.05, 0.03, z); bag.cyl('#fbfaf6', 0.045, 0.08, x + 0.06, 0.04, z); return [[x, z + 0.1]]; } bag.box(shade(c, 0.7), 0.08, 0.06, 0.08, x, 0.03, z); return [[x, z]]; },
-  hall: (bag, x, z, c, i) => { if (i % 3 === 0) bag.box('#3d8de0', 0.26, 0.02, 0.18, x, 0.01, z); return []; },
-  yoga: (bag, x, z, c, i) => { bag.box(['#a3d140', '#8fdac3', '#f5a3c7', '#f7c22e'][i % 4], 0.09, 0.012, 0.22, x, 0.006, z); return [[x, z]]; },
-  aquarium: (bag, x, z) => { for (let k = 0; k < 2; k++) bag.ball(['#f28b30', '#f7c22e', '#e2457d', '#ffffff'][(k + Math.round(x * 7)) & 3], 0.03, x + (k - 0.5) * 0.12, 0.16 + k * 0.12, z); return []; },
-};
-UNITS.ringhouse = UNITS.classroom;
-UNITS.archway = UNITS.hall;
-
 class Bag {
   constructor() { this.geos = new Map(); }
   add(col, g) { if (!this.geos.has(col)) this.geos.set(col, []); this.geos.get(col).push(g); }
@@ -252,7 +228,7 @@ class Bag {
 // Build the cut room. Coordinates are local to the piece (centred, y = 0 at the piece's base).
 // floorY: where this storey's floor is, inside the piece. Returns { group, seats, walk, inside }.
 export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
-  const o = outline(b), g = new THREE.Group(), sh = shapesOf(o);
+  const k = TALL.has(b.type) ? 0 : Math.round(floorY / LEVEL), o = outline(b, k), g = new THREE.Group(), sh = shapesOf(o);
   // Everything below this floor stays solid; the floor and cut walls sit on top.
   if (floorY > 0.001) { const base = new THREE.Mesh(slab(sh.floor, floorY), mat(hex)); base.castShadow = base.receiveShadow = true; if (o.rot) base.rotation.y = -o.rot * Math.PI / 2; g.add(base); }
   const shell = new THREE.Group(); if (o.rot) shell.rotation.y = -o.rot * Math.PI / 2; g.add(shell);
@@ -261,15 +237,21 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
   let segments = [];
   if (opts.walk) {
     // Walls right up to the ceiling, with real window openings and one doorway, and a ceiling over the room.
-    const w = walkWalls(o, b, hex, floorY, opts.top);
+    const w = buildWalls(b, k, hex, floorY, opts.top, false);
     g.add(w.group); segments = w.segments;
     const ceil = new THREE.Mesh(slab(sh.floor, 0.02), mat('#fbfaf6', { emissive: '#f3ede2', emissiveIntensity: 0.75 }));
     ceil.position.y = floorY + opts.top - 0.02; shell.add(ceil);       // no shadow from the ceiling, so the room stays sunny
     const above = opts.boxH - (floorY + opts.top);
     if (above > 0.02) { const top = new THREE.Mesh(slab(sh.floor, above), mat(hex)); top.position.y = floorY + opts.top; shell.add(top); }
   } else {
-    const walls = new THREE.Mesh(slab(sh.walls, cutH), [mat('#ffffff'), mat(hex)]);
-    walls.position.y = floorY; walls.castShadow = walls.receiveShadow = true; shell.add(walls);
+    g.add(buildWalls(b, k, hex, floorY, cutH, true).group);
+  }
+  // A ring: columns round the courtyard on the ground floor, and the garden with its big tree in the middle.
+  if (o.kind === 'ring') {
+    const ringFrame = new THREE.Group();
+    if (o.col) colonnade(ringFrame, o.fWi + 0.08, o.fDi + 0.08, opts.walk ? opts.top : cutH);
+    if (!(b.level > 0) && b.w >= 3 && b.d >= 3) courtyard(ringFrame, o.fWi, o.fDi, b.id);
+    g.add(ringFrame);
   }
   // Furniture: playful pieces placed loosely round the room (not in rows), so it feels like a happy place.
   const bag = new Bag(), seats = [];

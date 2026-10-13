@@ -106,6 +106,11 @@ export const PROGRAMMES = {
   turbine: { name: 'Wind turbine', emoji: '🌬️', size: [1, 1, 1], shapes: ['turbine'], colour: 'white',
     holds: '', say: 'A wind turbine makes electricity from the wind.' },
 };
+// Window styles Finn can choose for a building (after MVRDV's pixel and box windows and OMA's strips).
+export const WINDOWS = [
+  { id: 'big', name: 'Big windows' }, { id: 'pixel', name: 'Pixels' }, { id: 'ribbon', name: 'Long strips' },
+  { id: 'porthole', name: 'Portholes' }, { id: 'slots', name: 'Tall slots' }, { id: 'grid', name: 'Neat rows' },
+];
 // Surfaces Finn can put on the walls.
 export const SURFACES = [
   { id: 'plain', name: 'Plain' }, { id: 'climb', name: 'Climbing wall' }, { id: 'green', name: 'Green wall' },

@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LEVEL } from './catalogue.js';
 import { TREE_GREENS } from './site.js';
 import { addFacade, addTerrace, contactShadow } from './facade.js';
+import { REC, SOFFIT, hasColonnade, ringThickness } from './plan.js';
 
 const GAP = 0.035;                   // a hair of space round every piece, so each reads as its own block
 const ROOF = 0.4;
@@ -152,24 +153,33 @@ const BUILD = {
     }
     return g;
   },
-  ring(w, d, H, c) {
+  ring(w, d, H, c, o) {
     if (w < 2 || d < 2) return BUILD.drum(w, d, H, c, {});
-    const W = w - 2 * GAP - 0.03, D = d - 2 * GAP - 0.03, t = w >= 3 && d >= 3 ? 0.95 : Math.min(W, D) * 0.3;
-    const s = roundedRect(W, D, Math.min(W, D) / 2);
-    s.holes.push(roundedRect(W - 2 * t, D - 2 * t, Math.max(0.05, Math.min(W, D) / 2 - t)));
-    const g = new THREE.Group(); g.add(mesh(upExtrude(s, H), mat(c)));
-    if (w >= 3 && d >= 3) { const tr = roundTree(Math.min(0.35, (Math.min(W, D) - 2 * t) * 0.3)); g.add(tr); }
+    const W = w - 2 * GAP - 0.03, D = d - 2 * GAP - 0.03, t = ringThickness({ shape: 'ring', w, d });
+    const outer = () => roundedRect(W, D, Math.min(W, D) / 2);
+    const hole = e => roundedRect(W - 2 * t + 2 * e, D - 2 * t + 2 * e, Math.max(0.05, Math.min(W, D) / 2 - t + e));
+    const g = new THREE.Group();
+    if (o.box && hasColonnade(o.box)) {
+      // The ground floor steps back behind a ring of columns, so you can walk round the courtyard under cover.
+      const low = outer(); low.holes.push(hole(REC)); g.add(mesh(upExtrude(low, SOFFIT), mat(c)));
+      const up = outer(); up.holes.push(hole(0)); const top = mesh(upExtrude(up, H - SOFFIT), mat(c)); top.position.y = SOFFIT; g.add(top);
+      colonnade(g, W - 2 * t - 0.03 + 0.08, D - 2 * t - 0.03 + 0.08);
+    } else { const s = outer(); s.holes.push(hole(0)); g.add(mesh(upExtrude(s, H), mat(c))); }
+    if (w >= 3 && d >= 3) courtyard(g, W - 2 * t - 0.03, D - 2 * t - 0.03, o.id);
     return g;
   },
-  ringhouse(w, d, H, c) {
+  ringhouse(w, d, H, c, o) {
     // A ring of pointy-roofed houses round a garden: the roof follows the curve, one little house after another.
+    // On the ground the courtyard side steps back behind a colonnade, like a cloister.
     if (w < 2 || d < 2) return BUILD.house(w, d, H, c);
-    const t = w >= 3 && d >= 3 ? 0.9 : 0.6;
+    const t = ringThickness({ shape: 'ringhouse', w, d }), col = !!(o.box && hasColonnade(o.box));
     const W = w - 2 * GAP - t, D = d - 2 * GAP - t;       // the centre line of the band
     const path = loopPath(W, D, Math.min(W, D) / 2);
     const g = new THREE.Group();
-    g.add(mesh(sweepHouses(path, t, H, true), mat(c)));
-    if (w >= 3 && d >= 3) g.add(roundTree(Math.min(0.32, (Math.min(w, d) - 2 * t) * 0.3)));
+    g.add(mesh(sweepHouses(path, t, H, true, col ? REC : 0), mat(c)));
+    const Wi = w - 2 * GAP - 2 * t, Di = d - 2 * GAP - 2 * t;
+    if (col) colonnade(g, Wi + 0.08, Di + 0.08);
+    if (w >= 3 && d >= 3) courtyard(g, Wi, Di, o.id);
     return g;
   },
   arc(w, d, H, c) {
@@ -717,6 +727,22 @@ Object.assign(BUILD, {
   },
 });
 
+// A ring of slim white columns holding up the floor above a colonnade (Wc x Dc is the loop they stand on).
+export function colonnade(g, Wc, Dc, hgt = SOFFIT) {
+  const sh = roundedRect(Wc, Dc, Math.min(Wc, Dc) / 2), n = Math.max(8, Math.round(sh.getLength() / 0.3));
+  const parts = sh.getSpacedPoints(n).slice(0, -1).map(p => new THREE.CylinderGeometry(0.024, 0.024, hgt, 10).translate(p.x, hgt / 2, -p.y));
+  g.add(mesh(mergeGeometries(parts.map(x => { x.deleteAttribute('uv'); return x; })), mat(WHITE)));
+}
+// A garden in a courtyard (Wi x Di): a lawn, flowers, a round bench and a big tree in the middle.
+export function courtyard(g, Wi, Di, id = 1) {
+  const r = Math.min(Wi, Di) / 2; if (r < 0.2) return;
+  const lawn = new THREE.ExtrudeGeometry(roundedRect(Wi - 0.08, Di - 0.08, r - 0.04), { depth: 0.02, bevelEnabled: false, curveSegments: 32 }).rotateX(-Math.PI / 2);
+  g.add(mesh(lawn, mat('#9bd06a'), false));
+  const tr = roundTree(Math.min(0.42, r * 0.5), TREE_GREENS[2]); tr.position.y = 0.02; g.add(tr);
+  const br = Math.min(0.3, r * 0.42); g.add(mesh(new THREE.TorusGeometry(br, 0.028, 8, 36).rotateX(Math.PI / 2).translate(0, 0.05, 0), mat(WHITE)));
+  const rr = seeded(id * 5 + 11), flowers = ['#f5a3c7', '#f7c22e', '#ffffff', '#e2457d'];
+  for (let i = 0; i < Math.round(r * 30); i++) { const a = rr() * Math.PI * 2, d = br + 0.08 + rr() * (r - br - 0.16); const f = mesh(new THREE.SphereGeometry(0.022, 6, 4), mat(flowers[i % 4]), false); f.position.set(Math.cos(a) * d * (Wi / (2 * r)), 0.04, Math.sin(a) * d * (Di / (2 * r))); f.raycast = () => {}; g.add(f); }
+}
 // The centre line of a rounded-rectangle loop (a circle when square), as points.
 function loopPath(W, D, r) {
   const s = roundedRect(W, D, r);
@@ -724,7 +750,7 @@ function loopPath(W, D, r) {
 }
 // Sweep a pointy-roofed house section along a path; a closed loop or an open curve with gable ends.
 // The roof is broken into little houses (alternating heights), like a ring of cottages.
-function sweepHouses(path, t, H, closed) {
+function sweepHouses(path, t, H, closed, rec = 0) {
   const n = path.length, pos = [];
   const nrm = i => {
     const a = path[(i - 1 + n) % n], b = path[(i + 1) % n];
@@ -733,7 +759,10 @@ function sweepHouses(path, t, H, closed) {
     return [dz / l, -dx / l];
   };
   // Profile across the band (u from inside to outside), with a ridge in the middle.
-  const prof = (hh, r) => [[-t / 2, 0], [t / 2, 0], [t / 2, hh], [0, hh + r * 1.35], [-t / 2, hh]];
+  // (+u is the courtyard side; with a recess the ground floor steps back there under the floor above.)
+  const prof = (hh, r) => rec > 0
+    ? [[-t / 2, 0], [t / 2 - rec, 0], [t / 2 - rec, SOFFIT], [t / 2, SOFFIT], [t / 2, hh], [0, hh + r * 1.35], [-t / 2, hh]]
+    : [[-t / 2, 0], [t / 2, 0], [t / 2, hh], [0, hh + r * 1.35], [-t / 2, hh]];
   let len = 0; const acc = [0];
   for (let i = 1; i < (closed ? n + 1 : n); i++) { len += path[i % n].distanceTo(path[i - 1]); acc.push(len); }
   const houses = Math.max(2, Math.round(len / 0.95));
@@ -750,8 +779,7 @@ function sweepHouses(path, t, H, closed) {
       const j = k2 !== k ? i + 1 : (i === 0 ? 0 : i + 1);
       const hh2 = H + (k2 % 2 ? 0.13 : 0), r2 = ROOF * (k2 % 2 ? 0.8 : 1), Q = prof(Math.max(hh, hh2), Math.max(r, r2));
       const c0 = Q.map(([u, y]) => at(j, u, y));
-      pos.push(...c0[0], ...c0[1], ...c0[2], ...c0[0], ...c0[2], ...c0[4], ...c0[4], ...c0[2], ...c0[3]);
-      pos.push(...c0[0], ...c0[2], ...c0[1], ...c0[0], ...c0[4], ...c0[2], ...c0[4], ...c0[3], ...c0[2]);
+      for (const [a, b, e] of THREE.ShapeUtils.triangulateShape(Q.map(([u, y]) => new THREE.Vector2(u, y)), [])) pos.push(...c0[a], ...c0[b], ...c0[e], ...c0[a], ...c0[e], ...c0[b]);
     }
   }
   const geo = new THREE.BufferGeometry();
@@ -775,6 +803,9 @@ export function addInk(root, angle = 33) {
     if (o.userData.people || o.parent?.userData.people || o.userData.noInk) continue;
     const ms = Array.isArray(o.material) ? o.material : [o.material];
     if (ms.some(m => !m || m.transparent || m.isSpriteMaterial || m.userData?.ghost)) continue;
+    // Tiny bits (flowers, stars, knobs) stay soft: outlined, they look like dice.
+    if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+    if (o.geometry.boundingSphere.radius * Math.max(o.scale.x, o.scale.y, o.scale.z) < 0.035) continue;
     const shared = !!o.geometry.userData.shared;
     let e = shared ? edgeCache.get(o.geometry) : null;
     if (!e) { e = new THREE.EdgesGeometry(o.geometry, angle); if (shared) { e.userData.shared = true; edgeCache.set(o.geometry, e); } }
@@ -797,7 +828,7 @@ export function addInk(root, angle = 33) {
 export function buildPiece(box, opts = {}) {
   const H = box.h * LEVEL;
   const make = BUILD[box.shape] || BUILD.box;
-  const g = make(box.w, box.d, H, box.hex, { ...opts, id: box.id || 1 });
+  const g = make(box.w, box.d, H, box.hex, { ...opts, id: box.id || 1, box });
   if (box.shape === 'arc' && box.rot && box.w === box.d) { const inner = new THREE.Group(); while (g.children.length) inner.add(g.children[0]); inner.rotation.y = -box.rot * Math.PI / 2; g.add(inner); }
   if (box.surface && box.surface !== 'plain' && !opts.ghost) applySurface(g, box);
   if (!opts.ghost) {

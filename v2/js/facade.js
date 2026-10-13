@@ -1,90 +1,102 @@
-// Facade details that make a block read as a building: big framed windows on every storey, a front door,
-// and a pale terrace deck on an open flat roof. Merged into two or three meshes per piece, so it stays fast.
+// Facade details that make a block read as a building: windows in the building's own style (big boxy frames,
+// pixel squares, long strips, portholes or tall slots), a front door with a little canopy and a step, round
+// windows up in the gable ends, and a pale deck on an open flat roof. Where the windows go comes from plan.js,
+// so the cutaway and the walk-through show the same openings. Merged into a few meshes per piece, so it stays fast.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { LEVEL } from './catalogue.js';
-import { mat, shade } from './shapes.js';
+import { mat } from './shapes.js';
+import { GAP, WINDOWED, rows, wallRuns, openings, runAt, eachPiece, roundedRect } from './plan.js';
 
-const GAP = 0.035;
-const RECT = new Set(['box', 'house', 'saw', 'vault']);
-const ROUND = new Set(['drum', 'tower']);
-const TALL = new Set(['hall', 'pool', 'aquarium', 'maker']);       // one tall room: tall windows
-const NO_WINDOWS = new Set(['glass']);
+const ROOF = 0.4;
+const FRAME = '#fbfaf6';
+// A bright colour that stands out against each wall colour, for doors and deep window frames.
+const POP = { '#f7c22e': '#3d8de0', '#f28b30': '#22b2bf', '#e6463c': '#f7c22e', '#e2457d': '#f7c22e', '#f5a3c7': '#22b2bf', '#7c46a8': '#f7c22e', '#3d8de0': '#f28b30',
+  '#22b2bf': '#e2457d', '#8fdac3': '#e2457d', '#a3d140': '#7c46a8', '#3e9a4f': '#f7c22e', '#f4f1ea': '#e6463c', '#2e4a8c': '#f7c22e' };
+export const popColour = hex => POP[(hex || '').toLowerCase()] || '#3d8de0';
 
-function roundedRectPath(W, D, r) {
-  const s = new THREE.Shape(), x = -W / 2, y = -D / 2;
-  r = Math.max(0.001, Math.min(r, W / 2, D / 2));
-  s.moveTo(x + r, y); s.lineTo(x + W - r, y); s.absarc(x + W - r, y + r, r, -Math.PI / 2, 0, false);
-  s.lineTo(x + W, y + D - r); s.absarc(x + W - r, y + D - r, r, 0, Math.PI / 2, false);
-  s.lineTo(x + r, y + D); s.absarc(x + r, y + D - r, r, Math.PI / 2, Math.PI, false);
-  s.lineTo(x, y + r); s.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
-  return s;
+// A box w wide (along the wall), h tall and d deep, centred at height y on the wall at (x, z), out from the wall by `out`.
+function panel(list, x, y, z, nx, nz, w, h, d, out = 0) {
+  list.push(new THREE.BoxGeometry(w, h, d).translate(0, 0, out).rotateY(Math.atan2(nx, nz)).translate(x, y, z));
+}
+function disc(list, p, y, r, d, out) {
+  list.push(new THREE.CylinderGeometry(r, r, d, 22).rotateX(Math.PI / 2).translate(0, 0, out).rotateY(Math.atan2(p.nx, p.nz)).translate(p.x, y, p.z));
 }
 
-// One window: a white frame with glass in front, facing outward along (nx, nz).
-function windowAt(glass, frames, x, z, nx, nz, y, ww, wh, door = false) {
-  const a = Math.atan2(nx, nz);
-  const put = (list, w, h, d, off, yy) => list.push(new THREE.BoxGeometry(w, h, d).translate(0, 0, off).rotateY(a).translate(x, yy, z));
-  put(frames, ww + 0.035, wh + 0.035, 0.012, 0.006, y);
-  put(door ? frames.doors : glass, ww, wh, 0.012, 0.012, y);
-  if (!door && wh > 0.2) put(frames, ww, 0.012, 0.014, 0.014, y);      // a transom bar
+// One window: glass on the wall, a frame round it (deep and brightly coloured for big windows), and glazing bars.
+function rectWindow(L, run, o, yb) {
+  const h = o.y1 - o.y0, yc = yb + (o.y0 + o.y1) / 2;
+  eachPiece(run, o.s0, o.s1, p => panel(L.glass, p.x, yc, p.z, p.nx, p.nz, p.len + 0.002, h, 0.01, 0.012));
+  const F = o.deep ? L.pop : o.frame ? L.of(o.frame) : L.frame, depth = o.deep ? 0.06 : 0.018, th = o.deep ? 0.024 : 0.016, off = depth / 2;
+  eachPiece(run, o.s0 - th, o.s1 + th, p => {
+    panel(F, p.x, yb + o.y1 + th / 2, p.z, p.nx, p.nz, p.len + 0.002, th, depth, off);
+    panel(F, p.x, yb + o.y0 - th / 2, p.z, p.nx, p.nz, p.len + 0.002, th, depth, off);
+  });
+  for (const s of [o.s0 - th / 2, o.s1 + th / 2]) { const p = runAt(run, s); panel(F, p.x, yc, p.z, p.nx, p.nz, th, h, depth, off); }
+  if (o.mull) for (let s = o.s0 + o.mull; s < o.s1 - 0.06; s += o.mull) { const p = runAt(run, s); panel(L.frame, p.x, yc, p.z, p.nx, p.nz, 0.012, h, 0.02, 0.014); }
+  if (o.cross) {
+    const p = runAt(run, (o.s0 + o.s1) / 2); panel(L.frame, p.x, yc, p.z, p.nx, p.nz, 0.012, h, 0.02, 0.014);
+    eachPiece(run, o.s0, o.s1, q => panel(L.frame, q.x, yb + o.y0 + h * 0.64, q.z, q.nx, q.nz, q.len + 0.002, 0.012, 0.02, 0.014));
+  }
+}
+function roundWindow(L, run, o, yb) {
+  const p = runAt(run, (o.s0 + o.s1) / 2), r = (o.s1 - o.s0) / 2, y = yb + (o.y0 + o.y1) / 2;
+  disc(o.frame ? L.of(o.frame) : L.frame, p, y, r + 0.022, 0.016, 0.008);
+  disc(L.glass, p, y, r, 0.012, 0.016);
+}
+// The front door: a bright door with a little window, a white canopy over it and a step.
+function frontDoor(L, run, o, yb) {
+  if (o.glassDoor) return rectWindow(L, run, o, yb);
+  const p = runAt(run, (o.s0 + o.s1) / 2), w = o.s1 - o.s0;
+  panel(L.frame, p.x, yb + 0.158, p.z, p.nx, p.nz, w + 0.036, 0.316, 0.012, 0.006);
+  panel(L.pop, p.x, yb + 0.15, p.z, p.nx, p.nz, w, 0.3, 0.014, 0.012);
+  panel(L.glass, p.x, yb + 0.225, p.z, p.nx, p.nz, w * 0.46, 0.07, 0.01, 0.021);
+  panel(L.frame, p.x, yb + 0.345, p.z, p.nx, p.nz, w + 0.12, 0.016, 0.1, 0.05);
+  panel(L.step, p.x, yb + 0.008, p.z, p.nx, p.nz, w + 0.08, 0.016, 0.07, 0.035);
+}
+// Round windows up in the gable ends of pointy and round roofs.
+function gableWindows(L, box, H) {
+  const long = box.shape === 'saw' ? box.w >= box.d : box.w > box.d, Lg = Math.max(box.w, box.d) - 2 * GAP, Wd = Math.min(box.w, box.d) - 2 * GAP, at = (a, b) => (long ? [a, b] : [b, a]), nrm = (a, b) => (long ? [a, b] : [b, a]);
+  const put = (alongPos, acrossPos, nA, nB, y, r) => { const [x, z] = at(alongPos, acrossPos), [nx, nz] = nrm(nA, nB); const p = { x, z, nx, nz }; disc(L.frame, p, y, r + 0.02, 0.016, 0.008); disc(L.glass, p, y, r, 0.012, 0.016); };
+  if (box.shape === 'house') {
+    const r = Math.min(ROOF + 0.05, (Wd - 0.03) * 0.45); if (r < 0.2) return;
+    for (const s of [-1, 1]) put(s * Lg / 2, 0, s, 0, H + r * 0.36, Math.min(0.075, r * 0.22));
+  } else if (box.shape === 'vault') {
+    const r = Math.min((Wd - 0.03) / 2, 0.55); if (r < 0.2) return;
+    for (const s of [-1, 1]) put(s * Lg / 2, 0, s, 0, H + r * 0.42, Math.min(0.09, r * 0.24));
+  } else if (box.shape === 'saw') {
+    const Ls = Math.max(box.w, box.d), n = Math.max(1, Math.round(Ls)), u = (Ls - 2 * GAP) / n;
+    for (let i = 0; i < n; i++) {
+      const hh = H + (i % 2 ? 0.06 : 0), rf = Math.min(ROOF, u * 0.48), along = -Ls / 2 + GAP + u * (i + 0.5);
+      for (const s of [-1, 1]) put(along, s * Wd / 2, 0, s, hh + rf * 0.36, Math.min(0.065, rf * 0.2));
+    }
+  }
 }
 
 export function addFacade(g, box, H) {
-  if (NO_WINDOWS.has(box.surface)) return;
-  const glass = [], frames = []; frames.doors = [];
-  const storeys = Math.max(1, Math.round(H / LEVEL)), tall = TALL.has(box.type);
-  const wallH = H;
-  const rows = tall ? [{ y: wallH * 0.5, h: Math.min(wallH * 0.62, 0.6) }] : Array.from({ length: storeys }, (_, k) => ({ y: k * LEVEL + 0.25, h: 0.22 }));
-  const W = box.w - 2 * GAP, D = box.d - 2 * GAP;
-  if (RECT.has(box.shape)) {
-    const faces = [[0, D / 2, 0, 1, W], [0, -D / 2, 0, -1, W], [W / 2, 0, 1, 0, D], [-W / 2, 0, -1, 0, D]];
-    // Saw and house roofs: windows only below the eaves, and a round window up in each gable end.
-    for (const [cx, cz, nx, nz, len] of faces) {
-      const n = Math.max(1, Math.round(len / 0.34)), step = len / n, ww = Math.min(0.2, step * 0.62);
-      rows.forEach((row, ri) => {
-        for (let i = 0; i < n; i++) {
-          const t = -len / 2 + step * (i + 0.5);
-          const x = cx + (nz !== 0 ? t : 0), z = cz + (nx !== 0 ? t : 0);
-          const isDoor = box.level === 0 && ri === 0 && nz === 1 && i === Math.floor(n / 2);
-          if (isDoor) windowAt(glass, frames, x, z, nx, nz, 0.14, 0.15, 0.27, true);
-          else windowAt(glass, frames, x, z, nx, nz, row.y, ww, row.h);
-        }
-      });
+  if (!WINDOWED.has(box.shape) || box.surface === 'glass') return;
+  const byColour = new Map(), of = hex => { if (!byColour.has(hex)) byColour.set(hex, []); return byColour.get(hex); };
+  const L = { of, glass: [], frame: of(FRAME), pop: of(popColour(box.hex)), step: of('#e6e1d6') };
+  for (const row of rows(box)) {
+    const runs = wallRuns(box, row.k);
+    for (const o of openings(box, row.k, runs)) {
+      const run = runs[o.run];
+      if (o.door) frontDoor(L, run, o, row.y0); else if (o.round) roundWindow(L, run, o, row.y0); else rectWindow(L, run, o, row.y0);
     }
-  } else if (ROUND.has(box.shape) || box.shape === 'ring' || box.shape === 'ringhouse') {
-    const loops = [];
-    if (box.shape === 'ringhouse') { const t = box.w >= 3 && box.d >= 3 ? 0.9 : 0.6; loops.push([W - 0.02, D - 0.02, Math.min(W, D) / 2, 1]); loops.push([W - 2 * t + 0.02, D - 2 * t + 0.02, Math.max(0.05, Math.min(W, D) / 2 - t), -1]); }
-    else if (box.shape === 'ring') { const t = box.w >= 3 && box.d >= 3 ? 0.95 : Math.min(W, D) * 0.3; loops.push([W - 0.02, D - 0.02, Math.min(W, D) / 2, 1]); if (box.w >= 2 && box.d >= 2) loops.push([W - 2 * t + 0.02, D - 2 * t + 0.02, Math.max(0.05, Math.min(W, D) / 2 - t), -1]); }
-    else loops.push([W - 0.01, D - 0.01, Math.min(W, D) / 2, 1]);
-    for (const [lw, ld, r, side] of loops) {
-      const path = roundedRectPath(lw, ld, r), len = path.getLength(), n = Math.max(4, Math.round(len / 0.36));
-      for (let i = 0; i < n; i++) {
-        const u = (i + 0.5) / n, p = path.getPointAt(u), tg = path.getTangentAt(u);
-        const nx = tg.y * side, nz = tg.x * side;            // outward (shape y is world -z)
-        rows.forEach((row, ri) => {
-          const isDoor = box.level === 0 && ri === 0 && side === 1 && i === Math.floor(n * 0.375);
-          if (isDoor) windowAt(glass, frames, p.x, -p.y, nx, nz, 0.14, 0.15, 0.27, true);
-          else windowAt(glass, frames, p.x, -p.y, nx, nz, row.y, 0.16, row.h);
-        });
-      }
-    }
-  } else return;
-  const merge = list => list.length ? mergeGeometries(list.map(x => { x.deleteAttribute('uv'); return x; })) : null;
-  const gm = merge(glass), fm = merge(frames), dm = merge(frames.doors);
-  if (gm) { const m = new THREE.Mesh(gm, mat('#bfe4f3', { emissive: '#7fc6e0', emissiveIntensity: 0.18 })); m.userData.glass = true; g.add(m); }
-  if (fm) { const m = new THREE.Mesh(fm, mat('#fbfaf6')); m.castShadow = true; g.add(m); }
-  if (dm) g.add(new THREE.Mesh(dm, mat(shade(box.hex, 0.55))));
+  }
+  gableWindows(L, box, H);
+  const merge = list => mergeGeometries(list.map(x => { x.deleteAttribute('uv'); return x; }));
+  if (L.glass.length) { const m = new THREE.Mesh(merge(L.glass), mat('#a9d8ec', { emissive: '#6cb6d6', emissiveIntensity: 0.22 })); m.userData.glass = true; m.receiveShadow = true; g.add(m); }
+  for (const [hex, list] of byColour) if (list.length) { const m = new THREE.Mesh(merge(list), mat(hex)); m.castShadow = true; m.receiveShadow = true; g.add(m); }
 }
 
 // A pale deck on an open flat roof, so it reads as a terrace to play on.
 export function addTerrace(g, box, H) {
   const W = box.w - 2 * GAP - 0.06, D = box.d - 2 * GAP - 0.06;
-  let shape;
-  if (box.shape === 'drum') shape = roundedRectPath(W, D, Math.min(W, D) / 2);
-  else if (box.shape === 'box') shape = roundedRectPath(W, D, 0.03);
+  let shape, y = H;
+  if (box.shape === 'drum') { shape = roundedRect(W, D, Math.min(W, D) / 2); y = H + 0.015; }      // the drum's rounded top edge sits a little higher
+  else if (box.shape === 'box') shape = roundedRect(W, D, 0.03);
   else return;
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.014, bevelEnabled: false, curveSegments: 24 }).rotateX(-Math.PI / 2).translate(0, H, 0);
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.014, bevelEnabled: false, curveSegments: 24 }).rotateX(-Math.PI / 2).translate(0, y, 0);
   const deck = new THREE.Mesh(geo, mat('#efe9dd')); deck.receiveShadow = true;
   g.add(deck);
 }

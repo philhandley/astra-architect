@@ -3,7 +3,8 @@
 // "Inside" cuts every building at one floor to show furniture and people.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { PROGRAMMES, SHAPES, PALETTE, SURFACES, NO_SURFACE, LEVEL, MAX_SIZE, MAX_LEVELS, TRAY, colourHex } from './catalogue.js';
+import { PROGRAMMES, SHAPES, PALETTE, SURFACES, NO_SURFACE, WINDOWS, LEVEL, MAX_SIZE, MAX_LEVELS, TRAY, colourHex } from './catalogue.js';
+import { WINDOWED, winStyle } from './plan.js';
 import { GRID, square } from './site.js';
 import { buildPiece, disposePiece, ghostMaterial, addInk, INK } from './shapes.js';
 import { cutRoom, outline, CUTTABLE, storeyFloor, SINGLE_SPACE } from './inside.js';
@@ -343,6 +344,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     if (b.shape === 'rocket') btn('rocket', 'Launch!', () => launch(b), 'go');
     if (P.shapes.length > 1) btn('shape', 'Shape', () => nextShape(b));
     btn('colour', 'Colour', x => swatches(b, x));
+    if (WINDOWED.has(b.shape) && b.surface !== 'glass') btn('windows', 'Windows', x => windowsPick(b, x));
     if (!NO_SURFACE.has(b.shape)) btn('surface', 'Walls', x => surfaces(b, x));
     if (b.w !== b.d || b.shape === 'arc') btn('turn', 'Turn', () => turnBox(b));
     btn('copy', 'Copy', () => copyBox(b));
@@ -372,6 +374,26 @@ export function mountSite(root, world, model, siteView, thumbs) {
     const pop = popover(anchor, SURFACES.map(s => `<button class="surf ${(b.surface || 'plain') === s.id ? 'on' : ''}" type="button" data-s="${s.id}"><i class="sf sf-${s.id}"></i><span>${esc(s.name)}</span></button>`).join(''));
     pop.classList.add('surfaces');
     pop.addEventListener('click', e => { const s = e.target.closest('[data-s]')?.dataset.s; if (!s) return; model.update(b.id, { surface: s }); sfx.tap(); say(SURFACES.find(x => x.id === s).name); select(b.id, { quiet: true }); });
+  }
+  // A little picture of each window style, on a wall in the room's own colour.
+  function winSwatch(id, hex) {
+    const W = '<rect x="0" y="0" width="64" height="44" fill="' + hex + '"/>', g = '#a9d8ec', f = '#fbfaf6', pop = '#3d8de0';
+    const r = (x, y, w, h, fr = f, sw = 1.6) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${g}" stroke="${fr}" stroke-width="${sw}"/>`;
+    const art = {
+      big: r(6, 9, 22, 26, pop, 3) + r(36, 9, 22, 26, pop, 3) + `<path d="M17 9v26M6 25h22M47 9v26M36 25h22" stroke="${f}" stroke-width="1.4"/>`,
+      pixel: r(6, 7, 9, 9, '#f7c22e') + r(20, 18, 14, 14) + r(40, 6, 9, 9, '#e2457d') + r(46, 24, 12, 12, '#22b2bf') + r(8, 28, 8, 8),
+      ribbon: r(5, 15, 54, 13) + [16, 27, 38, 49].map(x => `<path d="M${x} 15v13" stroke="${f}" stroke-width="1.4"/>`).join(''),
+      porthole: [12, 32, 52].map((x, i) => `<circle cx="${x}" cy="${i % 2 ? 19 : 25}" r="7" fill="${g}" stroke="${f}" stroke-width="2.4"/>`).join(''),
+      slots: [[6, 4], [14, 7], [26, 3], [33, 9], [47, 5], [56, 4]].map(([x, w]) => r(x, 6, w, 32)).join(''),
+      grid: [8, 26, 44].map(x => r(x, 9, 12, 12) + r(x, 26, 12, 12)).join(''),
+    }[id] || '';
+    return `<svg class="sf" viewBox="0 0 64 44" aria-hidden="true">${W}${art}</svg>`;
+  }
+  function windowsPick(b, anchor) {
+    const now = winStyle(b), hex = colourHex(b.colour);
+    const pop = popover(anchor, WINDOWS.map(w => `<button class="surf ${now === w.id ? 'on' : ''}" type="button" data-w="${w.id}">${winSwatch(w.id, hex)}<span>${esc(w.name)}</span></button>`).join(''));
+    pop.classList.add('surfaces');
+    pop.addEventListener('click', e => { const w = e.target.closest('[data-w]')?.dataset.w; if (!w) return; model.update(b.id, { win: w }); model.setStyle(b.type, { win: w }); sfx.tap(); say(WINDOWS.find(x => x.id === w).name); select(b.id, { quiet: true }); });
   }
   // 3, 2, 1... lift off! The rocket climbs out of sight in a puff of smoke, then floats back down.
   function launch(b) {

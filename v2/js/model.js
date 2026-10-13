@@ -93,7 +93,7 @@ export class Model {
   make(type, x, z, level) {
     const P = PROGRAMMES[type], st = this.style(type);
     const [w, d, h] = P.size;
-    return { id: 0, type, shape: st.shape, colour: st.colour, x: x - Math.floor((w - 1) / 2), z: z - Math.floor((d - 1) / 2), w, d, level, h };
+    return { id: 0, type, shape: st.shape, colour: st.colour, ...(st.win ? { win: st.win } : {}), x: x - Math.floor((w - 1) / 2), z: z - Math.floor((d - 1) / 2), w, d, level, h };
   }
   // Find a spot near the tap where the new box fits (nudging up to one square), turning it if that helps.
   fit(b) {

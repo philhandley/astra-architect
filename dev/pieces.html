@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Every piece</title>
+<style>
+  html, body { margin: 0; background: #fff; font-family: system-ui, sans-serif; }
+  canvas.sheet { display: block; max-width: 100%; height: auto; margin: 0 auto 12px; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<script type="module">
+// Dev page: every programme in every shape, outside and cut open, on sheets for checking the design.
+// ?view=out|in  ?only=classroom,hall  ?size=w,d,h (override)  ?win=pixel (window style for all)
+import * as THREE from 'three';
+import { PROGRAMMES, TRAY, LEVEL, colourHex } from '../v2/js/catalogue.js';
+import { buildPiece, addInk } from '../v2/js/shapes.js';
+import { cutRoom, CUTTABLE, storeyFloor } from '../v2/js/inside.js';
+
+const q = new URLSearchParams(location.search);
+const VIEW = q.get('view') || 'out', ONLY = q.get('only')?.split(','), WIN = q.get('win');
+const [CW, CH] = (q.get('cell') || '360x300').split('x').map(Number), COLS = +(q.get('cols') || 5), ROWS = +(q.get('rows') || 4);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1.5); renderer.setSize(CW, CH);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#eef3f1');
+scene.add(new THREE.HemisphereLight('#ffffff', '#d9d3c5', 1.35));
+const sun = new THREE.DirectionalLight('#fff4e2', 2.1); sun.position.set(-4, 7, 4); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5 }); sun.shadow.bias = -0.0004; scene.add(sun);
+const ground = new THREE.Mesh(new THREE.BoxGeometry(14, 0.04, 14).translate(0, -0.02, 0), new THREE.MeshLambertMaterial({ color: '#e7ecd9' }));
+ground.receiveShadow = true; scene.add(ground);
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, -40, 60);
+
+const items = [];
+for (const type of TRAY) {
+  if (ONLY && !ONLY.includes(type)) continue;
+  const P = PROGRAMMES[type];
+  for (const shape of P.shapes) {
+    if (VIEW === 'in' && !CUTTABLE.has(shape)) continue;
+    let [w, d, h] = P.size;
+    if (shape === 'ringhouse' || shape === 'ring') { w = Math.max(w, 3); d = Math.max(d, 3); }
+    if (q.get('size')) [w, d, h] = q.get('size').split(',').map(Number);
+    items.push({ type, shape, w, d, h });
+  }
+}
+let id = 1;
+function cell(it) {
+  const box = { id: id++, type: it.type, shape: it.shape, colour: PROGRAMMES[it.type].colour, w: it.w, d: it.d, h: it.h, x: 0, z: 0, level: 0, win: WIN || undefined };
+  const hex = colourHex(box.colour);
+  let g;
+  if (VIEW === 'in') {
+    const room = cutRoom(box, hex, storeyFloor(box, 0), undefined, {});
+    g = room.group; addInk(g);
+  } else g = buildPiece({ ...box, hex }, { open: true });
+  scene.add(g);
+  const bb = new THREE.Box3(); g.updateMatrixWorld(true); g.traverse(m => { if (m.isMesh && !m.userData.noInk) bb.expandByObject(m, false); }); const size = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
+  const f = Math.max(size.x, size.z) * 0.62 + size.y * 0.42 + 0.15;
+  const a = CW / CH; cam.left = -f * a; cam.right = f * a; cam.top = f; cam.bottom = -f; cam.updateProjectionMatrix();
+  const turn = +(q.get('turn') || 0); const el = +(q.get('el') || 5.2); cam.position.set(c.x + 6 * Math.cos(turn) + 7.2 * Math.sin(turn), c.y + el, c.z + 7.2 * Math.cos(turn) - 6 * Math.sin(turn)); cam.lookAt(c.x, c.y, c.z);
+  renderer.render(scene, cam);
+  scene.remove(g);
+}
+const per = COLS * ROWS, sheets = [];
+for (let s = 0; s * per < items.length; s++) {
+  const cv = document.createElement('canvas'); cv.className = 'sheet'; cv.width = CW * COLS; cv.height = CH * ROWS;
+  const x = cv.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, cv.width, cv.height);
+  items.slice(s * per, (s + 1) * per).forEach((it, i) => {
+    cell(it);
+    const cx = (i % COLS) * CW, cy = Math.floor(i / COLS) * CH;
+    x.drawImage(renderer.domElement, cx, cy, CW, CH);
+    x.fillStyle = 'rgba(255,255,255,0.85)'; x.fillRect(cx, cy, CW, 26);
+    x.fillStyle = '#222'; x.font = '600 15px system-ui'; x.fillText(`${PROGRAMMES[it.type].name} · ${it.shape} · ${it.w}×${it.d}×${it.h}`, cx + 8, cy + 18);
+    x.strokeStyle = '#fff'; x.lineWidth = 3; x.strokeRect(cx, cy, CW, CH);
+  });
+  document.body.append(cv); sheets.push(cv);
+}
+window.__sheets = sheets.length;
+window.__shot = async prefix => { const out = []; for (let i = 0; i < sheets.length; i++) { const blob = await new Promise(r => sheets[i].toBlob(r, 'image/jpeg', 0.88)); out.push((await fetch(`/__shot/${prefix}-${i + 1}`, { method: 'PUT', body: blob })).status); } return out; };
+window.__done = true;
+</script>
+</body>
+</html>

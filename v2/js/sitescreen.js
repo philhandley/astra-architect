@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PROGRAMMES, SHAPES, PALETTE, SURFACES, NO_SURFACE, WINDOWS, LEVEL, MAX_SIZE, MAX_LEVELS, TRAY, colourHex } from './catalogue.js';
 import { WINDOWED, winStyle } from './plan.js';
-import { GRID, square } from './site.js';
+import { GRID, square, canGrow, growSquares, resetGrowth } from './site.js';
 import { buildPiece, disposePiece, ghostMaterial, addInk, INK } from './shapes.js';
 import { cutRoom, outline, CUTTABLE, storeyFloor, SINGLE_SPACE } from './inside.js';
 import { SchoolDay, Trails, PERIODS } from './day.js';
@@ -28,11 +28,13 @@ export function mountSite(root, world, model, siteView, thumbs) {
       <button class="sbtn" data-a="in" aria-label="Closer">${icon('in')}<span>Closer</span></button>
       <button class="sbtn" data-a="out" aria-label="Further">${icon('out')}<span>Further</span></button>
       <button class="sbtn" data-a="home" aria-label="See the whole site">${icon('whole')}<span>Whole site</span></button>
+      <button class="sbtn grow" data-a="grow" aria-label="Make the site bigger">${icon('expand')}<span>Bigger site</span></button>
       <button class="sbtn" data-a="print" aria-label="Print drawings">${icon('print')}<span>Print</span></button>
     </div>
     <div class="floors" hidden></div>
     <div class="bubbles"></div>
     <div class="daybar" hidden></div>
+    <div class="growbar" hidden><button class="fbtn reset" type="button">${icon('undo')}<span>Start again</span></button><button class="fbtn ok done" type="button">${icon('done')}<span>Done</span></button></div>
     <div class="selbar" hidden></div>
     <div class="hint"></div>
   </div>`);
@@ -62,6 +64,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     }
   }
   function setTool(id) {
+    if (S.siteEdit) stopGrow();
     if (S.inside) setInside(false);
     S.tool = id;
     select(null);
@@ -209,7 +212,8 @@ export function mountSite(root, world, model, siteView, thumbs) {
     for (let z = 0; z < GRID.d; z++) for (let x = 0; x < GRID.w; x++) { const q = square(x, z); if (q?.build && q.zone !== 'clearing' && !model.at(x, z, 0)) free.push([x, z]); }
     if (!free.length) return [];
     const ok = (x, z) => { const q = square(Math.floor(x), Math.floor(z)); return q?.build && q.zone !== 'clearing' && !model.at(Math.floor(x), Math.floor(z), 0); };
-    return [{ rect: { x0: 1, z0: 6, x1: 16, z1: 13 }, ok, oy: 0.012, walkers: Math.min(14, 4 + Math.round(model.boxes.length * 0.6)), speed: 0.3, adults: true }];
+    const xs = free.map(f => f[0]), zs = free.map(f => f[1]);
+    return [{ rect: { x0: Math.min(...xs), z0: Math.min(...zs), x1: Math.max(...xs) + 1, z1: Math.max(...zs) + 1 }, ok, oy: 0.012, walkers: Math.min(14, 4 + Math.round(model.boxes.length * 0.6)), speed: 0.3, adults: true }];
   }
 
   // A new room pops up out of the ground.
@@ -491,10 +495,80 @@ export function mountSite(root, world, model, siteView, thumbs) {
 
   // ---------- touch: tap, drag an arrow, drag a room ----------
   const canvas = world.canvas;
+  // ---------- a bigger site: green arrows on the edges of the land ----------
+  const growTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    g.fillStyle = 'rgba(20,30,60,0.25)'; g.beginPath(); g.arc(64, 68, 56, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(64, 64, 56, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#2fa35a'; g.beginPath(); g.arc(64, 64, 47, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(64, 26); g.lineTo(94, 60); g.lineTo(76, 60); g.lineTo(76, 98); g.lineTo(52, 98); g.lineTo(52, 60); g.lineTo(34, 60); g.closePath(); g.fill();
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  const growbar = ui.querySelector('.growbar'), siteArrows = new THREE.Group(); world.scene.add(siteArrows); siteArrows.visible = false;
+  const GDIR = { px: [1, 0], nx: [-1, 0], pz: [0, 1], nz: [0, -1] }, GA = {};
+  for (const k of Object.keys(GDIR)) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: growTex, depthTest: false, transparent: true })); sp.renderOrder = 20; sp.userData.dir = k; GA[k] = sp; siteArrows.add(sp); }
+  // The squares one step further out, all along one edge of the land (each row or column grows at its own end).
+  function edgeSquares(dir) {
+    const [dx, dz] = GDIR[dir], out = [];
+    if (dz) for (let x = 0; x < GRID.w; x++) { let e = null; for (let z = 0; z < GRID.d; z++) if (square(x, z)?.build) e = e === null ? z : dz > 0 ? Math.max(e, z) : Math.min(e, z); if (e !== null && canGrow(x, e + dz)) out.push([x, e + dz]); }
+    else for (let z = 0; z < GRID.d; z++) { let e = null; for (let x = 0; x < GRID.w; x++) if (square(x, z)?.build) e = e === null ? x : dx > 0 ? Math.max(e, x) : Math.min(e, x); if (e !== null && canGrow(e + dx, z)) out.push([e + dx, z]); }
+    return out;
+  }
+  function placeSiteArrows() {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (let z = 0; z < GRID.d; z++) for (let x = 0; x < GRID.w; x++) if (square(x, z)?.build) { x0 = Math.min(x0, x); x1 = Math.max(x1, x + 1); z0 = Math.min(z0, z); z1 = Math.max(z1, z + 1); }
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, y = 0.45;
+    GA.px.position.set(x1 + 0.5, y, cz); GA.nx.position.set(x0 - 0.5, y, cz); GA.pz.position.set(cx, y, z1 + 0.5); GA.nz.position.set(cx, y, z0 - 0.5);
+    for (const k of Object.keys(GA)) GA[k].visible = edgeSquares(k).length > 0;
+  }
+  world.updaters.add(() => {
+    if (!siteArrows.visible) return;
+    const s = Math.min(1.4, Math.max(0.45, 0.8 / world.camera.zoom));
+    for (const [k, sp] of Object.entries(GA)) {
+      sp.scale.set(s, s, 1);
+      const a = world.toScreen(sp.position), b2 = world.toScreen(sp.position.clone().add(new THREE.Vector3(GDIR[k][0], 0, GDIR[k][1])));
+      sp.material.rotation = Math.atan2(-(b2.y - a.y), b2.x - a.x) - Math.PI / 2;
+    }
+  });
+  function startGrow() {
+    if (S.day) stopDay(); if (S.inside) setInside(false, { quiet: true });
+    select(null); S.tool = null; drawTray();
+    S.siteEdit = true; siteView.setGridStrong(true); placeSiteArrows(); siteArrows.visible = true;
+    growbar.hidden = false; sideEl.querySelector('.sbtn.grow').classList.add('on');
+    frameSite();
+    say('Tap a green arrow to make the land bigger. The trees are cleared and the ground is made flat.');
+    setHint('Tap a green arrow to make the land bigger.');
+  }
+  function stopGrow() {
+    S.siteEdit = false; siteArrows.visible = false; growbar.hidden = true; siteView.setGridStrong(false);
+    sideEl.querySelector('.sbtn.grow').classList.remove('on'); defaultHint();
+  }
+  function growDir(dir) {
+    const add = edgeSquares(dir);
+    if (!add.length) { sfx.no(); toast('The land cannot grow that way.'); return; }
+    growSquares(add); model.grown.push(...add); model.save();
+    siteView.regrow(); redraw(); placeSiteArrows();
+    sfx.grow(); say('More land!');
+  }
+  growbar.querySelector('.done').addEventListener('click', () => { sfx.tap(); stopGrow(); });
+  growbar.querySelector('.reset').addEventListener('click', () => {
+    sfx.tap();
+    if (model.boxes.some(b => b.level === 0 && model.squares(b).some(([x, z]) => model.grown.some(([gx, gz]) => gx === x && gz === z)))) { sfx.no(); toast('Move the rooms off the new land first.'); return; }
+    resetGrowth(); model.grown = []; model.save(); siteView.regrow(); redraw(); placeSiteArrows(); say('The site is back to how it was.');
+  });
+  // Land added in an earlier visit comes back.
+  if (model.grown.length) { growSquares(model.grown); siteView.regrow(); }
+
   const onDown = e => {
     if (!ui.isConnected || ui.hidden) return;
     ui.querySelector('.swatches')?.remove();
     const start = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    if (S.siteEdit) {
+      let best = null, bd = 48;
+      for (const sp of siteArrows.children) { if (!sp.visible) continue; const p = world.toScreen(sp.position), dd = Math.hypot(p.x - e.clientX, p.y - e.clientY); if (dd < bd) { bd = dd; best = sp; } }
+      if (best) { growDir(best.userData.dir); world.controls.enabled = false; S.drag = { mode: 'grow', start, moved: false }; }
+      return;
+    }
     if (S.inside) { S.drag = { mode: 'tap', start, moved: false }; return; }
     // An arrow badge?
     if (handles.visible) {
@@ -694,6 +768,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
     if (a === 'in') zoomBy(1.3);
     if (a === 'out') zoomBy(1 / 1.3);
     if (a === 'home') frameSite();
+    if (a === 'grow') { if (S.siteEdit) stopGrow(); else startGrow(); }
     if (a === 'print') import('./print.js').then(m => m.openPrint(world, model, siteView, { design, crowd, handles }));
   });
   function zoomBy(f) {

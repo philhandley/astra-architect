@@ -145,7 +145,11 @@ export class SchoolDay {
     const S = site(), gate = [Math.max(0, Math.min(GRID.w - 1, S.gate[0])), Math.max(0, Math.min(GRID.d - 1, S.gate[1]))];
     this.gate = gate;
     const ok = (x, z) => { const xi = Math.floor(x), zi = Math.floor(z), q = square(xi, zi); return q?.build && !this.blocked(xi, zi); };
-    this.yard = { rect: { x0: 1, z0: 6, x1: 13, z1: 13 }, ok, oy: 0.012 };
+    // The yard: all the open land you can build on.
+    const land = []; for (let z = 0; z < GRID.d; z++) for (let x = 0; x < GRID.w; x++) if (ok(x + 0.5, z + 0.5)) land.push([x, z]);
+    this.land = land.length ? land : [gate];
+    const xs = this.land.map(l => l[0]), zs = this.land.map(l => l[1]);
+    this.yard = { rect: { x0: Math.min(...xs), z0: Math.min(...zs), x1: Math.max(...xs) + 1, z1: Math.max(...zs) + 1 }, ok, oy: 0.012 };
     this.gateZone = { rect: { x0: gate[0] + 0.1, z0: gate[1] + 0.1, x1: gate[0] + 0.9, z1: gate[1] + 0.9 }, oy: Math.max(0.012, square(gate[0], gate[1])?.base || 0) };
     // Classes: one for each classroom (two for a big ring of classrooms), each with a teacher.
     const homes = [];
@@ -279,11 +283,7 @@ export class SchoolDay {
     const target = dest === 'yard' ? { door: this.yardSquare(), zone: this.yard, type: 'yard', seats: [] } : dest;
     k.path = this.plan(from, k, target === 'gate' ? 'gate' : target, 0.5); k.pi = 0; k.mode = 'path'; k.dest = target; k.seat = null; k.at = null;
   }
-  yardSquare() {
-    const r = this.r;
-    for (let i = 0; i < 40; i++) { const x = 1 + Math.floor(r() * 12), z = 6 + Math.floor(r() * 7); if (square(x, z)?.build && !this.blocked(x, z)) return [x, z]; }
-    return this.gate;
-  }
+  yardSquare() { return this.land[Math.floor(this.r() * this.land.length)]; }
   // What a child does on arriving: find a seat, or wander about the place.
   arrive(k) {
     const d = k.dest; k.at = d; k.path = null;

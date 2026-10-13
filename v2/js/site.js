@@ -55,7 +55,34 @@ export async function loadSite() {
   }
   S.grown = new Set(grow.map(([x, z]) => `${x},${z}`));
   S.heights0 = heights.slice();          // the ground before any building levels it
+  // The site as first made, so extra land can be put back.
+  S.squaresBase = S.squares.map(row => row.map(q => ({ ...q })));
+  S.grownBase = new Set(S.grown);
+  S.heightsBase = S.heights0.slice();
   return S;
+}
+// Land Finn can add with the green arrows: forest or rocks (never the sea).
+export const canGrow = (x, z) => { const q = square(x, z); return !!q && !q.build && (q.zone === 'forest' || q.zone === 'rocks'); };
+// Clear and level squares of forest into lawn you can build on (easing back up at their edges).
+export function growSquares(list) {
+  const add = list.filter(([x, z]) => canGrow(x, z));
+  if (!add.length) return 0;
+  const fresh = new Set(add.map(([x, z]) => `${x},${z}`));
+  for (const [x, z] of add) { S.squares[z][x] = { zone: 'meadow', build: true, base: 0, lo: 0, grown: true }; S.grown.add(`${x},${z}`); }
+  const { hw, hd, heights0 } = S, res = S.raw.res, k = GRID.k, isNew = (x, z) => fresh.has(`${x},${z}`);
+  for (let j = 0; j < hd; j++) for (let i = 0; i < hw; i++) {
+    const wx = i / res / k, wz = j / res / k, sx = Math.floor(wx), sz = Math.floor(wz), fx = wx - sx, fz = wz - sz, n = j * hw + i;
+    let w = 0;
+    for (const [ox, oz] of [[0, 0], [fx < 0.2 ? -1 : fx > 0.8 ? 1 : 0, 0], [0, fz < 0.2 ? -1 : fz > 0.8 ? 1 : 0]]) if (isNew(sx + ox, sz + oz)) w = Math.max(w, ox || oz ? 0.6 : 1);
+    if (w > 0) heights0[n] *= 1 - w;
+  }
+  return add.length;
+}
+// Back to the site as it first was.
+export function resetGrowth() {
+  S.squares = S.squaresBase.map(row => row.map(q => ({ ...q })));
+  S.grown = new Set(S.grownBase);
+  S.heights0.set(S.heightsBase);
 }
 // Level the ground under buildings: pads maps a square (x * 100 + z) to the height a building stands at.
 // Inside a pad the ground is cut or filled flat; just outside it eases back to the natural slope.
@@ -94,17 +121,21 @@ export function buildSite(world) {
   const s = S.raw, group = new THREE.Group();
   group.name = 'site';
 
-  // Ground colours, softly blended, painted once onto a canvas.
+  // Ground colours, softly blended, painted onto a canvas (again whenever the land grows).
   const px = 16, cv = document.createElement('canvas');
   cv.width = s.w * px; cv.height = s.d * px;
   const g = cv.getContext('2d');
-  for (let z = 0; z < s.d; z++) for (let x = 0; x < s.w; x++) { const grown = S.grown.has(`${Math.floor(x / GRID.k)},${Math.floor(z / GRID.k)}`); g.fillStyle = grown ? ZONE_COL.m : ZONE_COL[s.zones[z][x]] || '#cfe39c'; g.fillRect(x * px, z * px, px, px); }
   const soft = document.createElement('canvas'); soft.width = cv.width; soft.height = cv.height;
   const sg = soft.getContext('2d');
-  sg.filter = 'blur(9px)'; sg.drawImage(cv, 0, 0); sg.filter = 'none';
-  // The buildable meadow is a shade lighter, like a lawn that has been mown.
-  sg.fillStyle = 'rgba(255,255,240,0.18)';
-  for (let z = 0; z < GRID.d; z++) for (let x = 0; x < GRID.w; x++) if (S.squares[z][x].build && S.squares[z][x].zone !== 'clearing') sg.fillRect(x * px * GRID.k, z * px * GRID.k, px * GRID.k, px * GRID.k);
+  const paintGround = () => {
+    for (let z = 0; z < s.d; z++) for (let x = 0; x < s.w; x++) { const grown = S.grown.has(`${Math.floor(x / GRID.k)},${Math.floor(z / GRID.k)}`); g.fillStyle = grown ? ZONE_COL.m : ZONE_COL[s.zones[z][x]] || '#cfe39c'; g.fillRect(x * px, z * px, px, px); }
+    sg.clearRect(0, 0, soft.width, soft.height);
+    sg.filter = 'blur(9px)'; sg.drawImage(cv, 0, 0); sg.filter = 'none';
+    // The buildable meadow is a shade lighter, like a lawn that has been mown.
+    sg.fillStyle = 'rgba(255,255,240,0.18)';
+    for (let z = 0; z < GRID.d; z++) for (let x = 0; x < GRID.w; x++) if (S.squares[z][x].build && S.squares[z][x].zone !== 'clearing') sg.fillRect(x * px * GRID.k, z * px * GRID.k, px * GRID.k, px * GRID.k);
+  };
+  paintGround();
   const tex = new THREE.CanvasTexture(soft);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
@@ -133,7 +164,8 @@ export function buildSite(world) {
   group.add(water);
 
   // The model's base: off-white sides down to a board, like an architect's site model.
-  group.add(plinth(W, D));
+  let base = plinth(W, D);
+  group.add(base);
 
   // The waterfall: water running down the cliff, foam and ripples.
   const falls = waterfall();
@@ -145,16 +177,19 @@ export function buildSite(world) {
   group.add(trees.mesh, trees.trunks);
 
   // The grid, on the land you can build on.
-  const lines = [];
-  for (let z = 0; z < GRID.d; z++) for (let x = 0; x < GRID.w; x++) {
-    const q = S.squares[z][x];
-    if (!q.build) continue;
-    const y = q.base + 0.015;
-    lines.push(x, y, z, x + 1, y, z, x + 1, y, z, x + 1, y, z + 1, x + 1, y, z + 1, x, y, z + 1, x, y, z + 1, x, y, z);
-  }
-  const lg = new THREE.BufferGeometry();
-  lg.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
-  const grid = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, depthWrite: false }));
+  const gridGeometry = () => {
+    const lines = [];
+    for (let z = 0; z < GRID.d; z++) for (let x = 0; x < GRID.w; x++) {
+      const q = S.squares[z][x];
+      if (!q.build) continue;
+      const y = q.base + 0.015;
+      lines.push(x, y, z, x + 1, y, z, x + 1, y, z, x + 1, y, z + 1, x + 1, y, z + 1, x, y, z + 1, x, y, z + 1, x, y, z);
+    }
+    const lg = new THREE.BufferGeometry();
+    lg.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
+    return lg;
+  };
+  const grid = new THREE.LineSegments(gridGeometry(), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, depthWrite: false }));
   grid.renderOrder = 2;
   group.add(grid);
 
@@ -165,7 +200,7 @@ export function buildSite(world) {
     clearTrees(occupied) {
       const m = new THREE.Matrix4(), p = new THREE.Vector3(), zero = new THREE.Vector3(0, 0, 0);
       trees.list.forEach((t, i) => {
-        const hide = occupied.has(`${t.sx},${t.sz}`), dy = groundAt(t.tp.x, t.tp.z) - t.g0;
+        const hide = occupied.has(`${t.sx},${t.sz}`) || S.grown.has(`${t.sx},${t.sz}`), dy = groundAt(t.tp.x, t.tp.z) - t.g0;
         m.compose(p.copy(t.p).setY(t.p.y + dy), t.q, hide ? zero : t.s);
         trees.mesh.setMatrixAt(i, m);
         m.compose(p.copy(t.tp).setY(t.tp.y + dy), t.q, hide ? zero : t.ts);
@@ -181,6 +216,14 @@ export function buildSite(world) {
       const p = ground.geometry.attributes.position, h = S.heights;
       for (let n = 0; n < p.count; n++) p.setY(n, h[n] * EXAG / GRID.k);
       p.needsUpdate = true; ground.geometry.computeVertexNormals();
+      // The model's sides follow the ground at its edges.
+      group.remove(base); base.traverse(o => o.geometry?.dispose()); base = plinth(W, D); group.add(base);
+    },
+    // After the land grows (or is put back): paint the ground, redraw the grid, and level the terrain again.
+    regrow() {
+      paintGround(); tex.needsUpdate = true;
+      grid.geometry.dispose(); grid.geometry = gridGeometry();
+      this._pads = null;
     },
   };
 }

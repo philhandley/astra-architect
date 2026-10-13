@@ -181,3 +181,7 @@ svg.ic.big { width: 34px; height: 34px; }
 .bubble::after { content: ''; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); border: 7px solid transparent; border-bottom: 0; border-top-color: #fff; }
 .bubble .emo { width: 20px; height: 20px; }
 @keyframes bubble-in { from { opacity: 0; transform: translate(-50%, calc(-100% - 2px)) scale(.7); } to { opacity: 1; transform: translate(-50%, calc(-100% - 10px)) scale(1); } }
+
+.growbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 14px; display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,.97); border-radius: 26px; box-shadow: var(--shadow); padding: 8px; pointer-events: auto; }
+.sbtn.grow.on { background: #2fa35a; color: #fff; }
+.growbar .fbtn.ok { background: var(--green); color: #fff; }

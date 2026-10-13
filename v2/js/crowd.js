@@ -1,75 +1,52 @@
-// People: chunky little toy children with hair, faces, bright clothes and shoes, and swinging arms and legs.
+// People: children drawn like picture-book toys (see kid.js), with swinging arms and legs.
 // They sit at tables, wander round rooms and roof terraces, run in the hall, swim, stroll across the meadow,
 // cheer, and in the school day walk from room to room.
 // Each body part is one instanced mesh, so a whole school of children stays fast. Parts that move together
-// (the body, head, hair and face; a leg and its shoe; an arm and its hand) share one set of matrices.
+// (the body, head, face and hair; a leg and its shoe; an arm and its hand) share one set of matrices, and each
+// part's ink line shares the matrices of its part.
 import * as THREE from 'three';
-import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { HIP, SHOULDER, LEG_X, ARM_X, kidParts, kidLook, HAIR_PART, toon, KID_LINE, inkOf } from './kid.js';
 
 const MAX = 800;
 export function seeded(seed) {
   let a = seed >>> 0;
   return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
-// The body (a grown-up is about 0.22 tall, two thirds of a storey; children are drawn smaller).
-const HIP = 0.056, SHOULDER = 0.125, LEG_X = 0.016, ARM_X = 0.04;
-const two = (geo, x) => { const a = geo.clone().translate(-x, 0, 0), b = geo.clone().translate(x, 0, 0); return mergeTwo(a, b); };
-function mergeTwo(a, b) {
-  // Two small pieces as one geometry (eyes, cheeks, pigtails).
-  const g = new THREE.BufferGeometry(), A = a.toNonIndexed(), B = b.toNonIndexed();
-  for (const k of ['position', 'normal']) { const x = A.attributes[k].array, y = B.attributes[k].array, arr = new Float32Array(x.length + y.length); arr.set(x); arr.set(y, x.length); g.setAttribute(k, new THREE.BufferAttribute(arr, 3)); }
-  return g;
-}
-function parts() {
-  return {
-    torso: new RoundedBoxGeometry(0.066, 0.062, 0.044, 2, 0.016).translate(0, 0.1, 0),
-    shorts: new RoundedBoxGeometry(0.062, 0.026, 0.042, 1, 0.01).translate(0, 0.064, 0),
-    head: new THREE.SphereGeometry(0.042, 12, 9).translate(0, 0.17, 0),
-    hair: new THREE.SphereGeometry(0.0445, 12, 5, 0, Math.PI * 2, 0, Math.PI * 0.5).rotateX(-0.5).translate(0, 0.172, -0.004),
-    bun: new THREE.SphereGeometry(0.018, 8, 5).translate(0, 0.21, -0.03),
-    tails: two(new THREE.SphereGeometry(0.014, 8, 5).translate(0, 0.18, -0.01), 0.042),
-    eyes: two(new THREE.SphereGeometry(0.005, 6, 4).translate(0, 0.172, 0.04), 0.014),
-    cheeks: two(new THREE.SphereGeometry(0.007, 6, 4).scale(1, 0.6, 0.4).translate(0, 0.16, 0.036), 0.024),
-    leg: new THREE.CylinderGeometry(0.011, 0.01, 0.05, 8).translate(0, -0.025, 0),                  // hangs from the hip
-    shoe: new THREE.BoxGeometry(0.022, 0.014, 0.032).translate(0, -0.054, 0.006),
-    arm: new THREE.CylinderGeometry(0.0105, 0.009, 0.05, 8).translate(0, -0.025, 0),               // hangs from the shoulder
-    hand: new THREE.SphereGeometry(0.0105, 6, 4).translate(0, -0.054, 0),
-  };
-}
-// Bright clothes, a range of skin and hair colours, and three hair styles (short, a bun, bunches).
-const CLOTHES = ['#f4c23d', '#e6463c', '#22b2bf', '#e2457d', '#3d8de0', '#8bc34a', '#9a6cd4', '#ea7b2c'];
-const SHORTS = ['#2f4b7c', '#3d405b', '#ea7b2c', '#22b2bf', '#e2457d', '#2f4b7c'];
-const SKIN = ['#f6d7bf', '#e7b892', '#c98c62', '#9a6544', '#6e4630'];
-const HAIR = ['#3b2a20', '#1f1b18', '#b5652e', '#e3b65a', '#6b4128'];
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
-function look(p) {
-  // Mix the number well, so each part of the look is picked independently.
-  let h = Math.imul(Math.floor(p.ph * 1e6) ^ 0x9e3779b9, 0x85ebca6b) >>> 0; h = (h ^ (h >>> 13)) >>> 0; h = Math.imul(h, 0xc2b2ae35) >>> 0; h = (h ^ (h >>> 16)) >>> 0;
-  return { top: CLOTHES[h % CLOTHES.length], shorts: SHORTS[(h >>> 4) % SHORTS.length], skin: SKIN[(h >>> 8) % SKIN.length], hair: HAIR[(h >>> 12) % HAIR.length], style: (h >>> 16) % 3 };
-}
+const look = p => kidLook(Math.floor(p.ph * 1e6));
+// (Looks made elsewhere, like the teachers', may leave some of these out.)
+const LOOK_DEFAULTS = { shoes: '#fbfaf6', hat: '#e6463c', bag: null };
 
 export class Crowd {
   constructor(world) {
     this.world = world;
-    const P = parts();
-    const tinted = new THREE.MeshLambertMaterial({ color: '#ffffff' });
+    const P = kidParts();
+    const tinted = toon('#ffffff');
     this.all = [];
-    // name: [geometry, colour (null = each child's own), shares matrices with, casts a shadow]
+    // name: [geometry, colour (null = each child's own), shares matrices with, casts a shadow, ink line]
     const SPEC = {
-      torso: [P.torso, null, null, true], shorts: [P.shorts, null, 'torso'], head: [P.head, null, 'torso', true], hair: [P.hair, null, 'torso'],
-      eyes: [P.eyes, '#2a2c31', 'torso'], cheeks: [P.cheeks, '#f39aa0', 'torso'], bun: [P.bun, null], tails: [P.tails, null],
-      legL: [P.leg, null], legR: [P.leg, null], shoeL: [P.shoe, '#fbfaf6', 'legL'], shoeR: [P.shoe, '#fbfaf6', 'legR'],
-      armL: [P.arm, null], armR: [P.arm, null], handL: [P.hand, null, 'armL'], handR: [P.hand, null, 'armR'],
+      torso: [P.torso, null, null, true, true], head: [P.head, null, 'torso', true, true], eyes: [P.eyes, '#23252b', 'torso'],
+      bob: [P.bob, null, null, false, true], quiff: [P.quiff, null, null, false, true], puff: [P.puff, null, null, false, true],
+      capHair: [P.capHair, null, null, false, true], hat: [P.hat, null, 'capHair', false, true], bunches: [P.bunches, null, null, false, true], pony: [P.pony, null, null, false, true],
+      bag: [P.bag, null, null, false, true],
+      legL: [P.leg, null, null, false, true], legR: [P.leg, null, null, false, true], shoeL: [P.shoe, null, 'legL', false, true], shoeR: [P.shoe, null, 'legR', false, true],
+      armL: [P.arm, null, null, false, true], armR: [P.arm, null, null, false, true], handL: [P.hand, null, 'armL', false, true], handR: [P.hand, null, 'armR', false, true],
     };
     this.meshes = {};
-    for (const [name, [geo, colour, share, shadow]] of Object.entries(SPEC)) {
-      const m = new THREE.InstancedMesh(geo, colour ? new THREE.MeshLambertMaterial({ color: colour }) : tinted, MAX);
+    for (const [name, [geo, colour, share, shadow, ink]] of Object.entries(SPEC)) {
+      const m = new THREE.InstancedMesh(geo, colour ? toon(colour) : tinted, MAX);
       if (share) m.instanceMatrix = this.meshes[share].instanceMatrix;
       m.castShadow = !!shadow; m.count = 0; m.frustumCulled = false; m.userData.people = true; m.raycast = () => {};
       world.scene.add(m); this.meshes[name] = m; this.all.push(m);
+      if (ink) {
+        const o = new THREE.InstancedMesh(inkOf(geo), KID_LINE, MAX);
+        o.instanceMatrix = m.instanceMatrix; o.count = 0; o.frustumCulled = false; o.userData.people = true; o.raycast = () => {};
+        world.scene.add(o); this.all.push(o);
+      }
     }
     // Which colour each instanced part takes from the child's look.
-    this.colourOf = { torso: 'top', armL: 'top', armR: 'top', shorts: 'shorts', head: 'skin', legL: 'skin', legR: 'skin', handL: 'skin', handR: 'skin', hair: 'hair', bun: 'hair', tails: 'hair' };
+    this.colourOf = { torso: 'top', armL: 'top', armR: 'top', legL: 'shorts', legR: 'shorts', shoeL: 'shoes', shoeR: 'shoes', head: 'skin', handL: 'skin', handR: 'skin',
+      bob: 'hair', quiff: 'hair', puff: 'hair', capHair: 'hair', bunches: 'hair', pony: 'hair', hat: 'hat', bag: 'bag' };
     this.people = [];
     this.near = null;                 // in walk mode: hide anyone right next to the camera
     this.onStep = null;               // called with (x, z) as people walk between rooms (to wear paths)
@@ -82,8 +59,8 @@ export class Crowd {
     for (const m of this.all) m.count = n;
     const c = new THREE.Color();
     this.people.forEach((p, i) => {
-      p.look = p.look || look(p);
-      for (const [name, key] of Object.entries(this.colourOf)) this.meshes[name].setColorAt(i, c.set(p.look[key]));
+      p.look = { ...LOOK_DEFAULTS, ...(p.look || look(p)) };
+      for (const [name, key] of Object.entries(this.colourOf)) this.meshes[name].setColorAt(i, c.set(p.look[key] || '#ffffff'));
     });
     for (const name of Object.keys(this.colourOf)) if (this.meshes[name].instanceColor) this.meshes[name].instanceColor.needsUpdate = true;
   }
@@ -160,7 +137,7 @@ export class Crowd {
     const { base, part, rot, q, v, s, up, e } = this.tmp, M = this.meshes, kind = p.kind === 'agent' ? p.pose : p.kind;
     let legL = 0, legR = 0, armL = 0, armR = 0, outL = -0.12, outR = 0.12, y = p.y, lean = 0;
     const swing = Math.sin(p.walk || 0);
-    if (kind === 'sit') { legL = legR = -1.45; armL = armR = -0.55; y -= 0.033; }
+    if (kind === 'sit') { legL = legR = -1.45; armL = armR = -0.55; y -= 0.037; }
     else if (kind === 'swim') { y -= 0.125; const w = t * 4 + p.ph; armL = Math.sin(w) * 2.6; armR = Math.sin(w + Math.PI) * 2.6; lean = 0.3; }
     else if (moving) { const a = kind === 'run' ? 0.9 : 0.55; legL = swing * a; legR = -swing * a; armL = -swing * a * 0.9; armR = swing * a * 0.9; y += Math.abs(Math.cos(p.walk || 0)) * (kind === 'run' ? 0.012 : 0.006); lean = kind === 'run' ? 0.18 : 0.04; }
     else { armL = Math.sin(t * 1.5 + p.ph) * 0.05; armR = -armL; }
@@ -169,10 +146,10 @@ export class Crowd {
     q.setFromAxisAngle(up, p.yaw); v.set(p.x, y, p.z); s.setScalar(hide ? 1e-4 : p.s);
     base.compose(v, q, s);
     if (lean) base.multiply(rot.makeRotationX(lean));
-    M.torso.setMatrixAt(i, base);         // also the shorts, head, hair and face
+    M.torso.setMatrixAt(i, base);         // also the head and face
     const st = p.look ? p.look.style : 0;
-    M.bun.setMatrixAt(i, st === 1 ? base : ZERO);
-    M.tails.setMatrixAt(i, st === 2 ? base : ZERO);
+    HAIR_PART.forEach((name, k) => M[name].setMatrixAt(i, st === k ? base : ZERO));      // (the hat goes with the cap)
+    M.bag.setMatrixAt(i, p.look?.bag ? base : ZERO);
     const limb = (mesh, x, yy, rx, rz) => { part.makeTranslation(x, yy, 0).multiply(rot.makeRotationFromEuler(e.set(rx, 0, rz))); mesh.setMatrixAt(i, part.premultiply(base)); };
     limb(M.legL, -LEG_X, HIP, legL, 0);
     limb(M.legR, LEG_X, HIP, legR, 0);

@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figure styles 2</title>
+<style>
+  html, body { margin: 0; background: #efe9de; font-family: system-ui, sans-serif; }
+  #out { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  #gl { position: absolute; left: -9999px; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="out" width="1500" height="900"></canvas>
+<script type="module">
+// Dev page: new ways to draw the children (round two), side by side, in the same little scene and light as the app.
+import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+const PW = 500, PH = 450;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(2); renderer.setSize(PW, PH);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.domElement.id = 'gl'; document.body.append(renderer.domElement);
+
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#e9f1f2');
+scene.add(new THREE.HemisphereLight('#ffffff', '#d9d3c5', 1.35));
+const sun = new THREE.DirectionalLight('#fff4e2', 2.1); sun.position.set(2, 5, 3); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2 }); sun.shadow.bias = -0.0004; scene.add(sun);
+const V = 0.34, cam = new THREE.OrthographicCamera(-V * PW / PH, V * PW / PH, V, -V, -10, 20);
+cam.position.set(2.2, 2.1, 4.2); cam.lookAt(0.02, 0.12, 0.02);
+
+const mats = new Map();
+const mat = (hex, extra = {}) => { const k = hex + JSON.stringify(extra); if (!mats.has(k)) mats.set(k, new THREE.MeshLambertMaterial({ color: hex, ...extra })); return mats.get(k); };
+const mesh = (geo, m, shadow = true) => { const x = new THREE.Mesh(geo, m); x.castShadow = shadow; x.receiveShadow = true; return x; };
+const INK = new THREE.MeshBasicMaterial({ color: '#2a2c31', side: THREE.BackSide });
+// An outline: the same shape a touch fatter, drawn inside-out in dark grey.
+function inked(geo, m, w = 0.0045) {
+  const g = new THREE.Group(), h = geo.clone(), p = h.attributes.position, n = h.attributes.normal;
+  for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) + n.getX(i) * w, p.getY(i) + n.getY(i) * w, p.getZ(i) + n.getZ(i) * w);
+  g.add(mesh(geo, m), new THREE.Mesh(h, INK)); return g;
+}
+
+// A little bit of school round every set of children: floor, a yellow wall with a window, a round table, a tree.
+const set = new THREE.Group(); scene.add(set);
+set.add(mesh(new THREE.BoxGeometry(3, 0.04, 3).translate(0, -0.02, 0), mat('#efe9de')));
+set.add(mesh(new THREE.BoxGeometry(1.6, 0.5, 0.06).translate(0, 0.25, -0.5), mat('#f4c23d')));
+const win = mesh(new THREE.BoxGeometry(0.3, 0.22, 0.02).translate(-0.35, 0.26, -0.465), mat('#cfeaf5')); set.add(win);
+set.add(mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.015, 28).translate(0.36, 0.075, -0.18), mat('#22b2bf')));
+set.add(mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.075, 8).translate(0.36, 0.0375, -0.18), mat('#fbfaf6')));
+set.add(mesh(new THREE.SphereGeometry(0.13, 16, 12).translate(0.62, 0.32, -0.36), mat('#5fae4e')));
+set.add(mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.2, 8).translate(0.62, 0.1, -0.36), mat('#8a5a3c')));
+const stool = mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.045, 16).translate(0.2, 0.0225, -0.1), mat('#e2457d')); set.add(stool);
+
+const CLOTHES = ['#f4c23d', '#e6463c', '#22b2bf', '#e2457d', '#3d8de0', '#8bc34a', '#9a6cd4'];
+const HAIR = ['#3b2a20', '#1f1b18', '#b5652e', '#e3b65a', '#6b4128'];
+const SKIN = ['#f6d7bf', '#e7b892', '#c98c62', '#9a6544', '#6e4630'];
+// The five poses in every panel: waving, walking, sitting on the stool, running, standing with a bag.
+const POSES = [
+  { at: [-0.42, 0.12], yaw: 0.3, wave: true },
+  { at: [-0.12, 0.26], yaw: 0.9, walk: 0.5 },
+  { at: [0.2, -0.1], yaw: 0.4, sit: true },
+  { at: [0.42, 0.22], yaw: -0.8, walk: 0.9, run: true },
+  { at: [-0.02, -0.18], yaw: 0.1, bag: true },
+];
+
+// ---------- the styles ----------
+// Each returns a child (feet at y = 0, facing +z) in a pose.
+function limbs(g, P, opt) {
+  const { hip, sh, legGeo, armGeo, legM, armM, sx = 0.014, ax = 0.033, wrap = m => m } = opt;
+  const L = [], A = [];
+  for (const s of [-1, 1]) {
+    const leg = new THREE.Group(); leg.position.set(s * sx, hip, 0); leg.add(wrap(mesh(legGeo, legM))); g.add(leg); L.push(leg);
+    const arm = new THREE.Group(); arm.position.set(s * ax, sh, 0); arm.add(wrap(mesh(armGeo, armM))); g.add(arm); A.push(arm);
+  }
+  const sw = P.walk || 0;
+  L[0].rotation.x = sw; L[1].rotation.x = -sw; A[0].rotation.x = -sw * 0.9; A[1].rotation.x = sw * 0.9;
+  A[0].rotation.z = -0.12; A[1].rotation.z = 0.12;
+  if (P.sit) { L[0].rotation.x = L[1].rotation.x = -1.45; A[0].rotation.x = A[1].rotation.x = -0.6; }
+  if (P.wave) { A[1].rotation.z = 2.7; A[1].rotation.x = 0; }
+  if (P.run) g.rotation.x = 0.16;
+  return { L, A };
+}
+// Outfits that go together (top, bottom, shoes), rather than any colour with any colour.
+const OUTFITS = [['#f4c23d', '#2f4b7c', '#fbfaf6'], ['#e6463c', '#22b2bf', '#fbfaf6'], ['#22b2bf', '#f4c23d', '#e6463c'], ['#e2457d', '#3d405b', '#fbfaf6'],
+  ['#3d8de0', '#ea7b2c', '#fbfaf6'], ['#8bc34a', '#2f4b7c', '#f4c23d'], ['#9a6cd4', '#f4c23d', '#fbfaf6'], ['#fbfaf6', '#e6463c', '#2f4b7c'], ['#ea7b2c', '#3d8de0', '#fbfaf6']];
+const BAGS = ['#22b2bf', '#e6463c', '#f4c23d', '#9a6cd4'];
+// Sculpted hair: a bob, a quiff, a big round puff, a cap, bunches and a ponytail.
+function hairdo(g, kind, hairM, capM, headY, R, wrap = m => m) {
+  const add = geo => g.add(wrap(mesh(geo, hairM)));
+  if (kind === 'bob') add(new THREE.SphereGeometry(R * 1.08, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.62).scale(1.06, 1, 1.04).rotateX(-0.3).translate(0, headY + 0.002, -0.004));
+  if (kind === 'quiff') { add(new THREE.SphereGeometry(R * 1.05, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.46).rotateX(-0.45).translate(0, headY + 0.002, -0.004)); add(new THREE.SphereGeometry(R * 0.5, 12, 8).scale(1.2, 0.7, 1).rotateX(0.5).translate(0, headY + R * 0.92, R * 0.35)); }
+  if (kind === 'puff') add(new THREE.SphereGeometry(R * 1.18, 20, 14).translate(0, headY + R * 0.3, -R * 0.2));
+  if (kind === 'cap') {
+    add(new THREE.SphereGeometry(R * 1.04, 16, 8, 0, Math.PI * 2, Math.PI * 0.38, Math.PI * 0.2).rotateX(-0.4).translate(0, headY, -0.004));      // a little hair under the cap
+    g.add(wrap(mesh(new THREE.SphereGeometry(R * 1.07, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.42).rotateX(-0.2).translate(0, headY + 0.003, -0.002), capM)));
+    g.add(wrap(mesh(new THREE.CylinderGeometry(R * 0.75, R * 0.75, 0.005, 20, 1, false, -Math.PI / 2, Math.PI).scale(1, 1, 0.9).translate(0, headY + R * 0.55, R * 0.62).rotateX(0.1), capM)));
+  }
+  if (kind === 'bunches') { add(new THREE.SphereGeometry(R * 1.05, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.5).rotateX(-0.4).translate(0, headY + 0.002, -0.004)); for (const s of [-1, 1]) add(new THREE.SphereGeometry(R * 0.42, 12, 8).translate(s * R * 1.05, headY + R * 0.15, -R * 0.2)); }
+  if (kind === 'pony') { add(new THREE.SphereGeometry(R * 1.05, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.5).rotateX(-0.4).translate(0, headY + 0.002, -0.004)); add(new THREE.SphereGeometry(R * 0.4, 12, 8).scale(0.8, 1.5, 0.8).rotateX(0.5).translate(0, headY + R * 0.15, -R * 1.15)); }
+}
+const HAIRDOS = ['bob', 'quiff', 'puff', 'cap', 'bunches', 'pony'];
+// Designer toys: a bigger head, an A-line top, colour-blocked outfits, sculpted hair, chunky shoes, some with bags.
+function designer(P, i, { toon = false } = {}) {
+  const M = toon ? toonMat : mat, wrap = toon ? m => outlined(m) : m => m;
+  const g = new THREE.Group(), [top, bottom, shoeC] = OUTFITS[i % OUTFITS.length], skin = M(SKIN[(i * 2) % SKIN.length]), hair = M(HAIR[(i + 1) % HAIR.length]);
+  const R = 0.046, headY = 0.176;
+  const prof = [[0, 0.058], [0.035, 0.058], [0.037, 0.064], [0.03, 0.118], [0.022, 0.135], [0.012, 0.142], [0, 0.142]].map(([r, y]) => new THREE.Vector2(r, y));
+  g.add(wrap(mesh(new THREE.LatheGeometry(prof, 24), M(top))));
+  g.add(wrap(mesh(new THREE.SphereGeometry(R, 22, 16).translate(0, headY, 0), skin)));
+  hairdo(g, HAIRDOS[i % HAIRDOS.length], hair, M(BAGS[(i + 2) % BAGS.length]), headY, R, wrap);
+  for (const s of [-1, 1]) g.add(mesh(new THREE.SphereGeometry(0.0055, 8, 6).scale(0.75, 1.15, 0.5).translate(s * 0.015, headY - 0.002, R - 0.003), mat('#23252b'), false));
+  const legGeo = new THREE.CylinderGeometry(0.0105, 0.0105, 0.044, 10).translate(0, -0.022, 0);
+  const shoe = new THREE.CapsuleGeometry(0.0105, 0.012, 4, 10).rotateX(Math.PI / 2).scale(1.05, 0.8, 1).translate(0, -0.048, 0.006);
+  const { L, A } = limbs(g, P, { hip: 0.06, sh: 0.128, sx: 0.015, ax: 0.034, legGeo, armGeo: new THREE.CylinderGeometry(0.0095, 0.0085, 0.046, 10).translate(0, -0.023, 0), legM: M(bottom), armM: M(top), wrap });
+  for (const l of L) l.add(wrap(mesh(shoe, M(shoeC))));
+  for (const a of A) a.add(wrap(mesh(new THREE.SphereGeometry(0.0095, 10, 8).translate(0, -0.05, 0), skin)));
+  if (i % 3 === 2 || P.bag) g.add(wrap(mesh(new RoundedBoxGeometry(0.046, 0.05, 0.022, 2, 0.01).translate(0, 0.104, -0.034), M(BAGS[i % BAGS.length]))));
+  return g;
+}
+// Toon look: three flat tones and a dark outline, like a picture book.
+const ramp = (() => { const d = new Uint8Array([90, 175, 255]); const t = new THREE.DataTexture(d, 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+const toons = new Map();
+function toonMat(hex) { if (!toons.has(hex)) toons.set(hex, new THREE.MeshToonMaterial({ color: hex, gradientMap: ramp })); return toons.get(hex); }
+const LINE = new THREE.MeshBasicMaterial({ color: '#23252b', side: THREE.BackSide });
+function outlined(m, w = 0.0032) {
+  const geo = m.geometry.clone(); if (!geo.attributes.normal) geo.computeVertexNormals();
+  const p = geo.attributes.position, n = geo.attributes.normal;
+  for (let k = 0; k < p.count; k++) p.setXYZ(k, p.getX(k) + n.getX(k) * w, p.getY(k) + n.getY(k) * w, p.getZ(k) + n.getZ(k) * w);
+  const grp = new THREE.Group(); grp.add(m, new THREE.Mesh(geo, LINE)); return grp;
+}
+const STYLES = [
+  { name: 'A  Toy kids (now)', note: 'What the app has today', make(P, i) {
+    const g = new THREE.Group(), skin = mat(SKIN[i % SKIN.length]), top = mat(CLOTHES[(i + 2) % CLOTHES.length]), hair = mat(HAIR[(i + 1) % HAIR.length]), shorts = mat(i % 2 ? '#2f4b7c' : '#ea7b2c');
+    g.add(mesh(new RoundedBoxGeometry(0.066, 0.062, 0.044, 3, 0.016).translate(0, 0.1, 0), top));
+    g.add(mesh(new RoundedBoxGeometry(0.062, 0.026, 0.042, 2, 0.01).translate(0, 0.064, 0), shorts));
+    g.add(mesh(new THREE.SphereGeometry(0.042, 20, 14).translate(0, 0.17, 0), skin));
+    g.add(mesh(new THREE.SphereGeometry(0.0445, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.5).rotateX(-0.5).translate(0, 0.172, -0.004), hair));
+    for (const s of [-1, 1]) g.add(mesh(new THREE.SphereGeometry(0.005, 6, 4).translate(s * 0.014, 0.172, 0.04), mat('#2a2c31'), false));
+    const legGeo = new THREE.CylinderGeometry(0.011, 0.01, 0.05, 8).translate(0, -0.025, 0);
+    const shoe = new RoundedBoxGeometry(0.022, 0.014, 0.032, 2, 0.006).translate(0, -0.054, 0.006);
+    const { L, A } = limbs(g, P, { hip: 0.056, sh: 0.125, sx: 0.016, ax: 0.04, legGeo, armGeo: new THREE.CylinderGeometry(0.0105, 0.009, 0.05, 8).translate(0, -0.025, 0), legM: skin, armM: top });
+    for (const l of L) l.add(mesh(shoe, mat('#fbfaf6')));
+    for (const a of A) a.add(mesh(new THREE.SphereGeometry(0.0105, 8, 6).translate(0, -0.054, 0), skin));
+    return g;
+  } },
+  { name: 'B  Designer toys', note: 'Bigger heads, sculpted hair, outfits that match, bags', make: (P, i) => designer(P, i) },
+  { name: 'C  Bean kids', note: 'One smooth bean each, face on top: very simple', make(P, i) {
+    const g = new THREE.Group(), [top, bottom] = OUTFITS[(i + 3) % OUTFITS.length], skin = mat(SKIN[(i * 3) % SKIN.length]), hair = mat(HAIR[i % HAIR.length]);
+    const r = 0.04, split = 0.13;
+    // A capsule cut in two: clothes below, skin above.
+    g.add(mesh(new THREE.SphereGeometry(r, 22, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).translate(0, 0.07, 0), mat(top)));
+    g.add(mesh(new THREE.CylinderGeometry(r, r, split - 0.07, 22, 1, true).translate(0, (split + 0.07) / 2, 0), mat(top)));
+    g.add(mesh(new THREE.CylinderGeometry(r, r, 0.04, 22, 1, true).translate(0, split + 0.02, 0), skin));
+    g.add(mesh(new THREE.SphereGeometry(r, 22, 10, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, split + 0.04, 0), skin));
+    g.add(mesh(new THREE.SphereGeometry(r * 1.06, 22, 8, 0, Math.PI * 2, 0, Math.PI * 0.42).rotateX(-0.35).translate(0, split + 0.042, -0.002), hair));
+    if (i % 3 === 1) g.add(mesh(new THREE.SphereGeometry(0.016, 10, 8).translate(0, split + 0.088, -0.012), hair));
+    for (const s of [-1, 1]) g.add(mesh(new THREE.SphereGeometry(0.005, 8, 6).scale(0.75, 1.15, 0.5).translate(s * 0.013, split + 0.035, r - 0.002), mat('#23252b'), false));
+    const legGeo = new THREE.CapsuleGeometry(0.011, 0.02, 4, 10).translate(0, -0.02, 0);
+    limbs(g, P, { hip: 0.045, sh: 0.108, sx: 0.016, ax: 0.042, legGeo, armGeo: new THREE.CapsuleGeometry(0.009, 0.026, 4, 8).translate(0, -0.02, 0), legM: mat(bottom), armM: mat(top) });
+    return g;
+  } },
+  { name: 'D  Picture-book toys', note: 'Designer toys with flat shading and an ink line', make: (P, i) => designer(P, i + 1, { toon: true }) },
+];
+
+const out = document.getElementById('out'), ctx = out.getContext('2d');
+ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, out.width, out.height);
+const groups = STYLES.map((S, si) => {
+  const grp = new THREE.Group();
+  POSES.forEach((P, i) => {
+    const k = S.make(P, i + si);
+    const holder = new THREE.Group(); holder.add(k);
+    holder.position.set(P.at[0], P.sit ? 0 : 0, P.at[1]); holder.rotation.y = P.yaw;
+    if (P.sit) { holder.position.set(0.2, 0, -0.1); k.position.y += [0.057, 0.047, 0.04, 0.047][si]; }
+    grp.add(holder);
+  });
+  grp.visible = false; scene.add(grp); return grp;
+});
+const cells = [[0, 0], [1, 0], [2, 0], [0, 1]];
+STYLES.forEach((S, si) => {
+  groups.forEach((g, j) => (g.visible = j === si));
+  renderer.render(scene, cam);
+  const [cx, cy] = cells[si];
+  ctx.drawImage(renderer.domElement, cx * PW, cy * PH, PW, PH);
+  ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.fillRect(cx * PW, cy * PH, PW, 64);
+  ctx.fillStyle = '#23252b'; ctx.font = '700 24px system-ui, sans-serif'; ctx.fillText(S.name, cx * PW + 16, cy * PH + 30);
+  ctx.font = '15px system-ui, sans-serif'; ctx.fillStyle = '#555'; ctx.fillText(S.note, cx * PW + 16, cy * PH + 53);
+});
+// The last cells: how they look small, at the size they are on the whole-site view.
+{
+  const x0 = PW, y0 = PH, W2 = 2 * PW;
+  ctx.fillStyle = '#f6f3ee'; ctx.fillRect(x0, y0, W2, PH);
+  ctx.fillStyle = '#23252b'; ctx.font = '700 24px system-ui, sans-serif'; ctx.fillText('At site size', x0 + 16, y0 + 30);
+  ctx.font = '15px system-ui, sans-serif'; ctx.fillStyle = '#555'; ctx.fillText('How each one reads when it is small', x0 + 16, y0 + 53);
+  STYLES.forEach((S, si) => {
+    groups.forEach((g, j) => (g.visible = j === si));
+    renderer.render(scene, cam);
+    const w = 230, hgt = 207;
+    ctx.drawImage(renderer.domElement, x0 + 16 + si * 245, y0 + 110, w, hgt);
+    ctx.fillStyle = '#23252b'; ctx.font = '700 17px system-ui, sans-serif'; ctx.fillText(S.name.split('  ')[0] + '  ' + S.name.split('  ')[1].split(' (')[0], x0 + 20 + si * 245, y0 + 110 + hgt + 24);
+  });
+}
+for (let i = 1; i < 3; i++) { ctx.fillStyle = '#ffffff'; ctx.fillRect(i * PW - 2, 0, 4, i === 2 ? PH : out.height); }
+ctx.fillRect(0, PH - 2, out.width, 4);
+window.__done = true;
+window.__shot = async name => { const blob = await new Promise(r => out.toBlob(r, 'image/jpeg', 0.9)); return (await fetch('/__shot/' + name, { method: 'PUT', body: blob })).status; };
+</script>
+</body>
+</html>

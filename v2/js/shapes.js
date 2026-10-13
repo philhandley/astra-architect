@@ -7,6 +7,7 @@ import { LEVEL } from './catalogue.js';
 import { TREE_GREENS } from './site.js';
 import { addFacade, addTerrace, contactShadow } from './facade.js';
 import { REC, SOFFIT, hasColonnade, ringThickness, turnAngle } from './plan.js';
+import { miniKid } from './kid.js';
 
 const GAP = 0.035;                   // a hair of space round every piece, so each reads as its own block
 const ROOF = 0.4;
@@ -51,35 +52,6 @@ function upExtrude(shape, H) {
 
 // ---------- little people and trees, for scale ----------
 // A little toy child (like the people in the school day), to ride on swings, roundabouts, slides and zip lines.
-let MINI = null, miniN = 0;
-const KID_TOPS = ['#f4c23d', '#e6463c', '#22b2bf', '#e2457d', '#3d8de0', '#8bc34a', '#9a6cd4', '#ea7b2c'];
-const KID_SKIN = ['#f6d7bf', '#e7b892', '#c98c62', '#9a6544', '#6e4630'];
-const KID_HAIR = ['#3b2a20', '#1f1b18', '#b5652e', '#e3b65a', '#6b4128'];
-export function miniKid() {
-  if (!MINI) {
-    const legs = [], arms = [];
-    for (const s of [-1, 1]) {
-      legs.push(new THREE.CylinderGeometry(0.011, 0.01, 0.05, 8).translate(s * 0.016, 0.031, 0));
-      arms.push(new THREE.CylinderGeometry(0.0105, 0.009, 0.05, 8).translate(s * 0.042, 0.1, 0));
-    }
-    const strip = gs => mergeGeometries(gs.map(g => { const n = g.index ? g.toNonIndexed() : g; n.deleteAttribute('uv'); return n; }));
-    MINI = {
-      top: strip([new RoundedBoxGeometry(0.066, 0.062, 0.044, 3, 0.016).translate(0, 0.1, 0), ...arms]),
-      shorts: new RoundedBoxGeometry(0.062, 0.026, 0.042, 2, 0.01).translate(0, 0.064, 0),
-      skin: strip([new THREE.SphereGeometry(0.042, 16, 12).translate(0, 0.17, 0), ...legs, new THREE.SphereGeometry(0.0105, 8, 6).translate(-0.042, 0.072, 0), new THREE.SphereGeometry(0.0105, 8, 6).translate(0.042, 0.072, 0)]),
-      hair: new THREE.SphereGeometry(0.0445, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.5).rotateX(-0.5).translate(0, 0.172, -0.004),
-      eyes: strip([new THREE.SphereGeometry(0.005, 6, 4).translate(-0.014, 0.172, 0.04), new THREE.SphereGeometry(0.005, 6, 4).translate(0.014, 0.172, 0.04)]),
-      shoes: strip([new RoundedBoxGeometry(0.022, 0.014, 0.032, 2, 0.006).translate(-0.016, 0.003, 0.006), new RoundedBoxGeometry(0.022, 0.014, 0.032, 2, 0.006).translate(0.016, 0.003, 0.006)]),
-    };
-    for (const g of Object.values(MINI)) g.userData.shared = true;
-  }
-  const n = miniN++, k = new THREE.Group();
-  for (const [geo, hex] of [[MINI.top, KID_TOPS[n % KID_TOPS.length]], [MINI.shorts, n % 2 ? '#2f4b7c' : '#3d405b'], [MINI.skin, KID_SKIN[(n * 3) % KID_SKIN.length]],
-    [MINI.hair, KID_HAIR[(n * 2) % KID_HAIR.length]], [MINI.eyes, '#2a2c31'], [MINI.shoes, '#fbfaf6']]) {
-    const m = mesh(geo, mat(hex), geo === MINI.top || geo === MINI.skin); m.raycast = () => {}; m.userData.people = true; k.add(m);
-  }
-  return k;
-}
 function people(group, spots) {
   for (const [x, y, z] of spots) { const p = miniKid(); p.position.set(x, y, z); group.add(p); }
 }

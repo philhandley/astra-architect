@@ -19,8 +19,8 @@ const lighten = (hex, f) => '#' + new THREE.Color(hex).lerp(new THREE.Color('#ff
 function floorShapes(o, e = 0) {
   if (o.kind === 'rr') return [roundedRect(o.W - 2 * e, o.D - 2 * e, Math.max(0.001, o.r - e))];
   if (o.kind === 'ring') {
-    // (The floor runs out under the colonnade too.)
-    const f = roundedRect(o.W - 2 * e, o.D - 2 * e, o.r - e); f.holes.push(roundedRect(o.fWi + 2 * e, o.fDi + 2 * e, o.fri + e));
+    // (The floor runs out under the colonnade and a little under the edge of the courtyard lawn, which sits on it.)
+    const f = roundedRect(o.W - 2 * e, o.D - 2 * e, o.r - e); f.holes.push(roundedRect(Math.max(0.1, o.fWi - 0.12), Math.max(0.1, o.fDi - 0.12), Math.max(0.05, o.fri - 0.06)));
     return [f];
   }
   // A quarter band (a quarter of a pie when the inside radius is 0), round a corner nudged in by e.
@@ -387,7 +387,7 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
   if (o.kind === 'ring') {
     const ringFrame = new THREE.Group();
     if (o.col) colonnade(ringFrame, o.fWi + 0.08, o.fDi + 0.08, opts.walk ? opts.top : cutH);
-    if (!(b.level > 0) && b.w >= 3 && b.d >= 3 && !opts.walk) courtyard(ringFrame, o.fWi, o.fDi, b.id);
+    if (!(b.level > 0) && b.w >= 3 && b.d >= 3 && !opts.walk) courtyard(ringFrame, o.fWi, o.fDi, b.id, floorY + 0.02);
     g.add(ringFrame);
   }
   // Furniture: playful pieces placed loosely round the room (not in rows), so it feels like a happy place.

@@ -246,9 +246,22 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       if (zp) { const k = (t % (zp.period * 2)) / zp.period, u = k < 1 ? k * k : Math.max(0, 1 - (k - 1) * 1.6); o.position.set(zp.x0 + (zp.x1 - zp.x0) * u, zp.y0 + (zp.y1 - zp.y0) * u, 0); }
       const sl = o.userData.slide;
       if (sl) {
-        const k = ((t + (o.parent?.id || 0) * 0.37) % (sl.period + sl.pause)) / sl.period;
-        o.visible = k <= 1;
-        if (k <= 1) { const p = sl.curve.getPointAt(Math.min(1, k * k * 0.4 + k * 0.6)); o.position.set(p.x, p.y - 0.05, p.z); }
+        // Down the slide (sitting), then walk round to the door, then out of sight climbing the stairs.
+        const T = sl.period + sl.walk + sl.pause, k = (t + (o.parent?.id || 0) * 0.37) % T;
+        if (k < sl.period) {
+          const u = k / sl.period, s = Math.min(1, u * u * 0.4 + u * 0.6), p = sl.curve.getPointAt(s), q = sl.curve.getPointAt(Math.min(1, s + 0.01));
+          o.visible = true; sl.sit.visible = true; sl.walker.visible = false;
+          o.position.set(p.x, p.y - 0.1, p.z); o.rotation.y = Math.atan2(q.x - p.x, q.z - p.z);
+        } else if (k < sl.period + sl.walk) {
+          const d = ((k - sl.period) / sl.walk) * sl.lens[sl.lens.length - 1];
+          let i = 1; while (i < sl.lens.length - 1 && sl.lens[i] < d) i++;
+          const a = sl.path[i - 1], b = sl.path[i], f = (d - sl.lens[i - 1]) / ((sl.lens[i] - sl.lens[i - 1]) || 1);
+          o.visible = true; sl.sit.visible = false; sl.walker.visible = true;
+          o.position.lerpVectors(a, b, f); o.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
+          const sw = Math.sin(k * 11) * 0.55;
+          for (const l of sl.legs) l.rotation.x = sw * l.userData.s;
+          for (const m of sl.arms) m.rotation.x = -sw * 0.8 * m.userData.s;
+        } else o.visible = false;
       }
     });
   });

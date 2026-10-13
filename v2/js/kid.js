@@ -100,8 +100,8 @@ export function miniKid(pose = 'stand') {
   if (L.style === 3) add(P.hat, L.hat);
   if (L.bag) add(P.bag, L.bag);
   for (const s of [-1, 1]) {
-    const leg = new THREE.Group(); leg.position.set(s * LEG_X, HIP, 0); leg.rotation.x = legX; add(P.leg, L.shorts, leg); add(P.shoe, L.shoes, leg); k.add(leg);
-    const arm = new THREE.Group(); arm.position.set(s * ARM_X, SHOULDER, 0); arm.rotation.set(armX, 0, s * out); add(P.arm, L.top, arm); add(P.hand, L.skin, arm); k.add(arm);
+    const leg = new THREE.Group(); leg.position.set(s * LEG_X, HIP, 0); leg.rotation.x = legX; leg.userData.limb = 'leg'; leg.userData.s = s; add(P.leg, L.shorts, leg); add(P.shoe, L.shoes, leg); k.add(leg);
+    const arm = new THREE.Group(); arm.position.set(s * ARM_X, SHOULDER, 0); arm.rotation.set(armX, 0, s * out); arm.userData.limb = 'arm'; arm.userData.s = s; add(P.arm, L.top, arm); add(P.hand, L.skin, arm); k.add(arm);
   }
   return k;
 }

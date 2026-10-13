@@ -136,8 +136,9 @@ const BUILD = {
       const low = outer(); low.holes.push(hole(REC)); g.add(mesh(upExtrude(low, SOFFIT), mat(c)));
       const up = outer(); up.holes.push(hole(0)); const top = mesh(upExtrude(up, H - SOFFIT), mat(c)); top.position.y = SOFFIT; g.add(top);
       colonnade(g, W - 2 * t - 0.03 + 0.08, D - 2 * t - 0.03 + 0.08);
+      walkway(g, W - 2 * t - 0.03, D - 2 * t - 0.03, REC);
     } else { const s = outer(); s.holes.push(hole(0)); g.add(mesh(upExtrude(s, H), mat(c))); }
-    if (w >= 3 && d >= 3) courtyard(g, W - 2 * t - 0.03, D - 2 * t - 0.03, o.id);
+    if (w >= 3 && d >= 3) courtyard(g, W - 2 * t - 0.03, D - 2 * t - 0.03, o.id, o.box && hasColonnade(o.box) ? 0.02 : 0);
     return g;
   },
   ringhouse(w, d, H, c, o) {
@@ -151,8 +152,8 @@ const BUILD = {
     const [body, roofs] = sweepHouses(path, t, H, true, col ? REC : 0);
     g.add(mesh(body, mat(c)), mesh(roofs, mat(shade(c, 0.86))));
     const Wi = w - 2 * GAP - 2 * t, Di = d - 2 * GAP - 2 * t;
-    if (col) colonnade(g, Wi + 0.08, Di + 0.08);
-    if (w >= 3 && d >= 3) courtyard(g, Wi, Di, o.id);
+    if (col) { colonnade(g, Wi + 0.08, Di + 0.08); walkway(g, Wi, Di, REC); }
+    if (w >= 3 && d >= 3) courtyard(g, Wi, Di, o.id, col ? 0.02 : 0);
     return g;
   },
   arc(w, d, H, c) {
@@ -275,20 +276,28 @@ const BUILD = {
     const roof = mesh(new THREE.ConeGeometry(0.34, 0.34, 20), mat('#e2457d')); roof.position.set(x0, top + 0.35, 0); g.add(roof);
     const flag = mesh(new THREE.BoxGeometry(0.12, 0.07, 0.01), mat('#f7c22e')); flag.position.set(x0 + 0.07, top + 0.62, 0); g.add(flag);
     const pole = mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.16, 5), mat(WHITE)); pole.position.set(x0, top + 0.58, 0); g.add(pole);
-    // The slide: round and round the tower, then out along the next square.
-    const pts = [], turns = Math.max(1.5, H * 1.6), R = 0.4;
-    for (let i = 0; i <= 64; i++) { const t = i / 64, a = t * turns * Math.PI * 2; pts.push(new THREE.Vector3(x0 + Math.cos(a) * R, top - 0.02 - t * (top - 0.28), Math.sin(a) * R)); }
+    // A door at the foot of the tower, on the front, with a step: the way in to the stairs up.
+    g.add(mesh(new THREE.BoxGeometry(0.2, 0.27, 0.03).translate(x0, 0.135, 0.228), mat(WHITE)));
+    g.add(mesh(new THREE.BoxGeometry(0.15, 0.24, 0.03).translate(x0, 0.12, 0.236), mat('#3d405b')));
+    g.add(mesh(new THREE.BoxGeometry(0.22, 0.02, 0.1).translate(x0, 0.01, 0.28), mat('#e6e1d6')));
+    // The slide: out of the cabin at the top, round and round the tower, then out along the next square.
+    const pts = [new THREE.Vector3(x0 + 0.04, top + 0.1, 0), new THREE.Vector3(x0 + 0.3, top + 0.06, 0.02)], turns = Math.max(1.5, H * 1.6), R = 0.4;
+    for (let i = 1; i <= 64; i++) { const t = i / 64, a = 0.3 + t * turns * Math.PI * 2; pts.push(new THREE.Vector3(x0 + Math.cos(a) * R, top - 0.02 - t * (top - 0.28), Math.sin(a) * R)); }
     const last = pts[pts.length - 1];
     pts.push(new THREE.Vector3(x0 + 0.62, 0.17, last.z * 0.4), new THREE.Vector3(L / 2 - 0.3, 0.1, 0), new THREE.Vector3(L / 2 - 0.08, 0.11, 0));
     const curve = new THREE.CatmullRomCurve3(pts);
     const tube = new THREE.TubeGeometry(curve, 240, 0.085, 10, false);
     const uv = tube.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * curve.getLength() * 3);
     g.add(mesh(tube, mat(WHITE, { map: stripes(c) })));
-    // A child whizzing down now and then.
-    const kid = miniKid('sit'); kid.scale.setScalar(0.75);
-    kid.userData.slide = { curve, period: 3.4, pause: 2.2 };
-    g.add(kid);
-    if (d > w) g.rotation.y = -Math.PI / 2;
+    // A child: whizzes down sitting, climbs out at the bottom, walks round to the door and goes in to climb up again.
+    const rider = new THREE.Group(), sit = miniKid('sit'), walker = miniKid('stand');
+    sit.scale.setScalar(0.75); walker.scale.setScalar(0.75); rider.add(sit, walker);
+    const legs = [], arms = []; walker.traverse(o => { if (o.userData.limb === 'leg') legs.push(o); if (o.userData.limb === 'arm') arms.push(o); });
+    const path = [new THREE.Vector3(L / 2 + 0.06, 0, 0), new THREE.Vector3(x0 + 0.8, 0, 0.6), new THREE.Vector3(x0, 0, 0.4)];
+    const lens = [0]; for (let i = 1; i < path.length; i++) lens.push(lens[i - 1] + path[i].distanceTo(path[i - 1]));
+    rider.userData.slide = { curve, period: 3.4, pause: 2.6, sit, walker, legs, arms, path, lens, walk: lens[lens.length - 1] / 0.33 };
+    g.add(rider);
+    if (d > w) g.rotation.y = Math.PI / 2;          // (turned so the door and the walk back stay on the front, in view)
     const out = new THREE.Group(); out.add(g); return out;
   },
   pool(w, d, H, c) {
@@ -763,14 +772,22 @@ export function colonnade(g, Wc, Dc, hgt = SOFFIT) {
   g.add(mesh(mergeGeometries(parts.map(x => { x.deleteAttribute('uv'); return x; })), mat(WHITE)));
 }
 // A garden in a courtyard (Wi x Di): a lawn, flowers, a round bench and a big tree in the middle.
-export function courtyard(g, Wi, Di, id = 1) {
+// y: how high the garden sits (on the paving of a colonnade walkway, 0.02 up).
+export function courtyard(g, Wi, Di, id = 1, y = 0) {
   const r = Math.min(Wi, Di) / 2; if (r < 0.2) return;
+  const cy = new THREE.Group(); cy.position.y = y; cy.userData.keep = true; g.add(cy);
   const lawn = new THREE.ExtrudeGeometry(roundedRect(Wi - 0.08, Di - 0.08, r - 0.04), { depth: 0.02, bevelEnabled: false, curveSegments: 32 }).rotateX(-Math.PI / 2);
-  const lawnM = mesh(lawn, mat('#9bd06a'), false); lawnM.userData.keep = true; g.add(lawnM);
-  const tr = roundTree(Math.min(0.42, r * 0.5), TREE_GREENS[2]); tr.position.y = 0.02; tr.traverse(o => { o.userData.keep = true; }); g.add(tr);
-  const br = Math.min(0.3, r * 0.42), bench = mesh(new THREE.TorusGeometry(br, 0.028, 8, 36).rotateX(Math.PI / 2).translate(0, 0.05, 0), mat(WHITE)); bench.userData.keep = true; g.add(bench);
+  const lawnM = mesh(lawn, mat('#9bd06a'), false); lawnM.userData.keep = true; cy.add(lawnM);
+  const tr = roundTree(Math.min(0.42, r * 0.5), TREE_GREENS[2]); tr.position.y = 0.02; tr.traverse(o => { o.userData.keep = true; }); cy.add(tr);
+  const br = Math.min(0.3, r * 0.42), bench = mesh(new THREE.TorusGeometry(br, 0.028, 8, 36).rotateX(Math.PI / 2).translate(0, 0.05, 0), mat(WHITE)); bench.userData.keep = true; cy.add(bench);
   const rr = seeded(id * 5 + 11), flowers = ['#f5a3c7', '#f7c22e', '#ffffff', '#e2457d'];
-  for (let i = 0; i < Math.round(r * 30); i++) { const a = rr() * Math.PI * 2, d = br + 0.08 + rr() * (r - br - 0.16); const f = mesh(new THREE.SphereGeometry(0.022, 6, 4), mat(flowers[i % 4]), false); f.position.set(Math.cos(a) * d * (Wi / (2 * r)), 0.04, Math.sin(a) * d * (Di / (2 * r))); f.raycast = () => {}; f.userData.keep = true; g.add(f); }
+  for (let i = 0; i < Math.round(r * 30); i++) { const a = rr() * Math.PI * 2, d = br + 0.08 + rr() * (r - br - 0.16); const f = mesh(new THREE.SphereGeometry(0.022, 6, 4), mat(flowers[i % 4]), false); f.position.set(Math.cos(a) * d * (Wi / (2 * r)), 0.04, Math.sin(a) * d * (Di / (2 * r))); f.raycast = () => {}; f.userData.keep = true; cy.add(f); }
+}
+// The paved walkway under a colonnade: from the stepped-back wall to just under the edge of the lawn.
+export function walkway(g, Wi, Di, rec) {
+  const r = Math.min(Wi, Di) / 2, sh = roundedRect(Wi + 2 * rec + 0.02, Di + 2 * rec + 0.02, r + rec + 0.01);
+  sh.holes.push(roundedRect(Math.max(0.1, Wi - 0.12), Math.max(0.1, Di - 0.12), Math.max(0.05, r - 0.06)));
+  g.add(mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: false, curveSegments: 32 }).rotateX(-Math.PI / 2), mat('#efebe2')));
 }
 // The centre line of a rounded-rectangle loop (a circle when square), as points.
 function loopPath(W, D, r) {

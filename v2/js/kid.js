@@ -7,19 +7,22 @@
 // - 'crew': a hoodie with a band of colour across the chest (some with the hood showing, some with a skirt),
 //   joggers, chunky sneakers with white soles, pill eyes, stylish hair (a fade, curls, a bun, braids, long hair, a
 //   swoop, an afro, a cap worn backwards, a beanie), headphones on a few; muted colours.
-// Both: soft light and no outline (like the furniture). Pick one with ?kids=crew or ?kids=scale in the address
-// (remembered on this device). crowd.js draws hundreds at once from these parts; miniKid() makes a single one.
+// - 'muted': the scale-figure kids as in pass 7 (Phil's pick to try): muted colours, a slightly bigger head, more
+//   bucket hats and beanies, no stripes; small dot eyes.
+// All: soft light and no outline (like the furniture). Pick one with ?kids=scale, ?kids=muted or ?kids=crew in the
+// address (remembered on this device). crowd.js draws hundreds at once from these parts; miniKid() makes one.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 export const KIDS = (() => {
   try {
     const q = new URLSearchParams(location.search).get('kids');
-    if (q === 'crew' || q === 'scale') { localStorage.setItem('astraarch-kids', q); return q; }
-    return localStorage.getItem('astraarch-kids') === 'crew' ? 'crew' : 'scale';
+    if (q === 'crew' || q === 'scale' || q === 'muted') { localStorage.setItem('astraarch-kids', q); return q; }
+    const saved = localStorage.getItem('astraarch-kids');
+    return saved === 'crew' || saved === 'muted' ? saved : 'scale';
   } catch (e) { return 'scale'; }
 })();
-const CREW = KIDS === 'crew';
+const CREW = KIDS === 'crew', MUTED = KIDS === 'muted';
 
 // The body (feet at y = 0, facing +z; a grown-up is the same figure drawn bigger).
 export const HIP = CREW ? 0.086 : 0.088, SHOULDER = CREW ? 0.146 : 0.149, LEG_X = CREW ? 0.0135 : 0.0118, ARM_X = CREW ? 0.031 : 0.0285;
@@ -28,10 +31,10 @@ export const REACH = SHOULDER + (CREW ? 0.057 : 0.063);  // how high their hands
 export const SIT_DROP = HIP - 0.05;                      // how far the crowd lowers a sitting child: hips just above a stool
 export const SWIM_DROP = 0.138;                          // and a swimmer, so the head is just out of the water
 export const FACE = true;                                // eyes (false: faceless, like a scale figure)
-const R = CREW ? 0.0335 : 0.0295, HEAD_Y = 0.189;
+const R = CREW ? 0.0335 : MUTED ? 0.0305 : 0.0295, HEAD_Y = 0.189;
 
 // Outfits that go together: a top, its sleeves, trousers, shoes and an accent (a skirt, stripes, the chest band).
-export const OUTFITS = CREW ? [
+export const OUTFITS = CREW || MUTED ? [
   { top: '#c8664a', sleeve: '#c8664a', shorts: '#3c3f45', shoes: '#efe9dc', accent: '#efe9dc' },
   { top: '#9bb39a', sleeve: '#9bb39a', shorts: '#2f3e5c', shoes: '#efe9dc', accent: '#2f3e5c' },
   { top: '#d9a441', sleeve: '#d9a441', shorts: '#2f3e5c', shoes: '#3c3f45', accent: '#2f3e5c' },
@@ -58,7 +61,7 @@ export const OUTFITS = CREW ? [
 export const SKIN = ['#f3d4bd', '#e2b590', '#c68b62', '#98653f', '#6c4630'];
 export const HAIR = ['#3b2a20', '#1f1b18', '#b5652e', '#e3b65a', '#6b4128', '#2a2320'];
 const DARK_HAIR = ['#3b2a20', '#1f1b18', '#6b4128', '#2a2320'];
-export const BRIGHT = CREW ? ['#d9a441', '#c8664a', '#2f3e5c', '#9bb39a', '#efe9dc', '#3c3f45'] : ['#e8b84a', '#e0573d', '#3b6fb6', '#2f3e5c', '#efe9dc', '#5f9e6e'];
+export const BRIGHT = CREW || MUTED ? ['#d9a441', '#c8664a', '#2f3e5c', '#9bb39a', '#efe9dc', '#3c3f45'] : ['#e8b84a', '#e0573d', '#3b6fb6', '#2f3e5c', '#efe9dc', '#5f9e6e'];
 // Hairstyles (the last two are hats, in the hat colour). Each is one part, named the same.
 export const HAIRDOS = CREW ? ['fade', 'curls', 'bun', 'braids', 'long', 'swoop', 'afro', 'capBack', 'beanie'] : ['short', 'side', 'bob', 'pony', 'bun', 'curls', 'afro', 'bucket', 'beanie'];
 export const HAIR_PART = HAIRDOS;
@@ -73,7 +76,8 @@ export const LEG_EXTRAS = CREW ? [['sole', '#efe9dc']] : [];
 export function kidLook(n) {
   let h = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b) >>> 0; h = (h ^ (h >>> 13)) >>> 0; h = Math.imul(h, 0xc2b2ae35) >>> 0; h = (h ^ (h >>> 16)) >>> 0;
   let h2 = Math.imul(h ^ 0x27d4eb2f, 0x165667b1) >>> 0; h2 = (h2 ^ (h2 >>> 15)) >>> 0;
-  const o = OUTFITS[h % OUTFITS.length], style = (h >>> 8) % 12 < 10 ? (h >>> 8) % 7 : 7 + ((h >>> 12) & 1);       // (about one in six wears a hat)
+  const o = OUTFITS[h % OUTFITS.length], hats = MUTED ? 3 : 2;      // (about one in six wears a hat; one in four in 'muted')
+  const style = (h >>> 8) % 12 < 12 - hats ? (h >>> 8) % 7 : 7 + ((h >>> 12) & 1);
   const name = HAIRDOS[style], hair = CURLY.has(name) ? DARK_HAIR[(h >>> 16) % 4] : HAIR[(h >>> 16) % HAIR.length];      // (curls and afros in dark colours)
   const L = { ...o, skin: SKIN[(h >>> 4) % SKIN.length], hair, style, hat: BRIGHT[(h >>> 20) % BRIGHT.length], bag: h2 % 3 === 0 ? BRIGHT[(h2 >>> 22) % BRIGHT.length] : null };
   const skirtCol = o.accent === '#efe9dc' ? o.shorts : o.accent;
@@ -81,7 +85,7 @@ export function kidLook(n) {
   else {
     const coat = (h2 >>> 3) % 10 < 3;
     Object.assign(L, { coat: coat ? o.top : null, skirt: !coat && (h2 >>> 7) % 4 === 0 ? skirtCol : null,
-      collar: (h2 >>> 11) % 5 < 2 ? (o.top === '#efe9dc' ? o.accent : '#f6f2ea') : null, stripes: (h2 >>> 15) % 9 < 2 ? (o.top === '#efe9dc' ? '#2f3e5c' : '#efe9dc') : null });
+      collar: (h2 >>> 11) % 5 < 2 ? (o.top === '#efe9dc' ? o.accent : '#f6f2ea') : null, stripes: !MUTED && (h2 >>> 15) % 9 < 2 ? (o.top === '#efe9dc' ? '#2f3e5c' : '#efe9dc') : null });
   }
   return L;
 }

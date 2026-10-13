@@ -37,3 +37,18 @@ export const MARK = `<svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
   <path d="M18 18l11-5.5 11 5.5-11 5.5z" fill="#ff7aa6"/><path d="M18 18v8l11 5.5v-8z" fill="#e2457d"/><path d="M29 23.5v8l11-5.5v-8z" fill="#c22f63"/>
   <path d="M6 14l8-4 8 4-8 4z" fill="#5fd2db"/><path d="M6 14v6l8 4v-6z" fill="#22b2bf"/><path d="M14 18v6l8-4v-6z" fill="#14919c"/>
 </svg>`;
+
+// A little picture of each window style, on a wall in the room's own colour.
+export function winSwatch(id, hex) {
+  const W = '<rect x="0" y="0" width="64" height="44" fill="' + hex + '"/>', g = '#a9d8ec', f = '#fbfaf6', pop = '#3d8de0';
+  const r = (x, y, w, h, fr = f, sw = 1.6) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${g}" stroke="${fr}" stroke-width="${sw}"/>`;
+  const art = {
+    big: r(6, 9, 22, 26, pop, 3) + r(36, 9, 22, 26, pop, 3) + `<path d="M17 9v26M6 25h22M47 9v26M36 25h22" stroke="${f}" stroke-width="1.4"/>`,
+    pixel: r(6, 7, 9, 9, '#f7c22e') + r(20, 18, 14, 14) + r(40, 6, 9, 9, '#e2457d') + r(46, 24, 12, 12, '#22b2bf') + r(8, 28, 8, 8),
+    ribbon: r(5, 15, 54, 13) + [16, 27, 38, 49].map(x => `<path d="M${x} 15v13" stroke="${f}" stroke-width="1.4"/>`).join(''),
+    porthole: [12, 32, 52].map((x, i) => `<circle cx="${x}" cy="${i % 2 ? 19 : 25}" r="7" fill="${g}" stroke="${f}" stroke-width="2.4"/>`).join(''),
+    slots: [[6, 4], [14, 7], [26, 3], [33, 9], [47, 5], [56, 4]].map(([x, w]) => r(x, 6, w, 32)).join(''),
+    grid: [8, 26, 44].map(x => r(x, 9, 12, 12) + r(x, 26, 12, 12)).join(''),
+  }[id] || '';
+  return `<svg class="sf" viewBox="0 0 64 44" aria-hidden="true">${W}${art}</svg>`;
+}

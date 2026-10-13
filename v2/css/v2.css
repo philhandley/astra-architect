@@ -169,3 +169,9 @@ svg.ic.big { width: 34px; height: 34px; }
 .pmodes { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--paper-2); }
 .pmode { appearance: none; border: 0; cursor: pointer; height: 42px; padding: 0 16px; border-radius: 999px; background: transparent; font: inherit; font-size: 15px; font-weight: 700; color: #4a4d55; }
 .pmode.on { background: #fff; color: #1f2126; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
+
+.preview { flex: none; }
+.wins { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.wins .surf { padding: 6px 2px; font-size: 11px; }
+.wins .sf { width: 100%; max-width: 64px; height: auto; aspect-ratio: 64 / 44; }
+.detail .build { position: sticky; bottom: 0; flex: none; box-shadow: 0 -8px 16px #fff; }

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { PROGRAMMES, LEVEL } from './catalogue.js';
 import { GRID, square, site } from './site.js';
 import { outline } from './inside.js';
+import { wallRuns, openings, runAt, roundedRect, TALL, ringThickness } from './plan.js';
 import { icon } from './icons.js';
 import { h, esc, sfx, say } from './ui.js';
 import { INK } from './shapes.js';
@@ -146,24 +147,28 @@ function drawPlan(model, siteView, L) {
     const P = PROGRAMMES[b.type], cx = X(b.x + b.w / 2), cz = Z(b.z + b.d / 2);
     if (['tree'].includes(b.shape)) { g.strokeStyle = '#1d1f24'; g.lineWidth = 2.5; for (let i = 0; i < b.w; i++) for (let j = 0; j < b.d; j++) { g.beginPath(); g.arc(X(b.x + i + 0.5), Z(b.z + j + 0.5), s * 0.3, 0, Math.PI * 2); g.stroke(); } continue; }
     if (b.shape === 'turbine') { g.strokeStyle = '#1d1f24'; g.lineWidth = 3; g.beginPath(); g.arc(cx, cz, s * 0.18, 0, Math.PI * 2); g.moveTo(cx - s * 0.4, cz); g.lineTo(cx + s * 0.4, cz); g.stroke(); continue; }
-    path(g, b, X, Z, s);
+    const k = TALL.has(b.type) ? 0 : L - b.level;
+    path(g, b, X, Z, s, k);
     g.fillStyle = b.shape === 'pool' ? '#e9f3f7' : '#ffffff'; g.fill('evenodd');
     g.strokeStyle = '#1d1f24'; g.lineWidth = b.shape === 'track' || b.shape === 'pool' || b.shape === 'garden' ? 3 : 7; g.stroke();
+    planOpenings(g, b, X, Z, s, k);
     // Little symbols.
     g.lineWidth = 2;
     if (b.shape === 'stairs' || b.shape === 'steps') { const n = b.shape === 'stairs' ? 6 : Math.round(Math.max(b.w, b.d) * 3); for (let i = 1; i < n; i++) { g.beginPath(); if (b.w >= b.d) { const x = X(b.x) + (s * b.w * i) / n; g.moveTo(x, Z(b.z) + 6); g.lineTo(x, Z(b.z + b.d) - 6); } else { const z = Z(b.z) + (s * b.d * i) / n; g.moveTo(X(b.x) + 6, z); g.lineTo(X(b.x + b.w) - 6, z); } g.stroke(); } }
     if (b.shape === 'spiral') { for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; g.beginPath(); g.moveTo(cx, cz); g.lineTo(cx + Math.cos(a) * s * 0.42, cz + Math.sin(a) * s * 0.42); g.stroke(); } }
     if (b.shape === 'pool') { g.strokeStyle = '#7fb7cc'; for (let i = 1; i < 3; i++) { g.beginPath(); const z = Z(b.z) + (s * b.d * i) / 3; for (let x = X(b.x) + 10; x < X(b.x + b.w) - 10; x += 8) g.lineTo(x, z + Math.sin(x / 9) * 3); g.stroke(); } }
     if (b.shape === 'track') { g.beginPath(); g.ellipse(cx, cz, s * b.w * 0.36, s * b.d * 0.3, 0, 0, Math.PI * 2); g.stroke(); }
-    // The name.
-    let fs = Math.max(12, Math.min(30, s * Math.min(b.w, b.d) * 0.24));
+    // The name (on a ring, written on the front of the band, not over the courtyard garden).
+    const ringy = (b.shape === 'ring' || b.shape === 'ringhouse') && b.w >= 3 && b.d >= 3;
+    const tz = ringy ? cz + (b.d / 2 - 0.035 - ringThickness(b) / 2) * s : cz;
+    let fs = Math.max(12, Math.min(ringy ? 22 : 30, s * Math.min(b.w, b.d) * 0.24));
     g.fillStyle = '#1d1f24'; g.textAlign = 'center'; g.textBaseline = 'middle';
     const words = P.name.split(' '), room = b.w * s * 0.86;
     g.font = `600 ${fs}px Lexend, sans-serif`;
     const lines = words.length > 1 && g.measureText(P.name).width > room ? [words.slice(0, Math.ceil(words.length / 2)).join(' '), words.slice(Math.ceil(words.length / 2)).join(' ')] : [P.name];
     const widest = Math.max(...lines.map(l => g.measureText(l).width));
     if (widest > room) { fs = Math.max(10, fs * room / widest); g.font = `600 ${fs}px Lexend, sans-serif`; }
-    lines.forEach((ln, i) => g.fillText(ln, cx, cz + (i - (lines.length - 1) / 2) * fs * 1.1));
+    lines.forEach((ln, i) => g.fillText(ln, cx, tz + (i - (lines.length - 1) / 2) * fs * 1.1));
   }
   // North arrow and scale bar.
   const nx = W - m - 40, ny = H - 110;
@@ -179,8 +184,49 @@ function drawPlan(model, siteView, L) {
 }
 
 // The outline of a room, as a canvas path.
-function path(g, b, X, Z, s) {
-  const o = outline(b), cx = X(b.x + b.w / 2), cz = Z(b.z + b.d / 2);
+// Windows and doors in a plan, the way architects draw them: a window is a gap in the wall with thin lines
+// for the glass; a door is a gap with the door drawn swinging open. A colonnade's columns are dots.
+function planOpenings(g, b, X, Z, s, k) {
+  const runs = wallRuns(b, k), ops = openings(b, k, runs), ox = b.x + b.w / 2, oz = b.z + b.d / 2;
+  const trace = (run, s0, s1, off) => {
+    const pts = [s0];
+    for (let i = 1; i < run.pts.length - 1; i++) if (run.s[i] > s0 && run.s[i] < s1) pts.push(run.s[i]);
+    pts.push(s1);
+    g.beginPath();
+    pts.forEach((u, i) => { const p = runAt(run, u), x = X(ox + p.x) + p.nx * off, z = Z(oz + p.z) + p.nz * off; i ? g.lineTo(x, z) : g.moveTo(x, z); });
+  };
+  g.lineCap = 'butt';
+  for (const o of ops) {
+    const cutHere = o.door || (o.y0 < 0.27 && o.y1 > 0.2); if (!cutHere) continue;
+    const run = runs[o.run];
+    g.strokeStyle = '#ffffff'; g.lineWidth = 9; trace(run, o.s0, o.s1, 0); g.stroke();
+    g.strokeStyle = '#1d1f24';
+    if (o.door && !o.glassDoor) {
+      const a = runAt(run, o.s0), e = runAt(run, o.s1), w = (o.s1 - o.s0) * s, hx = X(ox + a.x), hz = Z(oz + a.z);
+      const lx = hx - a.nx * w, lz = hz - a.nz * w;
+      g.lineWidth = 2.4; g.beginPath(); g.moveTo(hx, hz); g.lineTo(lx, lz); g.stroke();
+      g.lineWidth = 1.2; g.beginPath(); const a0 = Math.atan2(lz - hz, lx - hx), a1 = Math.atan2(Z(oz + e.z) - hz, X(ox + e.x) - hx);
+      let d = a1 - a0; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+      g.arc(hx, hz, w, a0, a1, d < 0); g.stroke();
+    } else {
+      g.lineWidth = 1.5; trace(run, o.s0, o.s1, 2.6); g.stroke(); trace(run, o.s0, o.s1, -2.6); g.stroke();
+      for (const u of [o.s0, o.s1]) { const p = runAt(run, u), x = X(ox + p.x), z = Z(oz + p.z); g.beginPath(); g.moveTo(x + p.nx * 4.5, z + p.nz * 4.5); g.lineTo(x - p.nx * 4.5, z - p.nz * 4.5); g.stroke(); }
+    }
+  }
+  const o = outline(b, k);
+  if (o.kind === 'ring' && o.col) {
+    const sh = roundedRect(o.fWi + 0.08, o.fDi + 0.08, Math.min(o.fWi, o.fDi) / 2 + 0.04), n = Math.max(8, Math.round(sh.getLength() / 0.3));
+    g.fillStyle = '#1d1f24';
+    for (const p of sh.getSpacedPoints(n).slice(0, -1)) { g.beginPath(); g.arc(X(ox + p.x), Z(oz - p.y), Math.max(2.5, 0.026 * s), 0, Math.PI * 2); g.fill(); }
+  }
+  if (o.kind === 'ring' && b.w >= 3 && b.d >= 3 && !(b.level > 0)) {
+    const r = Math.min(o.fWi, o.fDi) / 2;
+    g.strokeStyle = '#1d1f24'; g.lineWidth = 1.6; g.beginPath(); g.arc(X(ox), Z(oz), Math.min(0.42, r * 0.5) * s, 0, Math.PI * 2); g.stroke();
+    g.setLineDash([4, 4]); g.beginPath(); g.arc(X(ox), Z(oz), Math.min(0.3, r * 0.42) * s, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+  }
+}
+function path(g, b, X, Z, s, k = 0) {
+  const o = outline(b, k), cx = X(b.x + b.w / 2), cz = Z(b.z + b.d / 2);
   g.beginPath();
   const rr = (W, D, r) => { const x = cx - W * s / 2, y = cz - D * s / 2; g.roundRect(x, y, W * s, D * s, Math.max(0, r * s)); };
   if (o.kind === 'rr') rr(o.W, o.D, o.r);

@@ -1,7 +1,9 @@
 // The Rooms area: a card for each kind of room. Finn picks its shape and colour and sees it spin in 3D,
 // then taps Build it to place it on the site.
 import * as THREE from 'three';
-import { PROGRAMMES, SHAPES, PALETTE, TRAY, LEVEL, colourHex } from './catalogue.js';
+import { PROGRAMMES, SHAPES, PALETTE, TRAY, WINDOWS, LEVEL, colourHex } from './catalogue.js';
+import { WINDOWED, winStyle } from './plan.js';
+import { winSwatch } from './icons.js';
 import { buildPiece, disposePiece } from './shapes.js';
 import { h, esc, emo, say, sfx } from './ui.js';
 
@@ -48,14 +50,14 @@ class Studio {
 }
 
 let thumbStudio = null;
-export function thumb(type, shape, colour) {
+export function thumb(type, shape, colour, win) {
   if (!thumbStudio) thumbStudio = new Studio(180, 150);
   const [w, d, hh] = PROGRAMMES[type].size;
-  return thumbStudio.snap({ id: 1, type, shape, colour, w, d, h: hh, x: 0, z: 0, level: 0 });
+  return thumbStudio.snap({ id: 1, type, shape, colour, win, w, d, h: hh, x: 0, z: 0, level: 0 });
 }
 export function trayThumbs(model) {
   const m = new Map();
-  for (const id of TRAY) { const st = model.style(id); m.set(id, thumb(id, st.shape, st.colour)); }
+  for (const id of TRAY) { const st = model.style(id); m.set(id, thumb(id, st.shape, st.colour, st.win)); }
   return m;
 }
 
@@ -67,12 +69,13 @@ export function mountRooms(root, model, { onBuild, thumbs }) {
       <div class="preview"></div>
       <div class="label">Shape</div><div class="shapes"></div>
       <div class="label">Colour</div><div class="colours"></div>
+      <div class="label wlabel">Windows</div><div class="wins"></div>
       <button class="build" type="button">Build it on the site ➜</button>
     </div>
   </div>`);
   root.appendChild(ui);
   const cards = ui.querySelector('.cards'), preview = ui.querySelector('.preview');
-  const big = new Studio(520, 340);
+  const big = new Studio(520, 280);
   preview.appendChild(big.r.domElement);
   let current = TRAY[0], running = false;
 
@@ -91,18 +94,30 @@ export function mountRooms(root, model, { onBuild, thumbs }) {
     ui.querySelector('.dname').textContent = P.name;
     ui.querySelector('.dholds').textContent = `${P.size[0]} × ${P.size[1]} blocks${P.size[2] > 1 ? `, ${P.size[2]} storeys` : ''}${P.holds ? ` · holds ${P.holds}` : ''}`;
     const [w, d, hh] = P.size;
-    big.show({ id: 7, type: current, shape: st.shape, colour: st.colour, w, d, h: hh, x: 0, z: 0, level: 0 });
+    big.show({ id: 7, type: current, shape: st.shape, colour: st.colour, win: st.win, w, d, h: hh, x: 0, z: 0, level: 0 });
+    const redo = () => { const s2 = model.style(current); thumbs.set(current, thumb(current, s2.shape, s2.colour, s2.win)); };
     const shapes = ui.querySelector('.shapes'); shapes.innerHTML = '';
     for (const s of P.shapes) {
-      const b = h(`<button class="shapebtn ${s === st.shape ? 'on' : ''}" type="button"><img src="${thumb(current, s, st.colour)}" alt=""><span>${esc(SHAPES[s].name)}</span></button>`);
-      b.addEventListener('click', () => { model.setStyle(current, { shape: s }); thumbs.set(current, thumb(current, s, st.colour)); sfx.tap(); say(SHAPES[s].name); drawCards(); drawDetail(); });
+      const b = h(`<button class="shapebtn ${s === st.shape ? 'on' : ''}" type="button"><img src="${thumb(current, s, st.colour, st.win)}" alt=""><span>${esc(SHAPES[s].name)}</span></button>`);
+      b.addEventListener('click', () => { model.setStyle(current, { shape: s }); redo(); sfx.tap(); say(SHAPES[s].name); drawCards(); drawDetail(); });
       shapes.append(b);
     }
     const cols = ui.querySelector('.colours'); cols.innerHTML = '';
     for (const p of PALETTE) {
       const b = h(`<button class="sw ${p.id === st.colour ? 'on' : ''}" type="button" style="background:${p.hex}" aria-label="${esc(p.name)}"></button>`);
-      b.addEventListener('click', () => { model.setStyle(current, { colour: p.id }); thumbs.set(current, thumb(current, model.style(current).shape, p.id)); sfx.tap(); say(p.name); drawCards(); drawDetail(); });
+      b.addEventListener('click', () => { model.setStyle(current, { colour: p.id }); redo(); sfx.tap(); say(p.name); drawCards(); drawDetail(); });
       cols.append(b);
+    }
+    // Window styles, for rooms with walls.
+    const wins = ui.querySelector('.wins'), hasWin = WINDOWED.has(st.shape); wins.innerHTML = '';
+    wins.hidden = ui.querySelector('.wlabel').hidden = !hasWin;
+    if (hasWin) {
+      const now = winStyle({ type: current, win: st.win });
+      for (const wdw of WINDOWS) {
+        const b = h(`<button class="surf ${now === wdw.id ? 'on' : ''}" type="button">${winSwatch(wdw.id, colourHex(st.colour))}<span>${esc(wdw.name)}</span></button>`);
+        b.addEventListener('click', () => { model.setStyle(current, { win: wdw.id }); redo(); sfx.tap(); say(wdw.name); drawCards(); drawDetail(); });
+        wins.append(b);
+      }
     }
   }
   ui.querySelector('.speak').addEventListener('click', () => { const P = PROGRAMMES[current]; say(`${P.name}. ${P.say}`); });

@@ -53,10 +53,11 @@ export class Bag {
   meshes() {
     const out = [];
     for (const [col, list] of this.geos) {
-      // (A colour starting with ~ is water: see-through, and it casts no shadow. One starting with * glows.)
-      const water = col[0] === '~', glow = col[0] === '*', hex = water || glow ? col.slice(1) : col;
+      // (A colour starting with ~ is water: see-through, and it casts no shadow. One starting with * glows; one
+      // starting with ^ is seen from both sides, for open shells.)
+      const water = col[0] === '~', glow = col[0] === '*', both = col[0] === '^', hex = water || glow || both ? col.slice(1) : col;
       const g = mergeGeometries(list.map(x => { const y = x.index ? x.toNonIndexed() : x; if (y.attributes.uv) y.deleteAttribute('uv'); if (!y.attributes.normal) y.computeVertexNormals(); return y; }));
-      const m = new THREE.Mesh(g, water ? mat(hex, { transparent: true, opacity: 0.42, depthWrite: false }) : glow ? mat(hex, { emissive: hex, emissiveIntensity: 0.6 }) : mat(hex));
+      const m = new THREE.Mesh(g, water ? mat(hex, { transparent: true, opacity: 0.42, depthWrite: false }) : glow ? mat(hex, { emissive: hex, emissiveIntensity: 0.6 }) : both ? mat(hex, { side: THREE.DoubleSide }) : mat(hex));
       m.castShadow = m.receiveShadow = !water; if (water) m.renderOrder = 1;
       m.userData.noInk = true;
       out.push(m);
@@ -201,6 +202,23 @@ export const WALLS = {
     for (const x of [-0.052, 0.052]) s.box(WOOD, 0.012, 0.25, 0.02, x, 0.125, 0);
     for (let i = 0; i < 9; i++) s.add('#e8cfa4', new THREE.CylinderGeometry(0.004, 0.004, 0.1, 6).rotateZ(Math.PI / 2).translate(0, 0.02 + i * 0.026, 0.002));
   } },
+  // A sun lounger along the pool-side wall.
+  lounger: { w: 0.15, h: 0.06, d: 0.05, seat: [[0.02, 0]], make(s, rnd) {
+    const c = pickC(rnd);
+    s.box(WHITE, 0.1, 0.008, 0.04, 0.015, 0.03, 0); s.add(WHITE, new THREE.BoxGeometry(0.045, 0.008, 0.04).rotateZ(-0.6).translate(-0.05, 0.043, 0));
+    s.box(c, 0.1, 0.006, 0.034, 0.015, 0.037, 0); s.add(c, new THREE.BoxGeometry(0.042, 0.006, 0.034).rotateZ(-0.6).translate(-0.047, 0.05, 0));
+    for (const lx of [-0.03, 0.06]) for (const lz of [-0.016, 0.016]) s.box(STEEL, 0.004, 0.026, 0.004, lx, 0.013, lz);
+    s.add(PAPER, new THREE.BoxGeometry(0.03, 0.003, 0.03).translate(0.04, 0.0415, 0));
+  } },
+  // A tall lifeguard chair with a ladder and a ring hanging on it.
+  lifeguard: { w: 0.08, h: 0.18, d: 0.07, make(s) {
+    for (const lx of [-0.025, 0.025]) { s.box(WHITE, 0.006, 0.13, 0.006, lx, 0.065, -0.022); s.add(WHITE, new THREE.BoxGeometry(0.006, 0.135, 0.006).rotateX(-0.2).translate(lx, 0.065, 0.012)); }
+    for (let i = 1; i < 5; i++) s.box(WHITE, 0.05, 0.004, 0.004, 0, i * 0.026, 0.006 + i * 0.0052);
+    s.box('#e6463c', 0.06, 0.008, 0.045, 0, 0.13, -0.008); s.box('#e6463c', 0.06, 0.05, 0.008, 0, 0.158, -0.03);
+    s.add(PAPER, new THREE.TorusGeometry(0.016, 0.006, 6, 14).translate(0.035, 0.1, 0)); for (let i = 0; i < 4; i++) s.add(RED, new THREE.TorusGeometry(0.016, 0.0062, 6, 3, Math.PI / 4).rotateZ(i * Math.PI / 2).translate(0.035, 0.1, 0));
+  } },
+  // A stack of kickboards.
+  kickboards: { w: 0.07, h: 0.05, d: 0.04, make(s, rnd) { for (let i = 0; i < 6; i++) s.add(RAINBOW[(i * 3 + Math.floor(rnd() * 8)) % 8], new THREE.BoxGeometry(0.05, 0.006, 0.035).rotateY((rnd() - 0.5) * 0.3).translate(0, 0.003 + i * 0.007, 0)); } },
   // A drying rack of paintings (against the wall, in the art room).
   rack: { w: 0.14, h: 0.15, d: 0.06, make(s, rnd) {
     for (const x of [-0.06, 0.06]) { s.box(STEEL, 0.006, 0.15, 0.006, x, 0.075, -0.024); s.box(STEEL, 0.006, 0.15, 0.006, x, 0.075, 0.024); }
@@ -317,6 +335,12 @@ export const FEATURES = {
     bag.add('#fbfaf6', new THREE.TorusGeometry(0.095, 0.006, 6, 28).rotateX(Math.PI / 2).translate(x, 0.29, z));
     weedAt(bag, x + 0.03, 0.052, z - 0.02, rnd); coralAt(bag, x - 0.04, 0.052, z + 0.03, rnd);
     for (let k = 0; k < 5; k++) { const a = rnd() * 6.28, rr = 0.03 + rnd() * 0.04; fishAt(bag, x + Math.cos(a) * rr, 0.09 + rnd() * 0.17, z + Math.sin(a) * rr, -Math.sin(a), Math.cos(a), 0.012, FISH_COLS[k % FISH_COLS.length]); }
+    if (rnd() < 0.5) {      // a turtle paddling round
+      const ta = rnd() * 6.28, tx = x + Math.cos(ta) * 0.035, tz = z + Math.sin(ta) * 0.035, ty = 0.17, dir = ta + Math.PI / 2;
+      bag.add('#5f9a4c', new THREE.SphereGeometry(0.022, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.2, 0.55, 1).rotateY(-dir).translate(tx, ty, tz));
+      bag.add('#a3d140', new THREE.SphereGeometry(0.0085, 8, 5).translate(Math.cos(dir) * 0.03, 0.002, -Math.sin(dir) * 0.03).translate(tx, ty, tz));
+      for (const [fx, fz] of [[0.014, 0.02], [0.014, -0.02], [-0.016, 0.016], [-0.016, -0.016]]) bag.add('#a3d140', new THREE.BoxGeometry(0.016, 0.003, 0.008).rotateY(fz > 0 ? -0.5 : 0.5).translate(fx, 0, fz).rotateY(-dir).translate(tx, ty, tz));
+    }
     return [[x + 0.16, z], [x - 0.16, z], [x, z + 0.16]]; } },
   // A tank of jellyfish: pink bells with trailing legs in deeper blue water.
   jelly: { r: 0.12, make(bag, x, z, c, rnd) {
@@ -605,6 +629,54 @@ export const FEATURES = {
     });
     return []; } },
 
+  // ---- the chill-out room ----
+  // A hanging egg chair on a curved stand, with a cushion inside.
+  eggchair: { r: 0.08, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28), col = pickC(rnd);
+    bag.within(m, s => {
+      s.cyl(STEEL, 0.035, 0.006, -0.04, 0.003, 0);
+      s.tube(STEEL, [new THREE.Vector3(-0.04, 0.005, 0), new THREE.Vector3(-0.058, 0.1, 0), new THREE.Vector3(-0.035, 0.19, 0), new THREE.Vector3(0.008, 0.212, 0)], 0.005, 20, 6);
+      s.cyl(STEEL, 0.0015, 0.04, 0.008, 0.19, 0, 0.0015, 4);
+      s.add('^' + col, new THREE.SphereGeometry(0.046, 14, 10, Math.PI / 2 + 0.95, Math.PI * 2 - 1.9, 0, Math.PI).scale(1, 1.3, 1).translate(0.008, 0.11, 0));
+      s.ball(PAPER, 0.03, 0.008, 0.06, 0.004); s.ball(pickC(rnd), 0.014, -0.006, 0.08, -0.018);
+    });
+    return [at(m, 0.008, 0.005)]; } },
+  // A bubble tube: a tall column of water with bubbles rising, lit up, on a soft mat.
+  bubbletube: { r: 0.06, make(bag, x, z, c, rnd) {
+    bag.cyl(pickC(rnd), 0.055, 0.008, x, 0.004, z);
+    bag.cyl(WHITE, 0.026, 0.024, x, 0.02, z, 0.028); bag.cyl('*#7fd8f0', 0.019, 0.004, x, 0.034, z);
+    bag.cyl('~#9fdcf5', 0.018, 0.2, x, 0.136, z, 0.018, 14); bag.cyl(WHITE, 0.02, 0.012, x, 0.242, z); bag.cyl('*#f5a3c7', 0.019, 0.004, x, 0.234, z);
+    for (let i = 0; i < 9; i++) bag.sphere(PAPER, 0.0035 + rnd() * 0.003, x + (rnd() - 0.5) * 0.02, 0.05 + i * 0.02 + rnd() * 0.01, z + (rnd() - 0.5) * 0.02, 6);
+    return []; } },
+  // Floor cushions round a low table with a singing bowl on it.
+  cushions: { r: 0.1, make(bag, x, z, c, rnd) {
+    bag.cyl(WOOD, 0.036, 0.006, x, 0.028, z); bag.cyl(WOOD, 0.006, 0.025, x, 0.0125, z, 0.006, 6);
+    bag.cyl(GOLD, 0.012, 0.01, x, 0.036, z, 0.008, 10);
+    const seats = [], off = rnd() * 6;
+    for (let i = 0; i < 4; i++) { const a = off + i * Math.PI / 2, sx = x + Math.cos(a) * 0.07, sz = z + Math.sin(a) * 0.07; bag.cyl(['#f5a3c7', '#a3d140', '#7fd8f0', '#f7c22e'][i], 0.025, 0.014, sx, 0.007, sz, 0.027, 12); seats.push([sx, sz]); }
+    return seats; } },
+  // A little fountain: smooth stones in a round pool, water trickling down (like Finn's waterfall).
+  fountain: { r: 0.07, make(bag, x, z, c, rnd) {
+    const ring = new THREE.Shape(); ring.absarc(0, 0, 0.062, 0, Math.PI * 2, false); const hole = new THREE.Path(); hole.absarc(0, 0, 0.05, 0, Math.PI * 2, true); ring.holes.push(hole);
+    bag.slab('#b9b4aa', ring, 0.03, x, 0, z, 0, 18); bag.cyl('#7a8c99', 0.05, 0.006, x, 0.003, z, 0.05, 16); bag.cyl('~#5ec4e2', 0.05, 0.02, x, 0.016, z, 0.05, 16);
+    [[0.034, 0.015, '#9aa3a8'], [0.026, 0.04, '#c9ccd3'], [0.018, 0.06, '#e8e4da']].forEach(([r, y, col]) => bag.add(col, new THREE.SphereGeometry(r, 10, 6).scale(1, 0.45, 1).translate(x, y, z)));
+    bag.cyl('~#9fdcf5', 0.006, 0.05, x + 0.02, 0.04, z, 0.012, 8);
+    for (let i = 0; i < 3; i++) { const a = rnd() * 6.28; bag.sphere(LEAF[i], 0.012, x + Math.cos(a) * 0.07, 0.012, z + Math.sin(a) * 0.07, 6); }
+    return []; } },
+
+  // ---- the aquarium ----
+  // A touch pool: a low stone ring of shallow water, with starfish, shells and a crab on the sand.
+  touchpool: { r: 0.12, make(bag, x, z, c, rnd) {
+    const ring = new THREE.Shape(); ring.absarc(0, 0, 0.11, 0, Math.PI * 2, false); const hole = new THREE.Path(); hole.absarc(0, 0, 0.09, 0, Math.PI * 2, true); ring.holes.push(hole);
+    bag.slab('#b9b4aa', ring, 0.045, x, 0, z, 0, 22); bag.cyl('#f0e2c0', 0.09, 0.008, x, 0.004, z, 0.09, 20); bag.cyl('~#5ec4e2', 0.09, 0.03, x, 0.023, z, 0.09, 20);
+    for (let i = 0; i < 4; i++) { const a = rnd() * 6.28, rr = 0.02 + rnd() * 0.05; bag.add(['#f28b30', '#e2457d', '#7c46a8', '#f7c22e'][i], new THREE.ExtrudeGeometry(star(0.012), { depth: 0.004, bevelEnabled: false }).rotateX(-Math.PI / 2).rotateY(rnd() * 6).translate(x + Math.cos(a) * rr, 0.008, z + Math.sin(a) * rr)); }
+    const ca = rnd() * 6.28, cx = x + Math.cos(ca) * 0.04, cz = z + Math.sin(ca) * 0.04;
+    bag.add(RED, new THREE.SphereGeometry(0.009, 8, 5).scale(1.3, 0.55, 1).translate(cx, 0.012, cz)); for (const sg of [-1, 1]) bag.sphere(RED, 0.004, cx + sg * 0.012, 0.012, cz + 0.006, 6);
+    for (let i = 0; i < 2; i++) { const a = rnd() * 6.28; bag.add(PAPER, new THREE.ConeGeometry(0.006, 0.012, 6).rotateZ(1.2).translate(x + Math.cos(a) * 0.06, 0.011, z + Math.sin(a) * 0.06)); }
+    for (let i = 0; i < 2; i++) { const a = rnd() * 6.28; bag.add('#9aa3a8', new THREE.SphereGeometry(0.018, 8, 5).scale(1.2, 0.9, 1).translate(x + Math.cos(a) * 0.055, 0.03, z + Math.sin(a) * 0.055)); }
+    const seats = []; for (let i = 0; i < 3; i++) { const a = rnd() * 0.5 + i * 2.1; seats.push([x + Math.cos(a) * 0.15, z + Math.sin(a) * 0.15]); }
+    return seats; } },
+
   // ---- the lunch hall ----
   // A water fountain with cups.
   water: { r: 0.045, make(bag, x, z, c, rnd) {
@@ -808,9 +880,9 @@ export const PLANS = {
   art: A => [['rack', 1], ['art', 2 + A], ['painttable', Math.max(1, A)], ['artwall', 1], ['easel', A + 1], ['sculpture', A >= 2 ? 1 : 0], ['plant', 1]],
   maker: A => [['pegboard', 1 + Math.floor(A / 2)], ['cubbies', 1], ['printers', 1], ['robot', 1], ['workbench', A >= 2 ? 1 : 0], ['rover', A >= 2 ? 1 : 0], ['cardrocket', 1], ['kidney', A >= 3 ? 1 : 0], ['plant', 1]],
   music: A => [['guitars', 1], ['piano', 1], ['art', 1], ['drums', 1], ['xylophone', 1], ['stage', A >= 2 ? 1 : 0], ['beanbag', A + 1], ['plant', 1]],
-  yoga: A => [['rug', 1], ['yogamat', 3 + A * 2], ['plant', 2]],
-  aquarium: A => [['tank', A >= 2 ? Math.min(3, A - 1) : 1], ['jelly', A >= 3 ? 1 : 0], ['beanbag', Math.max(1, A - 1)], ['plant', 1]],
+  yoga: A => [['eggchair', 1], ['bubbletube', 1], ['fountain', 1], ['cushions', A >= 2 ? 1 : 0], ['rug', 1], ['yogamat', 2 + A], ['plant', 2]],
+  aquarium: A => [['touchpool', A >= 2 ? 1 : 0], ['tank', A >= 2 ? Math.min(3, A - 1) : 1], ['jelly', A >= 3 ? 1 : 0], ['beanbag', Math.max(1, A - 1)], ['plant', 1]],
   archway: A => [],
   observatory: A => [['poster', 2 + A], ['telescope', 1], ['orrery', 1], ['planet', 1 + A], ['beanbag', A * 2 + 2]],
-  pool: A => [['plant', 2], ['beanbag', 2]],
+  pool: A => [['lounger', 2 + Math.floor(A / 3)], ['lifeguard', 1], ['kickboards', 1], ['plant', 2]],
 };

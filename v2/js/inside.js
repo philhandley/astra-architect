@@ -180,8 +180,14 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
   if (b.type === 'pool' && o.kind === 'rr') {
     const BW = o.W - 0.34, BD = o.D - 0.34, rim = roundedRect(BW + 0.12, BD + 0.12, 0.1); rim.holes.push(roundedRect(BW, BD, 0.06));
     bag.plan('#fbfaf6', rim, 0.03, 0, 0, 0); bag.plan('#5fd0ea', roundedRect(BW, BD, 0.06), 0.012, 0, 0, 0);
-    const lanes = Math.max(2, Math.round(Math.min(BW, BD) * 2.5)), long = BW > BD;
-    for (let i = 1; i < lanes; i++) { const off = -Math.min(BW, BD) / 2 + (Math.min(BW, BD) * i) / lanes; bag.box('#ffffff', long ? BW - 0.1 : 0.012, 0.004, long ? 0.012 : BD - 0.1, long ? 0 : off, 0.02, long ? off : 0); }
+    const lanes = Math.max(2, Math.round(Math.min(BW, BD) * 2.5)), long = BW > BD, L = (long ? BW : BD) - 0.1, S = Math.min(BW, BD), prnd = seededRnd(b.id * 31 + 7);
+    // Lane ropes of red and white floats, a starting block at the end of each lane, and a few rings floating about.
+    for (let i = 1; i < lanes; i++) {
+      const off = -S / 2 + (S * i) / lanes, n = Math.max(4, Math.round(L / 0.05));
+      for (let j = 0; j < n; j++) { const u = -L / 2 + (j + 0.5) * (L / n); bag.box(j % 2 ? '#ffffff' : (j % 6 < 3 ? '#e6463c' : '#3d8de0'), long ? L / n * 0.9 : 0.012, 0.008, long ? 0.012 : L / n * 0.9, long ? u : off, 0.022, long ? off : u); }
+    }
+    for (let i = 0; i < lanes; i++) { const off = -S / 2 + (S * (i + 0.5)) / lanes, end = -(long ? BW : BD) / 2 - 0.032; bag.box('#fbfaf6', long ? 0.03 : 0.04, 0.026, long ? 0.04 : 0.03, long ? end : off, 0.043, long ? off : end); bag.box(['#e6463c', '#f7c22e', '#3d8de0', '#a3d140'][i % 4], long ? 0.026 : 0.036, 0.003, long ? 0.036 : 0.026, long ? end : off, 0.0575, long ? off : end); }
+    for (let i = 0; i < 3; i++) bag.add(['#e6463c', '#f7c22e', '#f28b30'][i], new THREE.TorusGeometry(0.02, 0.007, 6, 12).rotateX(Math.PI / 2).translate((prnd() - 0.5) * (BW - 0.2), 0.02, (prnd() - 0.5) * (BD - 0.2)));
     swim = { w: BW - 0.12, d: BD - 0.12, y: floorY + 0.03 };
   }
   for (const mm of bag.meshes()) { mm.position.y = floorY + 0.02; mm.userData.noInk = true; g.add(mm); }

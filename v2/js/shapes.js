@@ -349,16 +349,20 @@ const BUILD = {
     const band = Math.min(0.3, Math.min(W, D) * 0.22);
     const s = roundedRect(W - 0.06, D - 0.06, Math.min(W, D) / 2); s.holes.push(roundedRect(W - 0.06 - 2 * band, D - 0.06 - 2 * band, Math.max(0.05, Math.min(W, D) / 2 - band)));
     const tr = mesh(upExtrude(s, 0.025), mat(c)); tr.position.y = 0.06; g.add(tr);
-    for (const k of [1 / 3, 2 / 3]) {
-      const ln = roundedRect(W - 0.06 - 2 * band * k, D - 0.06 - 2 * band * k, Math.min(W, D) / 2 - band * k);
-      const pts = ln.getPoints(48).map(p => new THREE.Vector3(p.x, 0.09, -p.y));
-      const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#ffffff' }));
-      g.add(line);
+    // White lane markings painted on the track: both edges, three lane lines, and a start line across the straight.
+    const strips = [];
+    for (const k of [0.03, 0.27, 0.5, 0.73, 0.97]) {
+      const Wk = W - 0.06 - 2 * band * k, Dk = D - 0.06 - 2 * band * k, rk = Math.min(W, D) / 2 - band * k;
+      const ring = roundedRect(Wk + 0.012, Dk + 0.012, rk + 0.006); ring.holes.push(roundedRect(Wk - 0.012, Dk - 0.012, Math.max(0.03, rk - 0.006)));
+      strips.push(new THREE.ExtrudeGeometry(ring, { depth: 0.004, bevelEnabled: false, curveSegments: 40 }).rotateX(-Math.PI / 2).translate(0, 0.085, 0));
     }
-    // A football pitch on the infield: brighter grass, white markings, and a goal at each end.
+    strips.push(W >= D ? new THREE.BoxGeometry(0.02, 0.004, band).translate(0, 0.087, D / 2 - 0.03 - band / 2) : new THREE.BoxGeometry(band, 0.004, 0.02).translate(W / 2 - 0.03 - band / 2, 0.087, 0));
+    const lanes = mesh(mergeGeometries(strips.map(s => { const n = s.index ? s.toNonIndexed() : s; n.deleteAttribute('uv'); return n; })), mat(WHITE), false); lanes.userData.noInk = true; g.add(lanes);
+    // A football pitch on the infield, kept well inside the track: brighter grass, white markings, a goal at
+    // each end and a flag at each corner.
     const iw = W - 0.06 - 2 * band - 0.12, id = D - 0.06 - 2 * band - 0.12;
-    if (iw > 0.5 && id > 0.35) {
-      const pitch = new THREE.Group(), L = Math.max(iw, id), B = Math.min(iw, id), y = 0.064, white = new THREE.LineBasicMaterial({ color: '#ffffff' });
+    if (iw > 0.7 && id > 0.45) {
+      const pitch = new THREE.Group(), L = Math.max(iw, id) - 0.3, B = Math.min(iw, id) - 0.1, y = 0.064, white = new THREE.LineBasicMaterial({ color: '#ffffff' });
       pitch.add(mesh(new THREE.BoxGeometry(L, 0.006, B).translate(0, 0.061, 0), mat('#a6d86e'), false));
       const seg = [], R = Math.min(B * 0.18, 0.12), ga = Math.min(L * 0.16, 0.22), gw = B * 0.5;
       const line = (x0, z0, x1, z1) => seg.push(x0, y, z0, x1, y, z1);
@@ -375,6 +379,7 @@ const BUILD = {
         pitch.add(mesh(new THREE.BoxGeometry(Math.abs(back - gx), 0.006, 0.006).translate((gx + back) / 2, 0.06 + gh, -gwid / 2), mat(WHITE), false), mesh(new THREE.BoxGeometry(Math.abs(back - gx), 0.006, 0.006).translate((gx + back) / 2, 0.06 + gh, gwid / 2), mat(WHITE), false));
         const net = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(back - gx), gh, gwid).translate((gx + back) / 2, 0.06 + gh / 2, 0), mat('#ffffff', { transparent: true, opacity: 0.35, depthWrite: false })); net.userData.noInk = true; net.raycast = () => {}; pitch.add(net);
       }
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) { pitch.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.07, 5).translate(sx * L / 2, 0.095, sz * B / 2), mat(WHITE), false)); pitch.add(mesh(new THREE.BoxGeometry(0.03, 0.02, 0.004).translate(sx * L / 2 + 0.015, 0.12, sz * B / 2), mat('#f7c22e'), false)); }
       if (id > iw) pitch.rotation.y = Math.PI / 2;
       g.add(pitch);
     }

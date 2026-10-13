@@ -125,19 +125,15 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       if (yb === null) yb = Math.max(0, square(x, z)?.base || 0);
       const lx = x + 0.5 - cx, lz = z + 0.5 - cz, foot = yb - y0, drop = -foot;
       if (drop < 0.15) continue;
-      // The V stands in the plane of the slab's edge (front and back), its arms running along the edge, so it
-      // shows below the overhang the way V-columns do in an elevation; under the middle it would only hide.
-      const edge = (alongX ? b.d : b.w) / 2 - 0.06, arm = 0.36;
-      for (const f of [-1, 1]) {
-        const px = alongX ? lx : lx + f * edge, pz = alongX ? lz + f * edge : lz;
-        for (const s of [-1, 1]) {
-          const ax = alongX ? s * arm : 0, az = alongX ? 0 : s * arm, len = Math.hypot(arm, drop);
-          const strut = new THREE.CylinderGeometry(0.03, 0.036, len, 10).translate(0, len / 2, 0);
-          strut.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, new THREE.Vector3(ax, drop, az).normalize())).translate(px, foot, pz);
-          parts.push(strut);
-        }
-        parts.push(new THREE.CylinderGeometry(0.08, 0.09, 0.035, 14).translate(px, foot + 0.0175, pz));
+      // One V under each overhanging square: its foot in the middle, its arms up to the two edges of the slab.
+      const edge = (alongX ? b.d : b.w) / 2 - 0.04;
+      for (const s of [-1, 1]) {
+        const ax = alongX ? 0 : s * edge, az = alongX ? s * edge : 0, len = Math.hypot(edge, drop);
+        const strut = new THREE.CylinderGeometry(0.034, 0.04, len, 10).translate(0, len / 2, 0);
+        strut.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, new THREE.Vector3(ax, drop, az).normalize())).translate(lx, foot, lz);
+        parts.push(strut);
       }
+      parts.push(new THREE.CylinderGeometry(0.09, 0.1, 0.04, 14).translate(lx, foot + 0.02, lz));
     }
     if (!parts.length) return;
     const m = new THREE.Mesh(mergeGeometries(parts.map(p => { p.deleteAttribute('uv'); return p; })), TRUSS);

@@ -89,6 +89,7 @@ export function addFacade(g, box, H, opts = {}) {
     // (When walking through this storey, the walls inside have the glass, and the doorway stays open.)
     const walked = opts.walkK === row.k, LL = walked ? { ...L, glass: [], walk: true, body: L.of(box.hex) } : L;
     for (const o of openings(box, row.k, runs)) {
+      if (o.arch) continue;                       // (the tunnel through an arch is already in the shape)
       const run = runs[o.run];
       if (o.door) { if (walked && !o.glassDoor) { const p = runAt(run, (o.s0 + o.s1) / 2), w = o.s1 - o.s0; panel(L.frame, p.x, row.y0 + 0.345, p.z, p.nx, p.nz, w + 0.12, 0.016, 0.1, 0.05); panel(L.step, p.x, row.y0 + 0.008, p.z, p.nx, p.nz, w + 0.08, 0.016, 0.07, 0.035); } else frontDoor(LL, run, o, row.y0); }
       else if (o.round) roundWindow(LL, run, o, row.y0); else rectWindow(LL, run, o, row.y0);

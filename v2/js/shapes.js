@@ -623,12 +623,21 @@ Object.assign(BUILD, {
     return g;
   },
   observatory(w, d, H, c) {
-    const g = new THREE.Group(), r = Math.min(w, d) / 2 - GAP;
-    g.add(mesh(new THREE.CylinderGeometry(r, r, H, 40).translate(0, H / 2, 0), mat(c)));
-    const dome = mesh(new THREE.SphereGeometry(r * 0.98, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, H, 0), mat('#dfe5ea'));
-    g.add(dome);
-    const slot = mesh(new THREE.BoxGeometry(0.12, 0.02, r * 1.6).translate(0, H + r * 0.55, 0.02), mat('#26272d')); slot.rotation.x = -0.45; slot.position.z = r * 0.3; g.add(slot);
-    const scope = mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.42, 12), mat(WHITE)); scope.rotation.x = -0.9; scope.position.set(0, H + r * 0.75, r * 0.45); g.add(scope);
+    // A round tower with a silver dome on a white rim. The dome's shutter is slid open to one side, and the big
+    // telescope looks out through the slit at the sky (towards the front, where the door is).
+    // (The tower and its rim are open tubes with a flat white ring on top, so from inside you look straight up into
+    // the dome; a capped tower would put a lid at the roof line, fighting the rim.)
+    const g = new THREE.Group(), r = Math.min(w, d) / 2 - GAP, R = r * 0.98, slit = 0.5, y = H + 0.02;
+    g.add(mesh(new THREE.CylinderGeometry(r, r, H, 40, 1, true).translate(0, H / 2, 0), mat(c)));
+    g.add(mesh(new THREE.CylinderGeometry(r + 0.012, r + 0.012, 0.025, 40, 1, true).translate(0, H + 0.0125, 0), mat(WHITE)));
+    g.add(mesh(new THREE.RingGeometry(R - 0.012, r + 0.012, 40).rotateX(-Math.PI / 2).translate(0, H + 0.025, 0), mat(WHITE, { side: THREE.DoubleSide })));
+    g.add(mesh(new THREE.SphereGeometry(R, 36, 14, Math.PI / 2 + slit / 2, Math.PI * 2 - slit, 0, Math.PI / 2).translate(0, y, 0), mat('#dfe5ea', { side: THREE.DoubleSide })));
+    g.add(mesh(new THREE.SphereGeometry(R + 0.012, 12, 14, Math.PI / 2 + slit / 2, slit * 1.05, 0.05, Math.PI / 2 - 0.05).translate(0, y, 0), mat('#b9c2c9', { side: THREE.DoubleSide })));
+    // The telescope: pivoted inside the dome, tilted up through the slit.
+    const L = 0.56, up = geo => geo.rotateX(0.7).translate(0, H + 0.06, 0);
+    g.add(mesh(up(new THREE.CylinderGeometry(0.055, 0.045, L, 14).translate(0, L / 2, 0)), mat(WHITE)));
+    g.add(mesh(up(new THREE.CylinderGeometry(0.058, 0.058, 0.035, 14).translate(0, L - 0.06, 0)), mat('#2e4a8c')));
+    g.add(mesh(up(new THREE.CylinderGeometry(0.048, 0.048, 0.006, 14).translate(0, L + 0.002, 0)), mat('#6fcde6')));
     return g;
   },
   greenhouse(w, d, H, c) {

@@ -37,6 +37,8 @@ export class Model {
   style(type) { const P = PROGRAMMES[type]; return { shape: P.shapes[0], colour: P.colour, ...(this.styles[type] || {}) }; }
   setStyle(type, patch) { this.styles[type] = { ...this.style(type), ...patch }; this.save(); for (const fn of this.listeners) fn({ style: type }); }
   hex(b) { return colourHex(b.colour); }
+  // The size a new room of this type takes: its programme's size, square for a curve (which bends round a corner).
+  sizeOf(type) { const [w, d, h] = PROGRAMMES[type].size; return this.style(type).shape === 'arc' ? [Math.max(w, d), Math.max(w, d), h] : [w, d, h]; }
 
   // ---------- the voxel index ----------
   // Which squares of the footprint a shape fills (a ring leaves its middle open, for a garden).
@@ -96,7 +98,7 @@ export class Model {
   // A new box of a programme, centred on the tapped square.
   make(type, x, z, level) {
     const P = PROGRAMMES[type], st = this.style(type);
-    const [w, d, h] = P.size;
+    const [w, d, h] = this.sizeOf(type);
     return { id: 0, type, shape: st.shape, colour: st.colour, ...(st.win ? { win: st.win } : {}), x: x - Math.floor((w - 1) / 2), z: z - Math.floor((d - 1) / 2), w, d, level, h };
   }
   // Find a spot near the tap where the new box fits (nudging up to one square), turning it if that helps.

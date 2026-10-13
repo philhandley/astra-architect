@@ -47,6 +47,7 @@ for (const type of TRAY) {
     if (VIEW === 'in' && !CUTTABLE.has(shape)) continue;
     let [w, d, h] = P.size;
     if (shape === 'ringhouse' || shape === 'ring') { w = Math.max(w, 3); d = Math.max(d, 3); }
+    if (shape === 'arc') w = d = Math.max(w, d);
     if (q.get('size')) [w, d, h] = q.get('size').split(',').map(Number);
     if (q.get('rots')) for (let rot = 0; rot < 4; rot++) items.push({ type, shape, w, d, h, rot }); else items.push({ type, shape, w, d, h });
   }

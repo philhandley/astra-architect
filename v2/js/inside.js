@@ -9,7 +9,7 @@ import { outline, roundedRect, wallRuns, openings, eachPiece, runAt, TALL, WALL_
 export { outline } from './plan.js';
 
 const WALL = 0.05, CUT = 0.27;
-export const CUTTABLE = new Set(['box', 'house', 'saw', 'vault', 'drum', 'tower', 'ring', 'ringhouse', 'arc', 'arch']);
+export const CUTTABLE = new Set(['box', 'house', 'saw', 'vault', 'drum', 'tower', 'ring', 'ringhouse', 'arc', 'arch', 'observatory']);
 // Rooms that are one tall space (the floor stays at the bottom); others are stacked storeys.
 export const SINGLE = TALL;
 
@@ -103,7 +103,7 @@ function buildWalls(b, k, hex, floorY, top, cut) {
       const wall = (y0, y1) => { y1 = Math.min(y1, top); if (y1 - y0 > 0.004) walls.add(line.pts, line.ns, T, floorY + y0, floorY + y1, cut && y1 >= top - 1e-4); };
       if (!o) wall(0, top);
       else {
-        wall(0, Math.max(0, o.y0)); if (o.y1 < top) wall(o.y1, top);
+        if (o.y0 > 0.03) wall(0, o.y0); if (o.y1 < top) wall(o.y1, top);        // (no sill lower than the floor slab: its top would fight the floor's)
         if (!o.door || o.glassDoor) { const gl = wallLine(run, u0, u1, -T / 2 + 0.004); const y0 = Math.max(0, o.y0), y1 = Math.min(top, o.y1); if (y1 - y0 > 0.004) glass.add(gl.pts, gl.ns, 0.008, floorY + y0, floorY + y1, false); }
       }
       if (!o || !o.door) eachPiece(run, u0, u1, p => { const cx = p.x - p.nx * T / 2, cz = p.z - p.nz * T / 2; segments.push([cx - p.dx * p.len / 2, cz - p.dz * p.len / 2, cx + p.dx * p.len / 2, cz + p.dz * p.len / 2]); });
@@ -194,6 +194,24 @@ const FEATURES = {
     return seats; } },
   yogamat: { r: 0.07, make(bag, x, z, c, rnd) { const rot = rnd() * 6.28; bag.add(pickC(rnd), new THREE.BoxGeometry(0.06, 0.008, 0.15).rotateY(rot).translate(x, 0.004, z)); return [[x, z]]; } },
   counter: { r: 0.16, make(bag, x, z, c, rnd) { const s = new THREE.Shape(); s.absarc(0, 0, 0.14, 0, Math.PI, false); s.absarc(0, 0, 0.09, Math.PI, 0, true); bag.plan('#fbfaf6', s, 0.09, x, 0, z, rnd() * 6.28); return []; } },
+  // The observatory's telescope: a big white tube on a dark pier in the middle of the room, tilted up at the sky
+  // (towards the slit in the dome), with a round step to stand on and places to lie back and look up.
+  telescope: { r: 0.2, centre: true, make(bag, x, z, c, rnd) {
+    bag.cyl('#d8d3c8', 0.17, 0.02, x, 0.01, z, 0.17, 28);
+    bag.cyl('#3d405b', 0.04, 0.1, x, 0.07, z, 0.045, 14); bag.box('#3d405b', 0.1, 0.03, 0.04, x, 0.13, z);
+    const up = geo => geo.rotateX(0.7).translate(x, 0.13, z);
+    bag.add('#fbfaf6', up(new THREE.CylinderGeometry(0.034, 0.028, 0.3, 14).translate(0, 0.15, 0)));
+    bag.add('#2e4a8c', up(new THREE.CylinderGeometry(0.036, 0.036, 0.03, 14).translate(0, 0.255, 0)));
+    bag.add('#6fcde6', up(new THREE.CylinderGeometry(0.03, 0.03, 0.006, 14).translate(0, 0.302, 0)));
+    bag.add('#fbfaf6', up(new THREE.CylinderGeometry(0.012, 0.012, 0.06, 8).translate(0, -0.03, 0)));
+    const seats = []; for (let i = 0; i < 4; i++) { const a = Math.PI * (0.65 + i * 0.57); seats.push([x + Math.cos(a) * 0.2, z + Math.sin(a) * 0.2]); }
+    return seats; } },
+  // A planet on a stand, with a ring round it.
+  planet: { r: 0.07, make(bag, x, z, c, rnd) {
+    bag.cyl('#fbfaf6', 0.03, 0.01, x, 0.005, z, 0.035, 12); bag.cyl('#fbfaf6', 0.006, 0.09, x, 0.055, z, 0.006, 6);
+    bag.add(['#3d8de0', '#f28b30', '#e6463c'][Math.floor(rnd() * 3)], new THREE.SphereGeometry(0.04, 14, 10).translate(x, 0.14, z));
+    bag.add('#f7c22e', new THREE.TorusGeometry(0.06, 0.006, 6, 24).rotateX(Math.PI / 2 - 0.4).translate(x, 0.14, z));
+    return []; } },
   // A big round fish tank: see-through water on a navy base, sand, seaweed and coral, and fish swimming round.
   tank: { r: 0.12, make(bag, x, z, c, rnd) {
     bag.cyl('#2e4a8c', 0.105, 0.04, x, 0.02, z, 0.11, 24); bag.cyl('#f0e2c0', 0.088, 0.012, x, 0.046, z, 0.088, 20);
@@ -229,7 +247,7 @@ const PLANS = {
   yoga: A => [['rug', 1], ['yogamat', 3 + A * 2], ['plant', 2]],
   aquarium: A => [['tank', A >= 2 ? Math.min(3, A - 1) : 1], ['jelly', A >= 3 ? 1 : 0], ['beanbag', Math.max(1, A - 1)], ['plant', 1]],
   archway: A => [],
-  observatory: A => [['rug', 1]],
+  observatory: A => [['telescope', 1], ['planet', 1], ['beanbag', A * 2 + 2]],
   pool: A => [['plant', 2], ['beanbag', 2]],
 };
 
@@ -360,8 +378,8 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
     // Walls right up to the ceiling, with real window openings and one doorway, and a ceiling over the room.
     const w = buildWalls(b, k, hex, floorY, opts.top, false);
     g.add(w.group); segments = w.segments;
-    const ceil = new THREE.Mesh(slab(inner, 0.02), mat('#fbfaf6', { emissive: '#f3ede2', emissiveIntensity: 0.75 }));
-    ceil.position.y = floorY + opts.top - 0.02; shell.add(ceil);       // no shadow from the ceiling, so the room stays sunny
+    // (An observatory has no flat ceiling: you look up into the dome, where the real telescope is.)
+    if (b.shape !== 'observatory') { const ceil = new THREE.Mesh(slab(inner, 0.02), mat('#fbfaf6', { emissive: '#f3ede2', emissiveIntensity: 0.75 })); ceil.position.y = floorY + opts.top - 0.02; shell.add(ceil); }       // no shadow from the ceiling, so the room stays sunny
   } else {
     g.add(buildWalls(b, k, hex, floorY, cutH, true).group);
   }
@@ -375,7 +393,8 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
   // Furniture: playful pieces placed loosely round the room (not in rows), so it feels like a happy place.
   const bag = new Bag(), seats = [];
   const area = Math.max(1, Math.round(b.w * b.d * (o.kind === 'ring' ? 0.6 : o.kind === 'arc' ? 0.5 : 1)));
-  const aqua = b.type === 'aquarium', plan = aqua && b.shape === 'arch' ? [] : (PLANS[b.type] || PLANS.classroom)(area);
+  const aqua = b.type === 'aquarium', plan = (aqua && b.shape === 'arch' ? [] : (PLANS[b.type] || PLANS.classroom)(area))
+    .filter(([kind]) => !(opts.walk && b.shape === 'observatory' && kind === 'telescope'));      // (walking, the big telescope overhead is the real one)
   const placed = [], rnd = seededRnd(b.id * 97 + (b.x + 1) * 13 + (b.z + 1) * 7);
   // An aquarium: tanks along the walls, and in an arch, a tunnel of water overhead when you walk through.
   if (aqua) {
@@ -386,8 +405,8 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
     const F = FEATURES[kind];
     for (let n = 0; n < count; n++) {
       for (let tries = 0; tries < 60; tries++) {
-        const x = (rnd() - 0.5) * (b.w - 0.1), z = (rnd() - 0.5) * (b.d - 0.1);
-        if (!o.inside(x, z, WALL + (aqua ? 0.11 : 0) + F.r + 0.02)) continue;
+        const x = F.centre ? 0 : (rnd() - 0.5) * (b.w - 0.1), z = F.centre ? 0 : (rnd() - 0.5) * (b.d - 0.1);
+        if (!o.inside(x, z, WALL + (aqua ? 0.11 : 0) + F.r + 0.02) && !F.centre) continue;
         if (b.type === 'pool' && o.kind === 'rr' && Math.abs(x) < (o.W - 0.2) / 2 && Math.abs(z) < (o.D - 0.2) / 2) continue;
         if (placed.some(p => Math.hypot(p.x - x, p.z - z) < p.r + F.r + 0.03)) continue;
         placed.push({ x, z, r: F.r });

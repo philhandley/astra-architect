@@ -218,11 +218,15 @@ export function openings(b, k, runs = wallRuns(b, k)) {
   const tall = TALL.has(b.type), rh = tall ? b.h * LEVEL : LEVEL, style = winStyle(b), rnd = seeded((b.id || 1) * 131 + k * 17 + b.w * 7 + b.d * 3);
   const door = !(b.level > 0) && k === 0 && b.shape !== 'arch' ? findDoor(runs) : null;
   const pattern = PATTERNS[style] || PATTERNS.grid;
+  // An arch: the tunnel runs along the long axis, so its two ends (the short faces) are open: the way in and out.
+  const ang = runs.ang || 0, co = Math.cos(ang), si = Math.sin(ang), a0 = b.w >= b.d ? [1, 0] : [0, 1];
+  const along = [a0[0] * co - a0[1] * si, a0[0] * si + a0[1] * co];
+  const isEnd = r => Math.abs(r.n[0][0] * along[0] + r.n[0][1] * along[1]) > 0.5;
   runs.forEach((r, ri) => {
     if (b.shape === 'arch') {
-      // An arch: windows only on its long sides (the tunnel goes through the ends), and no door (the tunnel is the way in).
-      const along = b.w >= b.d ? [1, 0] : [0, 1], n = r.n[0];
-      if (b.type === 'archway' || Math.abs(n[0] * along[0] + n[1] * along[1]) > 0.5) return;
+      if (isEnd(r)) { const a = archSpan(b, rh); out.push({ run: ri, s0: r.len / 2 - a.w / 2, s1: r.len / 2 + a.w / 2, y0: 0, y1: a.h, door: true, arch: true }); return; }
+      // Windows only on its long sides, and no front door (the tunnel is the way in).
+      if (b.type === 'archway') return;
     }
     if (r.colonnade) { for (const o of glazed(r)) out.push({ ...o, run: ri }); return; }
     if (!door || door.run !== ri) { for (const o of pattern(r, rh, rnd)) out.push({ ...o, run: ri }); return; }
@@ -237,6 +241,12 @@ export function openings(b, k, runs = wallRuns(b, k)) {
   });
   if (door) out.push({ run: door.run, s0: door.s0, s1: door.s1, y0: 0, y1: 0.3, door: true });
   return out;
+}
+
+// The tunnel through an arch: how wide it is and how high its top is (the same curve shapes.js builds).
+export function archSpan(b, rh = (TALL.has(b.type) ? b.h : 1) * LEVEL) {
+  const Wd = Math.min(b.w, b.d) - 2 * GAP - 0.03, H = b.h * LEVEL, a = Wd * 0.56, spring = Math.min(H * 0.32, H - a / 2 - 0.06);
+  return { w: a, h: Math.min(rh, spring + a / 2), spring };
 }
 
 // A smooth band following a run from s0 to s1, from y0 to y1, standing o0..o1 out from the wall face.

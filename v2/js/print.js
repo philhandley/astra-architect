@@ -338,6 +338,7 @@ function planOpenings(g, b, X, Z, s, k) {
     const run = runs[o.run];
     g.strokeStyle = '#ffffff'; g.lineWidth = 9; trace(run, o.s0, o.s1, 0); g.stroke();
     g.strokeStyle = '#1d1f24';
+    if (o.arch) { g.lineWidth = 1.5; g.setLineDash([6, 5]); trace(run, o.s0, o.s1, 0); g.stroke(); g.setLineDash([]); continue; }     // the arch overhead, dashed
     if (o.door && !o.glassDoor) {
       const a = runAt(run, o.s0), e = runAt(run, o.s1), w = (o.s1 - o.s0) * s, hx = X(ox + a.x), hz = Z(oz + a.z);
       const lx = hx - a.nx * w, lz = hz - a.nz * w;

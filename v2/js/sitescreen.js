@@ -121,7 +121,8 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       // where the room with its real window openings stands instead.
       const y0 = yOf(b), k = SINGLE_SPACE.has(b.type) ? 0 : L - b.level;
       const real = buildPiece({ ...b, hex: colourHex(b.colour) }, { open: model.open(b), walkK: k, ink: false });
-      const planes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -(y0 + floorY + top)), new THREE.Plane(new THREE.Vector3(0, -1, 0), y0 + floorY)];
+      // (The lower cut sits a hair below the floor, so the building's bottom face never fights the levelled ground.)
+      const planes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -(y0 + floorY + top)), new THREE.Plane(new THREE.Vector3(0, -1, 0), y0 + floorY - 0.003)];
       real.traverse(o => {
         if (!o.isMesh || o.userData.noInk || o.userData.keep) return;
         const cl = m => { const c = m.clone(); c.clippingPlanes = planes; c.clipIntersection = true; c.clipShadows = true; c.side = THREE.DoubleSide; return c; };
@@ -145,6 +146,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       if (S.inside) { const r = makeInside(b); if (!r) continue; g = r.g; room = r.room; }
       else g = makeGroup(b);
       design.add(g); pieces.set(b.id, g);
+      if (gone.has(b.id)) g.traverse(o => { if (o.userData.rocket) o.visible = false; });
       zones.push(...peopleFor(b, g, room));
       // Where people can sit, in the world: room seats, or the benches and steps of a piece.
       const cx = b.x + b.w / 2, cz = b.z + b.d / 2, y0 = yOf(b);
@@ -387,7 +389,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     info.addEventListener('click', () => say(`${P.name}. ${P.say}`));
     selbar.append(info);
     const btn = (ic, label, fn, cls = '') => { const x = h(`<button class="selbtn ${cls}" type="button">${icon(ic)}<span>${esc(label)}</span></button>`); x.addEventListener('click', e => { e.stopPropagation(); if (!['Shape', 'Turn', 'Launch!', 'Big Question'].includes(label)) say(label); fn(x); }); selbar.append(x); return x; };
-    if (b.shape === 'rocket') btn('rocket', 'Launch!', () => launch(b), 'go');
+    if (b.shape === 'rocket') { if (gone.has(b.id)) btn('rocket', 'Next rocket soon', () => say('The next rocket is on its way. It will land in a minute.')); else btn('rocket', 'Launch!', () => launch(b), 'go'); }
     if (b.type === 'circle') btn('talk', 'Big Question', () => { select(null); hooks.bigQuestion?.(); }, 'go');
     if (P.shapes.length > 1) btn('shape', 'Shape', () => nextShape(b));
     btn('colour', 'Colour', x => swatches(b, x));
@@ -400,7 +402,9 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   }
   function nextShape(b) {
     const list = PROGRAMMES[b.type].shapes, s = list[(list.indexOf(b.shape) + 1) % list.length];
-    const r = model.update(b.id, { shape: s });
+    // A curve bends round a square footprint: try that first, then just the new shape.
+    const m = Math.max(b.w, b.d);
+    const r = s === 'arc' && b.w !== b.d && model.update(b.id, { shape: s, w: m, d: m }).ok ? { ok: true } : model.update(b.id, { shape: s });
     if (!r.ok) { sfx.no(); toast(WHY[r.why] || 'That shape will not fit here.'); return; }
     model.setStyle(b.type, { shape: s });
     sfx.tap(); say(SHAPES[s].name); select(b.id, { quiet: true });
@@ -429,18 +433,24 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     pop.addEventListener('click', e => { const w = e.target.closest('[data-w]')?.dataset.w; if (!w) return; model.update(b.id, { win: w }); model.setStyle(b.type, { win: w }); sfx.tap(); say(WINDOWS.find(x => x.id === w).name); select(b.id, { quiet: true }); });
   }
   // 3, 2, 1... lift off! The rocket climbs out of sight in a puff of smoke, then floats back down.
+  // ---------- the rocket ----------
+  // Tap the rocket (or its Launch! button) and it blasts off into the sky for good. A minute later a new one
+  // comes down out of the sky onto the pad, ready to go again.
+  const ROCKET_WAIT = 60000, gone = new Map();          // box id -> the timer for the next rocket
+  const rocketOf = id => { let rk = null; pieces.get(id)?.traverse(o => { if (o.userData.rocket) rk = o; }); return rk; };
+  const rocketReady = b => b.shape === 'rocket' && !gone.has(b.id) && !S.inside;
   function launch(b) {
-    const g = pieces.get(b.id); let rk = null; g?.traverse(o => { if (o.userData.rocket) rk = o; });
-    if (!rk || rk.userData.flying) return;
+    const g = pieces.get(b.id), rk = rocketOf(b.id);
+    if (!rk || rk.userData.flying || gone.has(b.id)) return;
     rk.userData.flying = true;
     say('Three, two, one. Lift off!');
     const puffs = [], base = rk.position.y;
+    rk.userData.base = base;
     let t = 0;
     const fn = dt => {
       t += dt;
-      const up = t < 0.8 ? 0 : t < 4 ? Math.pow(t - 0.8, 2) * 1.6 : t < 6 ? 16.4 : Math.max(0, 16.4 - (t - 6) * 4.5);
-      rk.position.y = base + up;
-      rk.rotation.y += dt * (t < 4 ? 0.6 : 0);
+      rk.position.y = base + (t < 0.8 ? 0 : Math.pow(t - 0.8, 2) * 1.6);
+      rk.rotation.y += dt * 0.6;
       if (t > 0.3 && t < 4.5 && Math.random() < 0.6) {
         const p = new THREE.Mesh(new THREE.SphereGeometry(0.08 + Math.random() * 0.06, 8, 6), new THREE.MeshLambertMaterial({ color: '#ffffff', transparent: true, opacity: 0.9 }));
         p.position.set(rk.position.x + (Math.random() - 0.5) * 0.15, rk.position.y + 0.02, rk.position.z + (Math.random() - 0.5) * 0.15);
@@ -448,10 +458,28 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
         g.add(p); puffs.push(p);
       }
       for (const p of puffs) { p.position.addScaledVector(p.userData.v, dt); p.scale.multiplyScalar(1 + dt * 1.4); p.material.opacity = Math.max(0, p.material.opacity - dt * 0.35); }
-      if (t > 9.8) { rk.position.y = base; rk.userData.flying = false; for (const p of puffs) { g.remove(p); p.geometry.dispose(); p.material.dispose(); } world.updaters.delete(fn); say('The rocket is back on its launch pad.'); }
+      if (t > 6.5) { rk.visible = false; rk.userData.flying = false; for (const p of puffs) { g.remove(p); p.geometry.dispose(); p.material.dispose(); } world.updaters.delete(fn); toast('Off it goes! A new rocket will come in a minute.'); }
     };
     world.updaters.add(fn);
+    gone.set(b.id, setTimeout(() => nextRocket(b.id), ROCKET_WAIT));
+    if (S.selected === b.id) drawSelbar(b);
     sfx.whoosh(); setTimeout(() => sfx.whoosh(), 800); setTimeout(() => sfx.whoosh(), 1300);
+  }
+  function nextRocket(id) {
+    gone.delete(id);
+    const b = model.byId.get(id), rk = rocketOf(id);
+    if (!b || !rk) return;                      // (the pad has gone, or is not drawn right now: the next redraw shows a rocket)
+    const base = rk.userData.base ?? rk.position.y, from = 9;
+    rk.visible = true; rk.position.y = base + from; rk.userData.flying = true;
+    let t = 0;
+    const fn = dt => {
+      t += dt;
+      const e = Math.min(1, t / 3.2), s = 1 - Math.pow(1 - e, 3);        // eases in to land softly
+      rk.position.y = base + from * (1 - s); rk.rotation.y += dt * 0.5;
+      if (e >= 1) { rk.position.y = base; rk.userData.flying = false; world.updaters.delete(fn); sfx.cheer(); confetti(new THREE.Vector3(b.x + b.w / 2, yOf(b) + 0.4, b.z + b.d / 2)); say('A new rocket is ready on the launch pad!'); if (S.selected === id) drawSelbar(b); }
+    };
+    world.updaters.add(fn);
+    sfx.whoosh();
   }
   function turnBox(b) {
     // A square piece turns a quarter where it stands (its door and windows turn with it);
@@ -781,9 +809,10 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
 
   function handleTap(x, y) {
     if (S.day && day.tap(x, y)) return;
-    if (S.inside || viewer) { const b = boxAt(x, y); if (b) { say(PROGRAMMES[b.type].name); cheer(b); } return; }
+    if (S.inside || viewer) { const b = boxAt(x, y); if (b) { if (rocketReady(b)) { launch(b); return; } say(PROGRAMMES[b.type].name); cheer(b); } return; }
     if (S.tool) { const t = target(x, y); if (t) place(t); return; }
     const b = boxAt(x, y);
+    if (b && rocketReady(b)) { if (b.id !== S.selected) select(b.id); launch(b); return; }
     if (b) { if (b.id === S.selected) select(null); else select(b.id); }
     else if (S.selected) select(null);
   }

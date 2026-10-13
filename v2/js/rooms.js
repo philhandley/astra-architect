@@ -49,10 +49,12 @@ class Studio {
   snap(box) { this.show(box); this.angle = Math.PI / 4; this.place(); this.render(); return this.r.domElement.toDataURL('image/png'); }
 }
 
+// The size a room is drawn at: its programme's size, square for a curve (as model.sizeOf).
+const sizeFor = (type, shape) => { const [w, d, hh] = PROGRAMMES[type].size; return shape === 'arc' ? [Math.max(w, d), Math.max(w, d), hh] : [w, d, hh]; };
 let thumbStudio = null;
 export function thumb(type, shape, colour, win) {
   if (!thumbStudio) thumbStudio = new Studio(180, 150);
-  const [w, d, hh] = PROGRAMMES[type].size;
+  const [w, d, hh] = sizeFor(type, shape);
   return thumbStudio.snap({ id: 1, type, shape, colour, win, w, d, h: hh, x: 0, z: 0, level: 0 });
 }
 export function trayThumbs(model) {
@@ -93,7 +95,7 @@ export function mountRooms(root, model, { onBuild, thumbs }) {
     ui.querySelector('.demo').innerHTML = emo(P.emoji, 'big');
     ui.querySelector('.dname').textContent = P.name;
     ui.querySelector('.dholds').textContent = `${P.size[0]} × ${P.size[1]} blocks${P.size[2] > 1 ? `, ${P.size[2]} storeys` : ''}${P.holds ? ` · holds ${P.holds}` : ''}`;
-    const [w, d, hh] = P.size;
+    const [w, d, hh] = sizeFor(current, st.shape);
     big.show({ id: 7, type: current, shape: st.shape, colour: st.colour, win: st.win, w, d, h: hh, x: 0, z: 0, level: 0 });
     const redo = () => { const s2 = model.style(current); thumbs.set(current, thumb(current, s2.shape, s2.colour, s2.win)); };
     const shapes = ui.querySelector('.shapes'); shapes.innerHTML = '';

@@ -264,9 +264,9 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
     const w = walkWalls(o, b, hex, floorY, opts.top);
     g.add(w.group); segments = w.segments;
     const ceil = new THREE.Mesh(slab(sh.floor, 0.02), mat('#fbfaf6', { emissive: '#f3ede2', emissiveIntensity: 0.75 }));
-    ceil.position.y = floorY + opts.top - 0.02; ceil.castShadow = true; shell.add(ceil);
+    ceil.position.y = floorY + opts.top - 0.02; shell.add(ceil);       // no shadow from the ceiling, so the room stays sunny
     const above = opts.boxH - (floorY + opts.top);
-    if (above > 0.02) { const top = new THREE.Mesh(slab(sh.floor, above), mat(hex)); top.position.y = floorY + opts.top; top.castShadow = true; shell.add(top); }
+    if (above > 0.02) { const top = new THREE.Mesh(slab(sh.floor, above), mat(hex)); top.position.y = floorY + opts.top; shell.add(top); }
   } else {
     const walls = new THREE.Mesh(slab(sh.walls, cutH), [mat('#ffffff'), mat(hex)]);
     walls.position.y = floorY; walls.castShadow = walls.receiveShadow = true; shell.add(walls);

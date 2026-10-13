@@ -40,14 +40,13 @@ function renderAxo(world, siteView, design, handles) {
   scene.traverse(o => {
     if (!o.isMesh || o === world.__skip) return;
     if (o.material && o.material.isSpriteMaterial) return;
-    const isPeople = !!o.userData.people;
-    if (isPeople) return;
+    const isPeople = !!o.userData.people || !!o.parent?.userData.people;
     swapped.push([o, o.material, o.instanceColor || null]);
     if (o.isInstancedMesh) o.instanceColor = null;
-    o.material = o === siteView.water ? pale : white;
+    o.material = o === siteView.water || isPeople ? pale : white;
   });
   design.traverse(o => {
-    if (!o.isMesh || o.isInstancedMesh) return;
+    if (!o.isMesh || o.isInstancedMesh || o.userData.people) return;
     const e = new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 28), new THREE.LineBasicMaterial({ color: '#1d1f24' }));
     o.add(e); edges.push(e);
   });

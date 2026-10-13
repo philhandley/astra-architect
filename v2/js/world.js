@@ -20,8 +20,8 @@ export class World {
     this.scene = scene;
 
     // Soft daylight: a big bright sky and a warm sun from the west, so shadows fall where we can see them.
-    scene.add(new THREE.HemisphereLight('#ffffff', '#d9d3c5', 1.35));
-    const sun = new THREE.DirectionalLight('#fff4e2', 2.1);
+    scene.add(new THREE.HemisphereLight('#ffffff', '#e6dfd0', 1.62));
+    const sun = new THREE.DirectionalLight('#fff4e2', 1.95);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.bias = -0.0004;

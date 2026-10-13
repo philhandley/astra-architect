@@ -77,17 +77,21 @@ export function mountSite(root, world, model, siteView, thumbs) {
   }
 
   // ---------- drawing the design ----------
-  const baseOf = b => { let m = 0; for (const [x, z] of model.squares(b)) m = Math.max(m, square(x, z)?.base || 0); return m; };
+  // A building stands at the lowest level of the ground under it; the ground is levelled to meet it (no plinth).
+  // Rooms stacked on top stand on whatever holds them up.
+  function baseOf(b, seen = 0) {
+    if (b.level > 0 && seen < 12) for (const [x, z] of model.squares(b)) { const s = model.at(x, z, b.level - 1); if (s && s.id !== b.id) return baseOf(s, seen + 1); }
+    let m = Infinity; for (let x = b.x; x < b.x + b.w; x++) for (let z = b.z; z < b.z + b.d; z++) { const q = square(x, z); if (q?.build) m = Math.min(m, q.base || 0); }
+    return m === Infinity ? 0 : m;
+  }
   const yOf = b => baseOf(b) + b.level * LEVEL;
-  function plinth(b, g, ghost) {
-    if (b.level !== 0) return;
-    let lo = Infinity; for (const [x, z] of model.squares(b)) lo = Math.min(lo, square(x, z)?.lo ?? 0);
-    const ph = baseOf(b) - Math.max(lo, -0.2);
-    if (ph > 0.03) { const p = new THREE.Mesh(new THREE.BoxGeometry(b.w - 0.04, ph, b.d - 0.04), ghost || new THREE.MeshLambertMaterial({ color: '#f1ede4' })); p.position.y = -ph / 2; p.receiveShadow = true; p.castShadow = true; g.add(p); }
+  function levelGround() {
+    const pads = new Map();
+    for (const b of model.boxes) if (b.level === 0) { const y = baseOf(b); for (let x = b.x; x < b.x + b.w; x++) for (let z = b.z; z < b.z + b.d; z++) pads.set(x * 100 + z, y); }
+    siteView.regrade(pads);
   }
   function makeGroup(b, ghost = null) {
     const g = buildPiece({ ...b, hex: colourHex(b.colour) }, { open: model.open(b), ghost });
-    plinth(b, g, ghost);
     g.position.set(b.x + b.w / 2, yOf(b), b.z + b.d / 2);
     g.traverse(o => { o.userData.boxId = b.id; });
     return g;
@@ -103,7 +107,6 @@ export function mountSite(root, world, model, siteView, thumbs) {
     const room = cutRoom(b, colourHex(b.colour), floorY, S.cutH, S.walkMode ? { walk: true, top, boxH: b.h * LEVEL } : {});
     if (S.walkMode) for (const [ax, az, bx, bz] of room.segments) walls.push([ax + b.x + b.w / 2, az + b.z + b.d / 2, bx + b.x + b.w / 2, bz + b.z + b.d / 2]);
     const g = room.group;
-    plinth(b, g, null);
     addInk(g);
     g.position.set(b.x + b.w / 2, yOf(b), b.z + b.d / 2);
     g.traverse(o => { o.userData.boxId = b.id; });
@@ -123,6 +126,7 @@ export function mountSite(root, world, model, siteView, thumbs) {
       zones.push(...peopleFor(b, g, room));
     }
     zones.push(...strollers());
+    levelGround();
     yard();
     if (!S.day) crowd.set(zones, model.boxes.length * 7 + (S.inside ? 101 : 0) + S.floor);
     const occ = new Set();
@@ -160,8 +164,10 @@ export function mountSite(root, world, model, siteView, thumbs) {
     const out = [], cx = b.x + b.w / 2, cz = b.z + b.d / 2, y0 = yOf(b), P = PROGRAMMES[b.type];
     if (room) {
       const area = model.squares(b).length;
-      out.push({ boxId: b.id, ox: cx, oy: y0 + room.floorY, oz: cz, w: b.w, d: b.d, inside: room.inside, margin: 0.12, seats: room.seats, fill: 0.85,
-        walkers: Math.max(1, Math.round((DENSITY[b.type] ?? 1) * area)), adults: true, kind: b.type === 'hall' ? 'run' : 'walk', speed: b.type === 'hall' ? 0.6 : 0.28 });
+      const sw = room.swim;
+      out.push({ boxId: b.id, ox: cx, oy: y0 + room.floorY, oz: cz, w: b.w, d: b.d, inside: sw ? (x, z, m) => room.inside(x, z, m) && !(Math.abs(x) < sw.w / 2 + 0.1 && Math.abs(z) < sw.d / 2 + 0.1) : room.inside, margin: 0.12, seats: room.seats, fill: 0.65,
+        walkers: sw ? 2 : Math.max(1, Math.round((DENSITY[b.type] ?? 1) * area)), adults: true, kind: b.type === 'hall' ? 'run' : 'walk', speed: b.type === 'hall' ? 0.6 : 0.28 });
+      if (sw) out.push({ boxId: b.id, ox: cx, oy: y0 + sw.y, oz: cz, w: sw.w, d: sw.d, inside: (x, z) => Math.abs(x) < sw.w / 2 && Math.abs(z) < sw.d / 2, margin: 0, walkers: Math.max(2, Math.round(area * 1.5)), kind: 'swim', speed: 0.25 });
       return out;
     }
     // Swimmers in the pool.

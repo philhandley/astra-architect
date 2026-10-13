@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat } from './shapes.js';
-import { GAP, WINDOWED, rows, wallRuns, openings, runAt, eachPiece, roundedRect } from './plan.js';
+import { GAP, WINDOWED, rows, wallRuns, openings, runAt, bandGeometry, roundedRect, ringThickness } from './plan.js';
 
 const ROOF = 0.4;
 const FRAME = '#fbfaf6';
@@ -25,17 +25,15 @@ function disc(list, p, y, r, d, out) {
 // One window: glass on the wall, a frame round it (deep and brightly coloured for big windows), and glazing bars.
 function rectWindow(L, run, o, yb) {
   const h = o.y1 - o.y0, yc = yb + (o.y0 + o.y1) / 2;
-  eachPiece(run, o.s0, o.s1, p => panel(L.glass, p.x, yc, p.z, p.nx, p.nz, p.len + 0.002, h, 0.01, 0.012));
-  const F = o.deep ? L.pop : o.frame ? L.of(o.frame) : L.frame, depth = o.deep ? 0.06 : 0.018, th = o.deep ? 0.024 : 0.016, off = depth / 2;
-  eachPiece(run, o.s0 - th, o.s1 + th, p => {
-    panel(F, p.x, yb + o.y1 + th / 2, p.z, p.nx, p.nz, p.len + 0.002, th, depth, off);
-    panel(F, p.x, yb + o.y0 - th / 2, p.z, p.nx, p.nz, p.len + 0.002, th, depth, off);
-  });
-  for (const s of [o.s0 - th / 2, o.s1 + th / 2]) { const p = runAt(run, s); panel(F, p.x, yc, p.z, p.nx, p.nz, th, h, depth, off); }
+  L.glass.push(bandGeometry(run, o.s0, o.s1, yb + o.y0, yb + o.y1, 0.007, 0.017));
+  const F = o.deep ? L.pop : o.frame ? L.of(o.frame) : L.frame, depth = o.deep ? 0.06 : 0.018, th = o.deep ? 0.024 : 0.016;
+  F.push(bandGeometry(run, o.s0 - th, o.s1 + th, yb + o.y1, yb + o.y1 + th, 0, depth));
+  F.push(bandGeometry(run, o.s0 - th, o.s1 + th, yb + o.y0 - th, yb + o.y0, 0, depth));
+  for (const s of [o.s0 - th / 2, o.s1 + th / 2]) { const p = runAt(run, s); panel(F, p.x, yc, p.z, p.nx, p.nz, th, h, depth, depth / 2); }
   if (o.mull) for (let s = o.s0 + o.mull; s < o.s1 - 0.06; s += o.mull) { const p = runAt(run, s); panel(L.frame, p.x, yc, p.z, p.nx, p.nz, 0.012, h, 0.02, 0.014); }
   if (o.cross) {
     const p = runAt(run, (o.s0 + o.s1) / 2); panel(L.frame, p.x, yc, p.z, p.nx, p.nz, 0.012, h, 0.02, 0.014);
-    eachPiece(run, o.s0, o.s1, q => panel(L.frame, q.x, yb + o.y0 + h * 0.64, q.z, q.nx, q.nz, q.len + 0.002, 0.012, 0.02, 0.014));
+    L.frame.push(bandGeometry(run, o.s0, o.s1, yb + o.y0 + h * 0.64 - 0.006, yb + o.y0 + h * 0.64 + 0.006, 0.004, 0.024));
   }
 }
 function roundWindow(L, run, o, yb) {
@@ -84,9 +82,10 @@ export function addFacade(g, box, H) {
     }
   }
   gableWindows(L, box, H);
-  const merge = list => mergeGeometries(list.map(x => { x.deleteAttribute('uv'); return x; }));
-  if (L.glass.length) { const m = new THREE.Mesh(merge(L.glass), mat('#a9d8ec', { emissive: '#6cb6d6', emissiveIntensity: 0.22 })); m.userData.glass = true; m.receiveShadow = true; g.add(m); }
-  for (const [hex, list] of byColour) if (list.length) { const m = new THREE.Mesh(merge(list), mat(hex)); m.castShadow = true; m.receiveShadow = true; g.add(m); }
+  // (Window frames, doors and glass carry no outlines: the lines stay on the buildings themselves.)
+  const merge = list => mergeGeometries(list.map(x => { const y = x.index ? x.toNonIndexed() : x; if (y.attributes.uv) y.deleteAttribute('uv'); return y; }));
+  if (L.glass.length) { const m = new THREE.Mesh(merge(L.glass), mat('#a9d8ec', { emissive: '#6cb6d6', emissiveIntensity: 0.22 })); m.userData.glass = true; m.userData.noInk = true; m.receiveShadow = true; g.add(m); }
+  for (const [hex, list] of byColour) if (list.length) { const m = new THREE.Mesh(merge(list), mat(hex)); m.castShadow = true; m.receiveShadow = true; m.userData.noInk = true; g.add(m); }
 }
 
 // A pale deck on an open flat roof, so it reads as a terrace to play on.
@@ -94,6 +93,10 @@ export function addTerrace(g, box, H) {
   const W = box.w - 2 * GAP - 0.06, D = box.d - 2 * GAP - 0.06;
   let shape, y = H;
   if (box.shape === 'drum') { shape = roundedRect(W, D, Math.min(W, D) / 2); y = H + 0.015; }      // the drum's rounded top edge sits a little higher
+  else if (box.shape === 'ring' && box.w >= 2 && box.d >= 2) {
+    const t = ringThickness(box), hw = box.w - 2 * GAP - 2 * t, hd = box.d - 2 * GAP - 2 * t;
+    shape = roundedRect(W, D, Math.min(W, D) / 2); shape.holes.push(roundedRect(hw, hd, Math.min(hw, hd) / 2)); y = H + 0.015;
+  }
   else if (box.shape === 'box') shape = roundedRect(W, D, 0.03);
   else return;
   const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.014, bevelEnabled: false, curveSegments: 24 }).rotateX(-Math.PI / 2).translate(0, y, 0);

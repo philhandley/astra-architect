@@ -187,13 +187,13 @@ const BUILD = {
       const R = 1 - 2 * GAP - 0.02, cx = -w / 2 + GAP, cz = -d / 2 + GAP, g = new THREE.Group();
       const s = new THREE.Shape(); s.moveTo(0, 0); s.lineTo(R, 0); s.absarc(0, 0, R, 0, -Math.PI / 2, true); s.lineTo(0, 0);
       const body = upExtrude(s, H); body.translate(cx, 0, cz); g.add(mesh(body, mat(c)));
-      const ch = R * 0.8, cone = new THREE.ConeGeometry(R + 0.02, ch, 24, 1, true, 0, Math.PI / 2);
-      cone.translate(cx, H + ch / 2, cz);
-      const roof = mesh(cone, mat(shade(c, 0.72), { side: THREE.DoubleSide })); g.add(roof);
-      const tri = new THREE.BufferGeometry();
-      const A = [cx, H + ch, cz], B = [cx, H, cz], X = [cx + R + 0.02, H, cz], Z = [cx, H, cz + R + 0.02];
-      tri.setAttribute('position', new THREE.Float32BufferAttribute([...A, ...X, ...B, ...A, ...B, ...Z], 3)); tri.computeVertexNormals();
-      g.add(mesh(tri, mat(shade(c, 0.62), { side: THREE.DoubleSide })));
+      // A soft quarter dome on top, like a slice of a round hut.
+      const Rr = R + 0.02, sq = 0.36, roofC = mat(shade(c, 0.82), { side: THREE.DoubleSide });
+      const dome = new THREE.SphereGeometry(Rr, 28, 12, Math.PI / 2, Math.PI / 2, 0, Math.PI / 2).scale(1, sq, 1).translate(cx, H, cz);
+      g.add(mesh(dome, roofC));
+      const q = new THREE.Shape(); q.moveTo(0, 0); q.lineTo(Rr, 0); q.absellipse(0, 0, Rr, Rr * sq, 0, Math.PI / 2, false); q.lineTo(0, 0);
+      g.add(mesh(new THREE.ShapeGeometry(q, 16).translate(cx, H, cz), roofC));
+      g.add(mesh(new THREE.ShapeGeometry(q, 16).rotateY(-Math.PI / 2).translate(cx, H, cz), roofC));
       return g;
     }
     // A curved building with a pointy roof, bending round a quarter circle.
@@ -213,6 +213,15 @@ const BUILD = {
     const geo = prism(null, L, s);
     if (w < d) geo.rotateY(Math.PI / 2);
     const g = new THREE.Group(); g.add(mesh(geo.rotateY(Math.PI / 2), mat(c)));
+    // A white rim round each end of the tunnel, like the edge of Finn's wooden arch.
+    const rim = new THREE.Shape(), o2 = a / 2 + 0.035;
+    rim.moveTo(-o2, 0); rim.lineTo(-o2, spring); rim.absarc(0, spring, o2, Math.PI, 0, true); rim.lineTo(o2, 0); rim.lineTo(a / 2, 0); rim.lineTo(a / 2, spring); rim.absarc(0, spring, a / 2, 0, Math.PI, false); rim.lineTo(-a / 2, 0); rim.lineTo(-o2, 0);
+    const end = L / 2 + 0.016;
+    for (const sgn of [-1, 1]) {
+      const rg = new THREE.ExtrudeGeometry(rim, { depth: 0.02, bevelEnabled: false, curveSegments: 18 }).translate(0, 0, sgn > 0 ? end - 0.006 : -end - 0.014);
+      if (w < d) rg.rotateY(Math.PI / 2);
+      g.add(mesh(rg.rotateY(Math.PI / 2), mat(WHITE)));
+    }
     return g;
   },
   steps(w, d, H, c, o) {
@@ -229,6 +238,11 @@ const BUILD = {
       spots.push(w >= d ? [along, y, across] : [across, y, along]);
     }
     g.userData.seats = spots;
+    const cols = ['#f7c22e', '#e2457d', '#22b2bf', '#a3d140', '#f28b30', '#ffffff'];
+    for (let i = 0; i < Math.min(8, n * 2); i++) {
+      const k = Math.floor(r() * n), along = -L / 2 + (L * (k + 0.5)) / n, across = (r() - 0.5) * W * 0.8, y = (H * (k + 1)) / n;
+      const cu = mesh(new RoundedBoxGeometry(0.11, 0.035, 0.1, 2, 0.014), mat(cols[i % cols.length])); cu.position.set(w >= d ? along : across, y + 0.03, w >= d ? across : along); cu.raycast = () => {}; g.add(cu);
+    }
     return g;
   },
   stairs(w, d, H, c) {
@@ -617,13 +631,12 @@ Object.assign(BUILD, {
     return g;
   },
   observatory(w, d, H, c) {
-    const g = new THREE.Group(), r = Math.min(w, d) / 2 - GAP - 0.02;
-    g.add(mesh(new THREE.CylinderGeometry(r, r, H, 28).translate(0, H / 2, 0), mat(c)));
+    const g = new THREE.Group(), r = Math.min(w, d) / 2 - GAP;
+    g.add(mesh(new THREE.CylinderGeometry(r, r, H, 40).translate(0, H / 2, 0), mat(c)));
     const dome = mesh(new THREE.SphereGeometry(r * 0.98, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, H, 0), mat('#dfe5ea'));
     g.add(dome);
     const slot = mesh(new THREE.BoxGeometry(0.12, 0.02, r * 1.6).translate(0, H + r * 0.55, 0.02), mat('#26272d')); slot.rotation.x = -0.45; slot.position.z = r * 0.3; g.add(slot);
     const scope = mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.42, 12), mat(WHITE)); scope.rotation.x = -0.9; scope.position.set(0, H + r * 0.75, r * 0.45); g.add(scope);
-    for (let i = 0; i < 6; i++) { const star = mesh(new THREE.OctahedronGeometry(0.03), mat('#f7c22e'), false); star.position.set(Math.cos(i) * r * 1.1, H + r + 0.25 + (i % 3) * 0.12, Math.sin(i * 1.7) * r * 0.8); g.add(star); }
     return g;
   },
   greenhouse(w, d, H, c) {
@@ -833,7 +846,7 @@ export function buildPiece(box, opts = {}) {
   if (box.surface && box.surface !== 'plain' && !opts.ghost) applySurface(g, box);
   if (!opts.ghost) {
     addFacade(g, box, H);
-    if (opts.open && (box.shape === 'box' || box.shape === 'drum')) addTerrace(g, box, H);
+    if (opts.open && ['box', 'drum', 'ring'].includes(box.shape)) addTerrace(g, box, H);
     addInk(g);
     if ((box.level || 0) === 0 && !['tree', 'turbine', 'weather', 'circle', 'track', 'garden', 'pool', 'bridge', 'canopy'].includes(box.shape)) g.add(contactShadow(box));
   }

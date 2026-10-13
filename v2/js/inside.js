@@ -190,6 +190,11 @@ const FEATURES = {
     return seats; } },
   yogamat: { r: 0.07, make(bag, x, z, c, rnd) { const rot = rnd() * 6.28; bag.add(pickC(rnd), new THREE.BoxGeometry(0.06, 0.008, 0.15).rotateY(rot).translate(x, 0.004, z)); return [[x, z]]; } },
   counter: { r: 0.16, make(bag, x, z, c, rnd) { const s = new THREE.Shape(); s.absarc(0, 0, 0.14, 0, Math.PI, false); s.absarc(0, 0, 0.09, Math.PI, 0, true); bag.plan('#fbfaf6', s, 0.09, x, 0, z, rnd() * 6.28); return []; } },
+  // A big round fish tank: blue water in a glass drum with a white rim, and bright fish swimming in it.
+  tank: { r: 0.12, make(bag, x, z, c, rnd) {
+    bag.cyl('#fbfaf6', 0.105, 0.03, x, 0.015, z, 0.11, 24); bag.cyl('#6fcde6', 0.095, 0.3, x, 0.18, z, 0.095, 24); bag.cyl('#fbfaf6', 0.1, 0.012, x, 0.336, z, 0.1, 24);
+    for (let k = 0; k < 4; k++) { const a = rnd() * 6.28; bag.ball(['#f28b30', '#f7c22e', '#e2457d', '#ffffff'][k], 0.018, x + Math.cos(a) * 0.098, 0.08 + k * 0.06, z + Math.sin(a) * 0.098); }
+    return [[x + 0.15, z], [x - 0.15, z]]; } },
   fish: { r: 0.08, make(bag, x, z, c, rnd) { for (let k = 0; k < 3; k++) bag.ball(['#f28b30', '#f7c22e', '#e2457d', '#ffffff'][k % 4], 0.025, x + (rnd() - 0.5) * 0.1, 0.12 + k * 0.08, z + (rnd() - 0.5) * 0.1); return []; } },
 };
 // What goes in each kind of room (piece, how many), by floor area in blocks.
@@ -204,9 +209,10 @@ const PLANS = {
   maker: A => [['kidney', Math.max(1, A)], ['roundTable', A], ['plant', 1]],
   music: A => [['stage', 1], ['beanbag', A + 2], ['plant', 1]],
   yoga: A => [['rug', 1], ['yogamat', 3 + A * 2], ['plant', 2]],
-  aquarium: A => [['fish', A * 3], ['beanbag', A]],
+  aquarium: A => [['tank', Math.max(2, A + 1)], ['rug', 1], ['beanbag', A + 1], ['plant', 1]],
   archway: A => [],
   observatory: A => [['rug', 1]],
+  pool: A => [['plant', 2], ['beanbag', 2]],
 };
 
 class Bag {
@@ -264,6 +270,7 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
       for (let tries = 0; tries < 60; tries++) {
         const x = (rnd() - 0.5) * (b.w - 0.1), z = (rnd() - 0.5) * (b.d - 0.1);
         if (!o.inside(x, z, WALL + F.r + 0.02)) continue;
+        if (b.type === 'pool' && o.kind === 'rr' && Math.abs(x) < (o.W - 0.2) / 2 && Math.abs(z) < (o.D - 0.2) / 2) continue;
         if (placed.some(p => Math.hypot(p.x - x, p.z - z) < p.r + F.r + 0.03)) continue;
         placed.push({ x, z, r: F.r });
         for (const s of F.make(bag, x, z, hex, rnd)) seats.push(s);
@@ -271,9 +278,18 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
       }
     }
   }
+  // A swimming pool in a building: the pool itself, with lanes, a white edge and swimmers.
+  let swim = null;
+  if (b.type === 'pool' && o.kind === 'rr') {
+    const BW = o.W - 0.34, BD = o.D - 0.34, rim = roundedRect(BW + 0.12, BD + 0.12, 0.1); rim.holes.push(roundedRect(BW, BD, 0.06));
+    bag.plan('#fbfaf6', rim, 0.03, 0, 0, 0); bag.plan('#5fd0ea', roundedRect(BW, BD, 0.06), 0.012, 0, 0, 0);
+    const lanes = Math.max(2, Math.round(Math.min(BW, BD) * 2.5)), long = BW > BD;
+    for (let i = 1; i < lanes; i++) { const off = -Math.min(BW, BD) / 2 + (Math.min(BW, BD) * i) / lanes; bag.box('#ffffff', long ? BW - 0.1 : 0.012, 0.004, long ? 0.012 : BD - 0.1, long ? 0 : off, 0.02, long ? off : 0); }
+    swim = { w: BW - 0.12, d: BD - 0.12, y: floorY + 0.03 };
+  }
   if ((b.type === 'classroom') && o.kind === 'rr') bag.box('#2f3a33', Math.min(0.5, o.W * 0.5), 0.12, 0.012, 0, 0.18, -o.D / 2 + WALL + 0.01);
   for (const mm of bag.meshes()) { mm.position.y = floorY + 0.02; mm.userData.noInk = true; g.add(mm); }
-  return { group: g, seats: seats.map(([x, z]) => [x, floorY + 0.02, z]), inside: o.inside, floorY: floorY + 0.02, segments };
+  return { group: g, seats: seats.map(([x, z]) => [x, floorY + 0.02, z]), inside: o.inside, floorY: floorY + 0.02, segments, swim };
 }
 
 export { CUT, SINGLE as SINGLE_SPACE };

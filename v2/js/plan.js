@@ -38,7 +38,7 @@ export const DEFAULT_WIN = { classroom: 'big', ringhouse: 'big', art: 'big', tre
   aquarium: 'porthole', yoga: 'porthole', music: 'porthole', observatory: 'porthole', library: 'pixel' };
 export const winStyle = b => b.win || DEFAULT_WIN[b.type] || 'grid';
 // Shapes with walls you can put windows in.
-export const WINDOWED = new Set(['box', 'house', 'saw', 'vault', 'drum', 'tower', 'ring', 'ringhouse', 'arc']);
+export const WINDOWED = new Set(['box', 'house', 'saw', 'vault', 'drum', 'tower', 'ring', 'ringhouse', 'arc', 'observatory', 'arch']);
 // A ring on the ground, big enough to walk round, has a colonnade round its courtyard.
 export const hasColonnade = b => (b.shape === 'ring' || b.shape === 'ringhouse') && b.w >= 3 && b.d >= 3 && !(b.level > 0);
 export function ringThickness(b) {
@@ -204,20 +204,53 @@ export function openings(b, k, runs = wallRuns(b, k)) {
   const out = [];
   if (!WINDOWED.has(b.shape) || b.surface === 'glass') return out;
   const tall = TALL.has(b.type), rh = tall ? b.h * LEVEL : LEVEL, style = winStyle(b), rnd = seeded((b.id || 1) * 131 + k * 17 + b.w * 7 + b.d * 3);
-  const door = !(b.level > 0) && k === 0 ? findDoor(runs) : null;
+  const door = !(b.level > 0) && k === 0 && b.shape !== 'arch' ? findDoor(runs) : null;
+  const pattern = PATTERNS[style] || PATTERNS.grid;
   runs.forEach((r, ri) => {
-    const list = r.colonnade ? glazed(r) : (PATTERNS[style] || PATTERNS.grid)(r, rh, rnd);
-    for (const o of list) {
-      if (door && door.run === ri && o.y0 < 0.34 && o.s1 > door.s0 - 0.03 && o.s0 < door.s1 + 0.03) {
-        // A long window (a strip) is split either side of the door; a small one just makes way.
-        if (o.round || o.s1 - o.s0 < 0.5) continue;
-        if (door.s0 - 0.05 - o.s0 >= 0.12) out.push({ ...o, s1: door.s0 - 0.05, run: ri });
-        if (o.s1 - (door.s1 + 0.05) >= 0.12) out.push({ ...o, s0: door.s1 + 0.05, run: ri });
-        continue;
+    if (b.shape === 'arch') {
+      // An arch: windows only on its long sides (the tunnel goes through the ends), and no door (the tunnel is the way in).
+      const along = b.w >= b.d ? [1, 0] : [0, 1], n = r.n[0];
+      if (b.type === 'archway' || Math.abs(n[0] * along[0] + n[1] * along[1]) > 0.5) return;
+    }
+    if (r.colonnade) { for (const o of glazed(r)) out.push({ ...o, run: ri }); return; }
+    if (!door || door.run !== ri) { for (const o of pattern(r, rh, rnd)) out.push({ ...o, run: ri }); return; }
+    // The wall with the front door: windows are laid out either side of it, so the door never pushes them all away.
+    for (const [a, z] of [[0, door.s0 - 0.04], [door.s1 + 0.04, r.len]]) {
+      if (z - a < 0.14) continue;
+      for (const o of pattern({ len: z - a }, rh, rnd)) {
+        if (o.y0 < 0.34 && (a + o.s1 > door.s0 - 0.02 && a + o.s0 < door.s1 + 0.02)) continue;
+        out.push({ ...o, s0: o.s0 + a, s1: o.s1 + a, run: ri });
       }
-      out.push({ ...o, run: ri });
     }
   });
   if (door) out.push({ run: door.run, s0: door.s0, s1: door.s1, y0: 0, y1: 0.3, door: true });
   return out;
+}
+
+// A smooth band following a run from s0 to s1, from y0 to y1, standing o0..o1 out from the wall face.
+// (One piece of geometry that bends round curves, so curved window frames look clean, not segmented.)
+export function bandGeometry(run, s0, s1, y0, y1, o0, o1) {
+  const P = [], a = runAt(run, s0), b = runAt(run, s1);
+  P.push([a.x, a.z, a.nx, a.nz]);
+  for (let i = 1; i < run.pts.length - 1; i++) if (run.s[i] > s0 + 1e-5 && run.s[i] < s1 - 1e-5) {
+    let nx = run.n[i - 1][0] + run.n[i][0], nz = run.n[i - 1][1] + run.n[i][1]; const l = Math.hypot(nx, nz) || 1;
+    P.push([run.pts[i][0], run.pts[i][1], nx / l, nz / l]);
+  }
+  P.push([b.x, b.z, b.nx, b.nz]);
+  const F = P.map(([x, z, nx, nz]) => [x + nx * o1, z + nz * o1]), B = P.map(([x, z, nx, nz]) => [x + nx * o0, z + nz * o0]), pos = [];
+  const quad = (p, q, r, s, n) => {
+    const ux = q[0] - p[0], uy = q[1] - p[1], uz = q[2] - p[2], vx = r[0] - p[0], vy = r[1] - p[1], vz = r[2] - p[2];
+    if ((uy * vz - uz * vy) * n[0] + (uz * vx - ux * vz) * n[1] + (ux * vy - uy * vx) * n[2] < 0) pos.push(...p, ...r, ...q, ...p, ...s, ...r); else pos.push(...p, ...q, ...r, ...p, ...r, ...s);
+  };
+  for (let i = 0; i < P.length - 1; i++) {
+    const n = [P[i][2] + P[i + 1][2], 0, P[i][3] + P[i + 1][3]];
+    quad([F[i][0], y0, F[i][1]], [F[i + 1][0], y0, F[i + 1][1]], [F[i + 1][0], y1, F[i + 1][1]], [F[i][0], y1, F[i][1]], n);
+    quad([B[i][0], y0, B[i][1]], [B[i + 1][0], y0, B[i + 1][1]], [B[i + 1][0], y1, B[i + 1][1]], [B[i][0], y1, B[i][1]], [-n[0], 0, -n[2]]);
+    quad([F[i][0], y1, F[i][1]], [F[i + 1][0], y1, F[i + 1][1]], [B[i + 1][0], y1, B[i + 1][1]], [B[i][0], y1, B[i][1]], [0, 1, 0]);
+    quad([F[i][0], y0, F[i][1]], [F[i + 1][0], y0, F[i + 1][1]], [B[i + 1][0], y0, B[i + 1][1]], [B[i][0], y0, B[i][1]], [0, -1, 0]);
+  }
+  const end = (i, j) => quad([F[i][0], y0, F[i][1]], [B[i][0], y0, B[i][1]], [B[i][0], y1, B[i][1]], [F[i][0], y1, F[i][1]], [F[i][0] - F[j][0], 0, F[i][1] - F[j][1]]);
+  end(0, 1); end(P.length - 1, P.length - 2);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  return g;
 }

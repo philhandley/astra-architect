@@ -22,18 +22,18 @@ function mergeTwo(a, b) {
 }
 function parts() {
   return {
-    torso: new RoundedBoxGeometry(0.066, 0.062, 0.044, 3, 0.016).translate(0, 0.1, 0),
-    shorts: new RoundedBoxGeometry(0.062, 0.026, 0.042, 2, 0.01).translate(0, 0.064, 0),
-    head: new THREE.SphereGeometry(0.042, 18, 12).translate(0, 0.17, 0),
-    hair: new THREE.SphereGeometry(0.0445, 18, 8, 0, Math.PI * 2, 0, Math.PI * 0.5).rotateX(-0.5).translate(0, 0.172, -0.004),
-    bun: new THREE.SphereGeometry(0.018, 10, 8).translate(0, 0.21, -0.03),
-    tails: two(new THREE.SphereGeometry(0.014, 10, 8).translate(0, 0.18, -0.01), 0.042),
+    torso: new RoundedBoxGeometry(0.066, 0.062, 0.044, 2, 0.016).translate(0, 0.1, 0),
+    shorts: new RoundedBoxGeometry(0.062, 0.026, 0.042, 1, 0.01).translate(0, 0.064, 0),
+    head: new THREE.SphereGeometry(0.042, 12, 9).translate(0, 0.17, 0),
+    hair: new THREE.SphereGeometry(0.0445, 12, 5, 0, Math.PI * 2, 0, Math.PI * 0.5).rotateX(-0.5).translate(0, 0.172, -0.004),
+    bun: new THREE.SphereGeometry(0.018, 8, 5).translate(0, 0.21, -0.03),
+    tails: two(new THREE.SphereGeometry(0.014, 8, 5).translate(0, 0.18, -0.01), 0.042),
     eyes: two(new THREE.SphereGeometry(0.005, 6, 4).translate(0, 0.172, 0.04), 0.014),
     cheeks: two(new THREE.SphereGeometry(0.007, 6, 4).scale(1, 0.6, 0.4).translate(0, 0.16, 0.036), 0.024),
     leg: new THREE.CylinderGeometry(0.011, 0.01, 0.05, 8).translate(0, -0.025, 0),                  // hangs from the hip
-    shoe: new RoundedBoxGeometry(0.022, 0.014, 0.032, 2, 0.006).translate(0, -0.054, 0.006),
+    shoe: new THREE.BoxGeometry(0.022, 0.014, 0.032).translate(0, -0.054, 0.006),
     arm: new THREE.CylinderGeometry(0.0105, 0.009, 0.05, 8).translate(0, -0.025, 0),               // hangs from the shoulder
-    hand: new THREE.SphereGeometry(0.0105, 8, 6).translate(0, -0.054, 0),
+    hand: new THREE.SphereGeometry(0.0105, 6, 4).translate(0, -0.054, 0),
   };
 }
 // Bright clothes, a range of skin and hair colours, and three hair styles (short, a bun, bunches).

@@ -54,7 +54,26 @@ export async function loadSite() {
     if (w > 0 && n > 0) heights[j * hw + i] = n * (1 - w);
   }
   S.grown = new Set(grow.map(([x, z]) => `${x},${z}`));
+  S.heights0 = heights.slice();          // the ground before any building levels it
   return S;
+}
+// Level the ground under buildings: pads maps a square (x * 100 + z) to the height a building stands at.
+// Inside a pad the ground is cut or filled flat; just outside it eases back to the natural slope.
+const EASE = 0.34;
+export function grade(pads) {
+  const { hw, hd, heights, heights0 } = S, res = S.raw.res, k = GRID.k;
+  for (let j = 0; j < hd; j++) for (let i = 0; i < hw; i++) {
+    const n = j * hw + i, wx = i / res / k, wz = j / res / k, sx = Math.floor(wx), sz = Math.floor(wz);
+    let best = null, bd = Infinity;
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      const x0 = sx + dx, z0 = sz + dz, h = pads.get(x0 * 100 + z0); if (h === undefined) continue;
+      const d = Math.max(Math.max(x0 - wx, 0, wx - (x0 + 1)), Math.max(z0 - wz, 0, wz - (z0 + 1)));
+      if (d < bd) { bd = d; best = h; }
+    }
+    if (best === null || bd >= EASE) { heights[n] = heights0[n]; continue; }
+    const target = best * k / EXAG, t = bd / EASE;
+    heights[n] = target + (heights0[n] - target) * t * t * (3 - 2 * t);
+  }
 }
 export const site = () => S;
 export const square = (x, z) => (S && x >= 0 && z >= 0 && x < GRID.w && z < GRID.d ? S.squares[z][x] : null);
@@ -142,17 +161,26 @@ export function buildSite(world) {
   world.scene.add(group);
   return { group, ground, water, grid, trees,
     setGridStrong(on) { grid.material.opacity = on ? 0.85 : 0.0; grid.visible = on; },
-    // Trees step out of the way of buildings.
+    // Trees step out of the way of buildings, and sit on the ground where it has been levelled.
     clearTrees(occupied) {
-      const m = new THREE.Matrix4();
+      const m = new THREE.Matrix4(), p = new THREE.Vector3(), zero = new THREE.Vector3(0, 0, 0);
       trees.list.forEach((t, i) => {
-        const hide = occupied.has(`${t.sx},${t.sz}`);
-        m.compose(t.p, t.q, hide ? new THREE.Vector3(0, 0, 0) : t.s);
+        const hide = occupied.has(`${t.sx},${t.sz}`), dy = groundAt(t.tp.x, t.tp.z) - t.g0;
+        m.compose(p.copy(t.p).setY(t.p.y + dy), t.q, hide ? zero : t.s);
         trees.mesh.setMatrixAt(i, m);
-        m.compose(t.tp, t.q, hide ? new THREE.Vector3(0, 0, 0) : t.ts);
+        m.compose(p.copy(t.tp).setY(t.tp.y + dy), t.q, hide ? zero : t.ts);
         trees.trunks.setMatrixAt(i, m);
       });
       trees.mesh.instanceMatrix.needsUpdate = true; trees.trunks.instanceMatrix.needsUpdate = true;
+    },
+    // Level the ground under the buildings (see grade), and move the terrain to match.
+    regrade(pads) {
+      const key = [...pads].sort((a, b) => a[0] - b[0]).join(';');
+      if (key === this._pads) return; this._pads = key;
+      grade(pads);
+      const p = ground.geometry.attributes.position, h = S.heights;
+      for (let n = 0; n < p.count; n++) p.setY(n, h[n] * EXAG / GRID.k);
+      p.needsUpdate = true; ground.geometry.computeVertexNormals();
     },
   };
 }
@@ -174,7 +202,7 @@ function forestTrees() {
     if (Math.abs(wx - S.waterfall[0]) < 0.55 && wz > S.waterfall[1] - 1.2 && wz < S.waterfall[1] + 0.7) continue;   // keep the falls clear
     const y = groundAt(wx, wz);
     const rad = 0.13 + r() * 0.09, trunkH = 0.12 + r() * 0.06;
-    list.push({ sx: Math.floor(wx), sz: Math.floor(wz), p: new THREE.Vector3(wx, y + trunkH + rad * 0.85, wz), q: new THREE.Quaternion(), s: new THREE.Vector3(rad, rad * 1.08, rad),
+    list.push({ g0: y, sx: Math.floor(wx), sz: Math.floor(wz), p: new THREE.Vector3(wx, y + trunkH + rad * 0.85, wz), q: new THREE.Quaternion(), s: new THREE.Vector3(rad, rad * 1.08, rad),
       tp: new THREE.Vector3(wx, y, wz), ts: new THREE.Vector3(0.18, trunkH + rad * 0.3, 0.18), c: TREE_GREENS[Math.floor(r() * TREE_GREENS.length)] });
   }
   const { canopy, trunk } = treeGeometries();

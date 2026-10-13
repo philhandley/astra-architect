@@ -14,8 +14,8 @@ class Studio {
     this.r.outputColorSpace = THREE.SRGBColorSpace;
     this.r.shadowMap.enabled = true; this.r.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene();
-    this.scene.add(new THREE.HemisphereLight('#ffffff', '#d9d3c5', 1.4));
-    const sun = new THREE.DirectionalLight('#fff4e2', 2.0);
+    this.scene.add(new THREE.HemisphereLight('#ffffff', '#e6dfd0', 1.62));
+    const sun = new THREE.DirectionalLight('#fff4e2', 1.9);
     sun.position.set(-4, 7, 4); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
     const c = sun.shadow.camera; c.left = -5; c.right = 5; c.top = 5; c.bottom = -5;
     this.scene.add(sun);

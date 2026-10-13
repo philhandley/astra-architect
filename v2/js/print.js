@@ -1,11 +1,11 @@
-// Drawings to print, each on a sheet with an architect's title block: an axonometric of the whole site, a floor
-// plan for each floor, and two elevations. Two colour schemes: coloured buildings on a white site, or full colour.
+// Drawings to print: an axonometric of the whole site, a floor plan for each floor (with a key to its numbered
+// rooms), and two elevations. Two colour schemes: coloured buildings on a white site, or full colour.
 import * as THREE from 'three';
 import { PROGRAMMES, LEVEL, colourHex } from './catalogue.js';
 import { GRID, square, site, groundAt, ZONE_COL } from './site.js';
 import { outline } from './inside.js';
 import { wallRuns, openings, runAt, roundedRect, TALL, ringThickness } from './plan.js';
-import { icon, MARK } from './icons.js';
+import { icon } from './icons.js';
 import { h, esc, sfx, say } from './ui.js';
 import { INK } from './shapes.js';
 
@@ -25,27 +25,11 @@ export async function openPrint(world, model, siteView, { design, handles }) {
     elev: renderElevations(world, model, siteView, design, handles, mode, cut),
   });
   const d = drawings('colour');
-  const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), sheets = 2 + floors.length;
-  // A sheet like an architect's drawing: the drawing on the right, and down the left the title block (project,
-  // a key to the numbered rooms, notes, and the drawing's details in boxes).
-  const page = ({ title, number, scale, key, note, img, sheet }) => `<section class="page">
-    <aside class="tb">
-      <div class="tb-brand">${MARK}<div><small>Astra Architect</small><b>Finn's Dream School</b></div></div>
-      <div class="tb-box"><small>Project</small><b>Finn's Dream School</b><span>A school in the valley, between the forest, the waterfall and the sea.</span></div>
-      ${key ? `<div class="tb-box tb-key"><small>Key</small>${key.length ? `<ol>${key.map(k => `<li><i>${k.n}</i><span>${esc(k.name)}</span><em>${esc(k.size)}</em></li>`).join('')}</ol>` : '<span>No rooms on this floor yet.</span>'}</div>` : ''}
-      <div class="tb-box"><small>Notes</small><span>${esc(note || 'One square is one wooden block: a classroom for 30 children, about 8 metres across.')}</span></div>
-      <table class="tb-table">
-        <tr><th>Drawing</th><td><b>${esc(title)}</b></td></tr>
-        <tr><th>Number</th><td>${esc(number)}</td></tr>
-        <tr><th>Scale</th><td>${esc(scale)}</td></tr>
-        <tr><th>Date</th><td>${esc(date)}</td></tr>
-        <tr><th>Architect</th><td>Finn</td></tr>
-        <tr><th>Checked</th><td class="sign"></td></tr>
-        <tr><th>Sheet</th><td>${sheet} of ${sheets}</td></tr>
-      </table>
-    </aside>
-    <div class="dwg">${img}</div>
-  </section>`;
+  const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  // A sheet: the school's name and the drawing's name along the top; on a plan, the key to its numbered rooms beside it.
+  const page = ({ title, key, img }) => `<section class="page"><header><h1>Finn's Dream School</h1><span>${esc(title)} · ${esc(date)}</span></header>${key
+    ? `<div class="sheet-body"><div class="plan-key"><small>Key</small>${key.length ? `<ol>${key.map(k => `<li><i>${k.n}</i><span>${esc(k.name)}</span><em>${esc(k.size)}</em></li>`).join('')}</ol>` : '<span>No rooms on this floor yet.</span>'}</div>${img}</div>`
+    : img}</section>`;
   const sheet = h(`<div class="print-sheet">
     <div class="print-bar no-print">
       <b>Your drawings</b>
@@ -56,9 +40,9 @@ export async function openPrint(world, model, siteView, { design, handles }) {
       <button class="pbtn go" type="button">${icon('print')} Print</button>
       <button class="pbtn close" type="button">${icon('close')} Close</button>
     </div>
-    ${page({ title: 'Axonometric view', number: 'A-001', scale: 'Not to scale', note: 'A bird\'s-eye view of the whole school and its site, drawn like an architect\'s model.', img: `<img class="axo" src="${d.axo}" alt="Axonometric drawing of the school">`, sheet: 1 })}
-    ${floors.map((l, i) => page({ title: `${FLOOR_NAMES[l]} plan`, number: `A-1${String(i + 1).padStart(2, '0')}`, scale: '1 square = 8 m', key: d.plans[i].key, img: `<img class="plan" data-i="${i}" src="${d.plans[i].url}" alt="${esc(FLOOR_NAMES[l])} plan">`, sheet: i + 2 })).join('')}
-    ${page({ title: 'Elevations', number: 'A-201', scale: '1 square = 8 m', note: 'The school seen from the side, as if the land in front were sliced away like a cake. A looks from the south and B from the east: the letters on the plans show where.', img: `<img class="elev" src="${d.elev}" alt="Elevations of the school from the south and the east">`, sheet: sheets })}
+    ${page({ title: 'Axonometric drawing', img: `<img class="axo" src="${d.axo}" alt="Axonometric drawing of the school">` })}
+    ${floors.map((l, i) => page({ title: `${FLOOR_NAMES[l]} plan`, key: d.plans[i].key, img: `<img class="plan" data-i="${i}" src="${d.plans[i].url}" alt="${esc(FLOOR_NAMES[l])} plan">` })).join('')}
+    ${page({ title: 'Elevations', img: `<img class="elev" src="${d.elev}" alt="Elevations of the school from the south and the east">` })}
   </div>`);
   document.body.appendChild(sheet);
   sheet.querySelector('.go').addEventListener('click', () => { sfx.tap(); window.print(); });
@@ -231,6 +215,7 @@ function scaleBar(g, sx, sy, s) {
   g.strokeStyle = INKC; g.lineWidth = 2; g.strokeRect(sx, sy, 4 * s, 14);
   g.font = '500 20px Lexend, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillStyle = INKC;
   for (let i = 0; i <= 4; i++) g.fillText(`${i * 8} m`, sx + i * s, sy + 40);
+  g.textAlign = 'left'; g.fillText('One square = one block = a classroom for 30 children', sx + 4 * s + 30, sy + 10);
 }
 
 // ---------- a floor plan ----------

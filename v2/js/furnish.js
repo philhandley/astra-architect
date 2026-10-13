@@ -870,7 +870,7 @@ export function hangingPlanets(bag, top) {
 // What goes in each kind of room (piece, how many), by floor area in blocks. Wall pieces (WALLS) go up first.
 export const PLANS = {
   classroom: A => [['cubbies', 1], ['pinboard', 1 + Math.floor(A / 2)], ['art', 1], ['frieze', A >= 2 ? 1 : 0], ['books', A >= 2 ? 1 : 0],
-    ['rug', 1], ['roundTable', Math.max(2, Math.round(A * 1.6))], ['artwall', A >= 2 ? 1 : 0], ['kidney', A >= 2 ? 1 : 0], ['mountain', A >= 2 ? 1 : 0], ['cave', A >= 3 ? 1 : 0], ['beanbag', A + 1], ['plant', A + 1]],
+    ['rug', 1], ['roundTable', Math.max(2, Math.round(A * 1.6))], ['artwall', A >= 2 ? 1 : 0], ['kidney', A >= 2 ? 1 : 0], ['mountain', A >= 2 ? 1 : 0], ['cave', A >= 3 ? 1 : 0], ['beanbag', A + 1]],      // (no plants: Phil asked)
   ringhouse: A => PLANS.classroom(A),
   treehouse: A => [['rug', 1], ['beanbag', 2]],
   hall: A => [['wallbars', 3], ['parachute', 1], ['climbframe', 1], ['softplay', A >= 4 ? 1 : 0], ['trampoline', A >= 4 ? 1 : 0], ['gymmat', Math.max(2, Math.round(A / 2))], ['vault', 1], ['balls', 1], ['bench', A >= 4 ? 2 : 1], ['hoop', 1], ['cones', A >= 4 ? 1 : 0], ['beanbag', Math.round(A / 3)]],

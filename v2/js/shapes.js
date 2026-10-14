@@ -623,7 +623,7 @@ Object.assign(BUILD, {
       const pivot = new THREE.Group(); pivot.position.set(sx, hh, 0);
       for (const o of [-0.048, 0.048]) pivot.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.3, 5).translate(o, -0.15, 0), mat('#3d405b'), false));
       pivot.add(mesh(new RoundedBoxGeometry(0.13, 0.016, 0.07, 2, 0.006).translate(0, -0.3, 0), mat('#e2457d')));
-      const kid = miniKid('swing'); kid.scale.setScalar(0.75); kid.position.set(0, -0.292 - SEAT * 0.75, 0.01); pivot.add(kid);
+      const kid = miniKid('swing'); kid.scale.setScalar(0.75); kid.position.set(0, -0.292 - SEAT * 0.75, 0.01); kid.userData.rideKid = true; pivot.add(kid);
       pivot.userData.swing = { amp: 0.7, speed: 2.6 + sx };
       inner.add(pivot);
     }
@@ -641,8 +641,9 @@ Object.assign(BUILD, {
       bars.push(bar);
     }
     g.add(mesh(mergeGeometries(bars.map(x => { x.deleteAttribute('uv'); return x; })), mat(c)));
-    { const k = miniKid(); k.position.set(0, R * 0.95, 0); k.scale.setScalar(0.75); g.add(k); }
-    { const k = miniKid('climb'); k.position.set(R * 0.72, R * 0.5, 0.1); k.scale.setScalar(0.75); k.rotation.y = -Math.PI / 2; k.rotation.z = 0.35; g.add(k); }
+    { const k = miniKid(); k.position.set(0, R * 0.95, 0); k.scale.setScalar(0.75); k.userData.rideKid = true; g.add(k); }
+    { const k = miniKid('climb'); k.position.set(R * 0.72, R * 0.5, 0.1); k.scale.setScalar(0.75); k.rotation.y = -Math.PI / 2; k.rotation.z = 0.35; k.userData.rideKid = true; g.add(k); }
+    g.userData.rideInfo = { kind: 'climbdome', R };
     return g;
   },
   roundabout(w, d, H, c) {
@@ -650,8 +651,8 @@ Object.assign(BUILD, {
     for (let i = 0; i < 4; i++) spin.add(mesh(new THREE.CylinderGeometry(R, R, 0.03, 24, 1, false, (i / 4) * Math.PI * 2, Math.PI / 2).translate(0, 0.05, 0), mat(i % 2 ? c : '#22b2bf')));
     spin.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.18, 8).translate(0, 0.14, 0), mat(WHITE)));
     spin.add(mesh(new THREE.TorusGeometry(R * 0.6, 0.008, 6, 24).rotateX(Math.PI / 2).translate(0, 0.18, 0), mat(WHITE)));
-    for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2, k = miniKid('hold'); k.position.set(Math.cos(a) * R * 0.75, 0.065, Math.sin(a) * R * 0.75); k.scale.setScalar(0.7); k.rotation.y = -a; spin.add(k); }
-    spin.userData.yspin = 1.6;
+    for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2, k = miniKid('hold'); k.position.set(Math.cos(a) * R * 0.75, 0.065, Math.sin(a) * R * 0.75); k.scale.setScalar(0.7); k.rotation.y = -a; k.userData.rideKid = true; spin.add(k); }
+    spin.userData.yspin = 1.6; spin.userData.R = R;
     g.add(mesh(new THREE.CylinderGeometry(R + 0.02, R + 0.04, 0.035, 24).translate(0, 0.0175, 0), mat('#d2cdc4')));
     g.add(spin); return g;
   },
@@ -660,8 +661,8 @@ Object.assign(BUILD, {
     inner.add(mesh(new THREE.ConeGeometry(0.05, 0.1, 4).translate(0, 0.05, 0), mat('#3d405b')));
     const plank = new THREE.Group(); plank.position.y = 0.1;
     plank.add(mesh(new THREE.BoxGeometry(L, 0.02, 0.07), mat(c)));
-    for (const s of [-1, 1]) { plank.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.06, 6).translate(s * (L / 2 - 0.1), 0.04, 0), mat(WHITE))); const k = miniKid('ride'); k.position.set(s * (L / 2 - 0.03), 0.01 - SEAT * 0.7, 0); k.scale.setScalar(0.7); k.rotation.y = -s * Math.PI / 2; plank.add(k); }
-    plank.userData.rock = { amp: 0.28, speed: 2.2 };
+    for (const s of [-1, 1]) { plank.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.06, 6).translate(s * (L / 2 - 0.1), 0.04, 0), mat(WHITE))); const k = miniKid('ride'); k.userData.rideKid = true; k.position.set(s * (L / 2 - 0.03), 0.01 - SEAT * 0.7, 0); k.scale.setScalar(0.7); k.rotation.y = -s * Math.PI / 2; plank.add(k); }
+    plank.userData.rock = { amp: 0.28, speed: 2.2 }; plank.userData.L = L;
     inner.add(plank);
     if (d > w) inner.rotation.y = Math.PI / 2;
     g.add(inner); return g;
@@ -692,7 +693,8 @@ Object.assign(BUILD, {
     const s = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.012, 0.42), mat('#22b2bf')); s.rotation.x = 0.7; s.position.set(0, top / 2, 0.32); s.castShadow = true; g.add(s);
     for (let i = 0; i < 5; i++) g.add(mesh(new THREE.BoxGeometry(0.2, 0.006, 0.006).translate(0, 0.05 + i * 0.06, -0.19 - i * 0.03), mat('#3d405b'), false));
     for (const x of [-0.1, 0, 0.1]) { const rope = mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.36, 4), mat('#3d405b'), false); rope.rotation.x = 0.45; rope.position.set(x, top / 2, -0.25); g.add(rope); }
-    const k = miniKid(); k.position.set(0.05, top + 0.015, 0); k.scale.setScalar(0.72); g.add(k);
+    const k = miniKid(); k.position.set(0.05, top + 0.015, 0); k.scale.setScalar(0.72); k.userData.rideKid = true; g.add(k);
+    g.userData.rideInfo = { kind: 'playtower', top };
     return g;
   },
   zipline(w, d, H, c) {
@@ -714,7 +716,7 @@ Object.assign(BUILD, {
     const rider = new THREE.Group();
     rider.add(mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.15, 4).translate(0, -0.075, 0), mat('#3d405b'), false));
     rider.add(mesh(new THREE.BoxGeometry(0.012, 0.012, 0.1).translate(0, -0.155, 0), mat('#3d405b'), false));
-    const hang = miniKid('hang'); hang.position.set(0, -0.162 - REACH * 0.75, 0);      // (hands on the bar) hang.scale.setScalar(0.75); hang.rotation.y = Math.PI / 2; rider.add(hang);
+    const hang = miniKid('hang'); hang.position.set(0, -0.162 - REACH * 0.75, 0); hang.scale.setScalar(0.75); hang.rotation.y = Math.PI / 2; hang.userData.rideKid = true; rider.add(hang);      // (hands on the bar)
     const walker = miniKid('stand'); walker.scale.setScalar(0.75); walker.visible = false;
     const legs = [], arms = []; walker.traverse(o => { if (o.userData.limb === 'leg') legs.push(o); if (o.userData.limb === 'arm') arms.push(o); });
     const path = [new THREE.Vector3(x1 - 0.2, 0, 0.1), new THREE.Vector3(x1 - 0.3, 0, 0.3), new THREE.Vector3(x0 + 0.6, 0, 0.3), new THREE.Vector3(x0 + 0.55, 0, 0)];

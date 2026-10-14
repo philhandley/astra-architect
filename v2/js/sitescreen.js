@@ -11,6 +11,7 @@ import { cutRoom, outline, CUTTABLE, storeyFloor, SINGLE_SPACE } from './inside.
 import { SchoolDay, Trails, PERIODS } from './day.js';
 import { startWalk } from './walk.js';
 import { startTour } from './tour.js';
+import { rideDriver } from './rides.js';
 import { mountMood, MOOD_NAMES, MOOD_LINES } from './mood.js';
 import { Crowd } from './crowd.js';
 import { WHY } from './model.js';
@@ -321,13 +322,15 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     for (const g of pieces.values()) g.traverse(o => {
       if (o.userData.spin) o.rotation.z += dt * o.userData.spin * (world.wind || 1);
       if (o.userData.yspin) o.rotation.y += dt * o.userData.yspin;
+      if (o.userData.rideKid) o.visible = !S.day;      // (in a school day the children of the day ride: rides.js)
       if (o.userData.swing) o.rotation.x = Math.sin(t * o.userData.swing.speed) * o.userData.swing.amp;
       if (o.userData.rock) o.rotation.z = Math.sin(t * o.userData.rock.speed) * o.userData.rock.amp;
       // Moving parts inside rooms: joints that swing to and fro (wave) and parts that slide to and fro (glide).
       const wv = o.userData.wave; if (wv) o.rotation[wv.axis] = wv.base + Math.sin(t * wv.speed + wv.phase) * wv.amp;
       const gl = o.userData.glide; if (gl) o.position[gl.axis] = gl.base + Math.sin(t * gl.speed + gl.phase) * gl.amp;
       const zp = o.userData.zipline;
-      if (zp) {
+      if (zp && S.day) { const live = zp.dayAt && performance.now() - zp.dayAt < 250; zp.rider.visible = true; zp.walker.visible = false; zp.rider.position.set(live ? zp.dayPos[0] : zp.x0, live ? zp.dayPos[1] : zp.y0, 0); }      // (the bar waits at the top, or rides with the child: rides.js)
+      else if (zp) {
         // Zip down the cable (holding the bar), land, walk back along the side, climb the steps (out of sight), again.
         const T = zp.period + zp.walk + zp.pause, k = (t + (o.parent?.parent?.id || 0) * 0.5) % T;
         if (k < zp.period) {
@@ -346,7 +349,8 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
         } else { zp.rider.visible = false; zp.walker.visible = false; }
       }
       const sl = o.userData.slide;
-      if (sl) {
+      if (sl && S.day) o.visible = false;
+      else if (sl) {
         // Down the slide (sitting), then walk round to the door, then out of sight climbing the stairs.
         const T = sl.period + sl.walk + sl.pause, k = (t + (o.parent?.id || 0) * 0.37) % T;
         if (k < sl.period) {
@@ -969,7 +973,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   }
 
   // ---------- the school day ----------
-  const day = new SchoolDay({ world, model, crowd, yOf, seatsOf: id => seatsById.get(id), obstaclesOf: id => obstaclesById.get(id), layer: ui.querySelector('.bubbles'), onPeriod: (i, P) => drawDaybar(i, P), onEnd: facts => { endDay(); setTimeout(() => hooks.dayDone?.(PERIODS, facts), 900); } });
+  const day = new SchoolDay({ world, model, crowd, yOf, seatsOf: id => seatsById.get(id), obstaclesOf: id => obstaclesById.get(id), rideOf: id => { const g = pieces.get(id); return g ? rideDriver(g) : null; }, layer: ui.querySelector('.bubbles'), onPeriod: (i, P) => drawDaybar(i, P), onEnd: facts => { endDay(); setTimeout(() => hooks.dayDone?.(PERIODS, facts), 900); } });
   function startDay() {
     if (!model.boxes.some(b => ['classroom', 'ringhouse', 'treehouse'].includes(b.type))) { sfx.no(); toast('Build a classroom first!'); say('Build a classroom first, so the children have somewhere to learn.'); return; }
     if (S.walking) return;

@@ -169,13 +169,16 @@ export class Crowd {
     const swing = Math.sin(p.walk || 0);
     if (kind === 'sit') { legL = legR = -1.45; armL = armR = -0.55; y -= SIT_DROP; }
     else if (kind === 'swim') { y -= SWIM_DROP; const w = t * 4 + p.ph; armL = Math.sin(w) * 2.6; armR = Math.sin(w + Math.PI) * 2.6; lean = 0.3; }
+    else if (kind === 'hang') { legL = -0.35; legR = -0.2; armL = armR = -3.0; outL = -0.1; outR = 0.1; }
+    else if (kind === 'hold') { armL = armR = -1.25; outL = -0.25; outR = 0.25; }
+    else if (kind === 'climb') { const c = Math.sin(t * 9 + p.ph); legL = c * 0.6 - 0.3; legR = -c * 0.6 - 0.3; armL = -2.6 + c * 0.45; armR = -2.6 - c * 0.45; }
     else if (moving) { const a = kind === 'run' ? 0.9 : 0.55; legL = swing * a; legR = -swing * a; armL = -swing * a * 0.9; armR = swing * a * 0.9; y += Math.abs(Math.cos(p.walk || 0)) * (kind === 'run' ? 0.012 : 0.006); lean = kind === 'run' ? 0.18 : 0.04; }
     else { armL = Math.sin(t * 1.5 + p.ph) * 0.05; armR = -armL; }
     if (p.jumpT > 0) { p.jumpT -= dt; y += Math.abs(Math.sin(t * 9 + p.ph)) * 0.07; const wave = 2.7 + Math.sin(t * 14 + p.ph) * 0.25; outL = -wave; outR = wave; armL = armR = 0; }
     const nr = this.near, hide = p.hidden || (nr && Math.abs(p.y - nr.y) < 0.2 && Math.hypot(p.x - nr.x, p.z - nr.z) < nr.r);
     q.setFromAxisAngle(up, p.yaw); v.set(p.x, y, p.z); s.setScalar(hide ? 1e-4 : p.s);
     base.compose(v, q, s);
-    if (lean) base.multiply(rot.makeRotationX(lean));
+    if (lean || p.tilt) base.multiply(rot.makeRotationX(lean + (p.tilt || 0)));
     M.torso.setMatrixAt(i, base);         // also the head and face
     if (p.hair) M[p.hair].setMatrixAt(p.hi, base);
     if (p.xi) for (const x of EXTRAS) if (p.xi[x] >= 0) M[x].setMatrixAt(p.xi[x], kind === 'sit' && OFF_WHEN_SEATED.has(x) ? ZERO : base);

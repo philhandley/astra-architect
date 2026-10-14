@@ -31,7 +31,7 @@ const TOP_Y = { track: 0.09, garden: 0.16, circle: 0.045, stage: 0.16, terraces:
 // Borrowed from theme-park games: children have simple needs (energy, fun, hunger) and choose what to do from them.
 // Rides take one child at a time, so a queue forms (seconds per go, by shape); tired children look for somewhere to
 // sit; passing something interesting they stop to look; and what they say comes from how they feel.
-const RIDES = { slide: 3.5, swings: 3, zipline: 3, roundabout: 3, seesaw: 3, playtower: 3.5, climbdome: 4 };
+const RIDES = { slide: 5, swings: 4.5, zipline: 4.5, roundabout: 4.5, seesaw: 4, playtower: 5, climbdome: 5 };      // (seconds a go takes, walking on and off included)
 const QUEUE_MAX = 4;                 // (a happy school: short lines, and anyone extra just plays nearby)
 const REST = new Set(['steps', 'circle', 'terraces', 'garden', 'stage', 'treehouse']);
 const LOOK = { rocket: ['🚀', 'Wow, a rocket!'], observatory: ['🔭', 'A telescope!'], aquarium: ['🐠', 'Fish!'], turbine: ['🌬️', 'Round and round!'], weather: ['🌡️', 'Is it windy?'], greenhouse: ['🌱', 'Look, plants!'], pool: ['🏊', 'Splash!'] };
@@ -99,8 +99,8 @@ const nearestEntry = (zone, sq) => { const E = zone?.entries; if (!E?.length) re
 
 export class SchoolDay {
   // seatsOf(boxId): world-space seats in a room or on a piece (benches, steps), if any.
-  constructor({ world, model, crowd, yOf, seatsOf, obstaclesOf, layer, onPeriod, onEnd }) {
-    Object.assign(this, { world, model, crowd, yOf, seatsOf, obstaclesOf, layer, onPeriod, onEnd });
+  constructor({ world, model, crowd, yOf, seatsOf, obstaclesOf, rideOf, layer, onPeriod, onEnd }) {
+    Object.assign(this, { world, model, crowd, yOf, seatsOf, obstaclesOf, rideOf, layer, onPeriod, onEnd });
     this.t = 0; this.period = -1; this.running = false;
     this.tick = dt => this.update(dt);
     this.bubbles = [];
@@ -393,6 +393,7 @@ export class SchoolDay {
   yardSquare() { return this.yardPool[Math.floor(this.r() * this.yardPool.length)]; }
   leaveQueue(k) {
     if (k.ride) { const i = k.ride.queue.indexOf(k); if (i >= 0) k.ride.queue.splice(i, 1); if (k.ride.busy === k) k.ride.busy = null; k.ride = null; }
+    if (k.drive) { k.drive = null; k.tilt = 0; k.y = Math.max(0.012, square(Math.floor(k.x), Math.floor(k.z))?.base || 0); }
     if (k.hidden) { k.hidden = false; }
   }
   // What a child does on arriving: find a seat, or wander about the place.
@@ -435,7 +436,7 @@ export class SchoolDay {
   // Indoors, nobody walks through the furniture or out through a wall: a gentle push out of any piece they are
   // in (so they slide round it), and back into the room if a push took them through the wall.
   keepClear(k) {
-    if (k.mode === 'sit' || k.hidden) return;
+    if (k.mode === 'sit' || k.mode === 'riding' || k.hidden) return;
     const inZ = z => z?.indoor && z.inside(k.x - z.ox, k.z - z.oz, -0.02);
     if (k.mode === 'toSeat') { const z = k.zone, s = k.seat; if (z?.obstacles?.length && s) nudgeClear(k, z.obstacles.filter(o => Math.hypot(s[0] - o.x, s[2] - o.z) > o.r + 0.01), 0.01); return; }
     if (k.mode === 'path' || k.mode === 'follow' || k.mode === 'lead') { for (const z of [k.zone, k.dest?.zone]) if (inZ(z) && z.obstacles?.length) nudgeClear(k, z.obstacles, 0.012); return; }
@@ -508,17 +509,21 @@ export class SchoolDay {
         const [sx, sy, sz] = this.qslot(p, i), there = this.stepTo(k, sx, sy, sz, k.speed * 0.7, dt, 0.015);
         if (!k.moving) k.yaw = Math.atan2(-p.q.dx, -p.q.dz);
         if (there && i === 0 && !p.busy) {
-          // My go! (Out of sight on the ride, then out again at the side.)
-          p.busy = k; p.queue.shift(); p.goes++; k.mode = 'riding'; k.rideT = p.ride; k.hidden = true; k.moving = false;
-          const e = this.qexit(p); k.x = e[0]; k.y = e[1]; k.z = e[2];
+          // My go! On to the ride itself (rides.js); a ride it does not know: out of sight, then out at the side.
+          p.busy = k; p.queue.shift(); p.goes++; k.mode = 'riding'; k.rideT = p.ride; k.moving = false;
+          k.drive = this.rideOf?.(p.b.id) || null; k.rideFrom = [k.x, k.y, k.z];
+          if (!k.drive) { k.hidden = true; const e = this.qexit(p); k.x = e[0]; k.y = e[1]; k.z = e[2]; }
         }
         return;
       }
       case 'riding': {
         k.moving = false; k.rideT -= dt;
+        if (k.drive) { try { k.drive(k, Math.min(1, 1 - k.rideT / (k.ride?.ride || 1))); } catch (err) { k.drive = null; k.hidden = true; } }
         if (k.rideT <= 0) {
           const p = k.ride; if (p && p.busy === k) p.busy = null;
-          k.hidden = false; k.ride = null; k.at = null; k.zone = this.yard; k.mode = 'wander'; [k.tx, k.tz] = this.crowd.pick(this.yard, this.r);
+          if (k.drive) { k.y = Math.max(0.012, square(Math.floor(k.x), Math.floor(k.z))?.base || 0); k.pose = 'walk'; }
+          k.drive = null; k.tilt = 0;
+          k.hidden = false; k.ride = null; k.at = null; k.zone = this.yard; k.mode = 'wander'; [k.tx, k.tz] = this.crowd.pick(this.yard, this.r, k);
           k.needs.fun = Math.min(1, k.needs.fun + 0.45); k.needs.energy = Math.max(0, k.needs.energy - 0.08);
           k.wait = 0.6 + this.r(); k.again = 2 + this.r() * 3;
           this.bubble(k, NEED_LINES.ride[Math.floor(this.r() * NEED_LINES.ride.length)]);
@@ -562,7 +567,7 @@ export class SchoolDay {
     for (let i = 0; i < A.length; i++) {
       const a = A[i]; if (a.hidden) continue;
       for (let j = i + 1; j < A.length; j++) {
-        const b = A[j]; if (b.hidden || Math.abs(a.y - b.y) > 0.1 || (a.mode === 'sit' && b.mode === 'sit') || (a.mode === 'sit' && b.mode === 'toSeat') || (b.mode === 'sit' && a.mode === 'toSeat')) continue;
+        const b = A[j]; if (b.hidden || a.mode === 'riding' || b.mode === 'riding' || Math.abs(a.y - b.y) > 0.1 || (a.mode === 'sit' && b.mode === 'sit') || (a.mode === 'sit' && b.mode === 'toSeat') || (b.mode === 'sit' && a.mode === 'toSeat')) continue;
         const R = 0.038 * (a.s + b.s), dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz);
         if (!(d < R && d > 1e-5)) continue;
         const ux = dx / d, uz = dz / d, gap = R - d;

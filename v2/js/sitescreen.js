@@ -179,18 +179,44 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   }
   const walls = [];          // wall lines on the floor being walked (for bumping into)
   const seatsById = new Map(), obstaclesById = new Map();
+  // Everything a piece's look depends on, as one string: its own fields, how high it stands, its links and doors,
+  // whether its roof is open, what holds up each square (for trusses), and the view. Same string, same piece.
+  const built = new Map();   // box id -> { sig, g, room, segs }
+  function sigOf(b) {
+    const { id, ...own } = b, parts = [JSON.stringify(own), yOf(b).toFixed(4), model.open(b) ? 1 : 0, JSON.stringify(model.links(b)), JSON.stringify(model.exits(b))];
+    if (b.level > 0) for (const [x, z] of model.squares(b)) { let yb = 'g'; for (let l = b.level - 1; l >= 0; l--) { const c = model.at(x, z, l); if (c) { yb = (yOf(c) + c.h * LEVEL).toFixed(3); break; } } parts.push(yb); }
+    if (S.inside) parts.push('in', S.floor, S.walkMode ? 1 : 0, S.day ? 1 : 0, S.cutH ?? '');
+    return parts.join('|');
+  }
+  // A kept piece goes back where it belongs (a drag may have moved it and tinted it red).
+  function settlePiece(g, b) {
+    g.position.set(b.x + b.w / 2, yOf(b), b.z + b.d / 2); g.scale.set(1, 1, 1);
+    g.traverse(o => { if (o.userData.mat0) { o.material = o.userData.mat0; delete o.userData.mat0; } });
+  }
   function redraw() {
-    walls.length = 0; seatsById.clear(); obstaclesById.clear();
-    for (const g of pieces.values()) { design.remove(g); disposePiece(g); }
-    pieces.clear();
+    const t0 = performance.now();
+    walls.length = 0; seatsById.clear(); obstaclesById.clear(); pieces.clear();
     if (siteView.gate) siteView.gate.visible = !model.at(siteView.gate.userData.sq[0], siteView.gate.userData.sq[1], 0);   // (the gate steps aside for a room built on its square)
-    const zones = [];
+    const zones = [], present = new Set();
+    let made = 0, kept = 0;
     for (const b of model.boxes) {
-      let g, room = null;
-      if (S.inside) { const r = makeInside(b); if (!r) continue; g = r.g; room = r.room; }
-      else g = makeGroup(b);
-      design.add(g); pieces.set(b.id, g);
-      if (gone.has(b.id) && !gone.get(b.id).landing) { g.traverse(o => { if (o.userData.rocket) o.visible = false; }); setArms(b.id, 1); }
+      present.add(b.id);
+      const sig = sigOf(b);
+      let e = built.get(b.id);
+      if (e && e.sig === sig) { kept++; if (e.g) settlePiece(e.g, b); walls.push(...e.segs); }
+      else {
+        if (e?.g) { design.remove(e.g); disposePiece(e.g); }
+        const w0 = walls.length;
+        let g = null, room = null;
+        if (S.inside) { const r = makeInside(b); if (r) { g = r.g; room = r.room; } }
+        else g = makeGroup(b);
+        e = { sig, g, room, segs: walls.slice(w0) }; built.set(b.id, e); made++;
+        if (g) { design.add(g); if (gone.has(b.id) && !gone.get(b.id).landing) { g.traverse(o => { if (o.userData.rocket) o.visible = false; }); } }
+      }
+      const g = e.g, room = e.room;
+      if (!g) continue;
+      pieces.set(b.id, g);
+      if (gone.has(b.id) && !gone.get(b.id).landing) setArms(b.id, 1);
       const zs = peopleFor(b, g, room); zones.push(...zs);
       const obs = (room?.obstacles || []).map(o => ({ x: b.x + b.w / 2 + o.x, z: b.z + b.d / 2 + o.z, r: o.r }));
       obstaclesById.set(b.id, obs); for (const z of zs) if (z.inside && z.margin) z.obstacles = obs;
@@ -199,6 +225,8 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       let st = room?.seats; if (!st) g.traverse(o => { if (o.userData.seats) st = o.userData.seats; });
       seatsById.set(b.id, (st || []).map(([x, y, z, yaw]) => [cx + x, y0 + y, cz + z, yaw]));
     }
+    // Pieces whose room has gone.
+    for (const [id, e] of built) if (!present.has(id)) { if (e.g) { design.remove(e.g); disposePiece(e.g); } built.delete(id); }
     zones.push(...strollers());
     levelGround();
     yard();
@@ -209,6 +237,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     if (S.selected && !model.byId.has(S.selected)) select(null); else if (S.selected) placeHandles();
     if (S.inside) drawFloors();
     updateLaunch();
+    S.lastRedraw = { made, kept, ms: +(performance.now() - t0).toFixed(1) };      // (for tests)
   }
   model.onChange(w => { if (w?.style) return; if (S.day) stopDay(); redraw(); });
   // The sky button: day, sunset, night, rain.

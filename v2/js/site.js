@@ -130,6 +130,29 @@ export const site = () => S;
 export const square = (x, z) => (S && x >= 0 && z >= 0 && x < GRID.w && z < GRID.d ? S.squares[z][x] : null);
 
 // Ground height (world units) at a world point, from the painted map's height grid.
+// The school gate: two posts with the school's name over the top and a little bell, on the square where the
+// children arrive in the morning and go home at the end of the day.
+function schoolGate(gx, gz) {
+  const g = new THREE.Group(), cx = gx + 0.5, cz = gz + 0.5, m = col => new THREE.MeshLambertMaterial({ color: col });
+  const post = new THREE.BoxGeometry(0.05, 0.34, 0.05);
+  for (const s of [-1, 1]) {
+    const p = new THREE.Mesh(post, m('#fbfaf6')); p.position.set(s * 0.3, 0.17, 0); p.castShadow = true; g.add(p);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.08), m('#e6463c')); cap.position.set(s * 0.3, 0.355, 0); g.add(cap);
+  }
+  const c = document.createElement('canvas'); c.width = 512; c.height = 96; const t = c.getContext('2d');
+  t.fillStyle = '#fbfaf6'; t.fillRect(0, 0, 512, 96); t.fillStyle = '#26272d'; t.textAlign = 'center'; t.textBaseline = 'middle';
+  let size = 52; do { t.font = `800 ${size}px Nunito, "Segoe UI", system-ui, sans-serif`; size -= 2; } while (t.measureText("Finn's Dream School").width > 460 && size > 20);
+  t.fillText("Finn's Dream School", 256, 50);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const blue = m('#3d8de0'), board = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.12, 0.03), [blue, blue, blue, blue, new THREE.MeshLambertMaterial({ map: tex }), blue]);
+  board.position.set(0, 0.33, 0); board.castShadow = true; g.add(board);
+  const bell = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.05, 12), m('#e8c547')); bell.position.set(0, 0.425, 0); g.add(bell);
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.008, 6, 12, Math.PI), m('#26272d')); arch.position.set(0, 0.4, 0); g.add(arch);
+  g.position.set(cx, groundAt(cx, cz), cz); g.rotation.y = Math.PI / 4;
+  g.traverse(o => { o.userData.noInk = true; });
+  g.userData.sq = [gx, gz];
+  return g;
+}
 export function groundAt(wx, wz) {
   const { hw, hd, heights } = S, res = S.raw.res;
   const fx = Math.min(Math.max(wx * GRID.k * res, 0), hw - 1.001), fz = Math.min(Math.max(wz * GRID.k * res, 0), hd - 1.001);
@@ -229,7 +252,8 @@ export function buildSite(world, view = {}) {
   group.add(grid);
 
   world.scene.add(group);
-  return Object.assign(view, { group, ground, water, grid, trees, _falls: fallsFn, _pads: null,
+  const gate = schoolGate(S.gate[0], S.gate[1]); group.add(gate);
+  return Object.assign(view, { group, ground, water, grid, trees, gate, _falls: fallsFn, _pads: null,
     setGridStrong(on) { grid.material.opacity = on ? 0.85 : 0.0; grid.visible = on; },
     // Trees step out of the way of buildings, and sit on the ground where it has been levelled.
     clearTrees(occupied) {

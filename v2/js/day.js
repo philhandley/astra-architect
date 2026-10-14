@@ -8,7 +8,7 @@ import { PROGRAMMES, SHAPES, LEVEL } from './catalogue.js';
 import { GRID, square, site } from './site.js';
 import { outline, storeyFloor, CUTTABLE } from './inside.js';
 import { seeded } from './crowd.js';
-import { emo, esc, say } from './ui.js';
+import { emo, esc, say, sfx } from './ui.js';
 
 // The timetable. go: own (the class's own classroom), room (one of these kinds of room, else their classroom),
 // play (scatter outside), gate (home).
@@ -229,6 +229,21 @@ export class SchoolDay {
       g.trail = [[g.teacher.x, g.teacher.y, g.teacher.z]];
       return g;
     });
+    // Parents: they bring the children to the gate, wave them off, and come back at home time. They walk in from
+    // and out to the edge of the meadow nearest the gate (the way to the road).
+    this.parents = [];
+    if (this.groups.length) {
+      const PG = { activity: 'arrive', kids: [], home: null, trail: [], gi: -1 };
+      const edge = this.land.filter(([, z]) => Math.abs(z - gate[1]) <= 2).sort((a, b) => a[0] - b[0])[0] || this.land[0];
+      this.exit = { door: edge, zone: { rect: { x0: edge[0] + 0.1, z0: edge[1] + 0.1, x1: edge[0] + 0.9, z1: edge[1] + 0.9 }, oy: Math.max(0.012, square(edge[0], edge[1])?.base || 0) }, type: 'exit', seats: [] };
+      const n = Math.min(9, 2 + this.groups.length * 2), TOPS = ['#e2457d', '#3d8de0', '#5f9a4c', '#f28b30', '#7c46a8', '#22b2bf', '#c9975f', '#e6463c', '#3d405b'], BOTTOMS = ['#3d405b', '#2e4a8c', '#5a3a26', '#8d8f96'];
+      for (let i = 0; i < n; i++) {
+        const [x, z] = [gate[0] + 0.2 + r() * 0.6, gate[1] + 0.2 + r() * 0.6];
+        const p = { kind: 'agent', pose: 'walk', teacher: false, parent: true, g: PG, k: i, s: 0.94 + r() * 0.1, ph: r() * 6, x, z, y: this.gateZone.oy, yaw: r() * 6, r, mode: 'wander', zone: this.gateZone, at: 'gate', speed: 1.05, wait: r() * 1.5,
+          needs: { energy: 1, fun: 1, hunger: 0 }, hidden: false, look: { top: TOPS[i % TOPS.length], shorts: BOTTOMS[i % BOTTOMS.length], skin: ['#f6d7bf', '#c98c62', '#e7b892', '#9a6544'][(i + 1) % 4], hair: ['#3b2a20', '#e3b65a', '#1f1b18', '#b5652e'][(i + 2) % 4], style: i % 3 } };
+        people.push(p); this.parents.push(p);
+      }
+    }
     this.agents = people;
     this.crowd.people = people; this.crowd.setCount(people.length);
     this.t = 0; this.period = -1; this.running = true; this.sayT = 0.6; this.stepT = 0; this.clock = 0; this.noSeat = 0;
@@ -259,6 +274,10 @@ export class SchoolDay {
     this.fields = new Map();
     const P = PERIODS[this.period];
     this.onPeriod?.(this.period, P);
+    if (this.parents?.length && this.exit) {
+      if (this.period === 1) for (const p of this.parents) { this.sendOne(p, this.exit); p.wait = this.r() * 2; }
+      if (P.go === 'gate') { for (const p of this.parents) { p.hidden = false; p.x = this.exit.door[0] + 0.2 + this.r() * 0.6; p.z = this.exit.door[1] + 0.2 + this.r() * 0.6; p.y = this.exit.zone.oy; p.at = null; this.sendOne(p, 'gate'); p.wait = this.r() * 0.8; } sfx.bell?.(); }
+    }
     const fill = new Map();
     const pick = types => {
       const list = this.places.filter(p => types.includes(p.type) || types.includes(p.b.shape));
@@ -362,6 +381,7 @@ export class SchoolDay {
   arrive(k) {
     const d = k.dest; k.at = d; k.path = null;
     if (d === 'gate') { k.mode = 'wander'; k.zone = this.gateZone; k.tx = k.x; k.tz = k.z; return; }
+    if (d.type === 'exit') { k.hidden = true; k.mode = 'idle'; k.moving = false; return; }
     k.zone = d.zone;
     const playing = k.g.activity === 'break';
     if (playing && !k.teacher && d.ride && d.queue.length < QUEUE_MAX) { d.queue.push(k); d.maxQ = Math.max(d.maxQ, d.queue.length); k.ride = d; k.mode = 'queue'; return; }
@@ -566,7 +586,7 @@ export class SchoolDay {
     if ((this.sayT -= dt) > 0) return;
     this.sayT = 0.9 + this.r() * 1.2;
     // Someone who is settled (sitting, playing or arriving) says something.
-    const pool = this.agents.filter(k => !k.teacher && !k.hidden && ['sit', 'wander', 'follow', 'queue'].includes(k.mode));
+    const pool = this.agents.filter(k => !k.teacher && !k.parent && !k.hidden && ['sit', 'wander', 'follow', 'queue'].includes(k.mode));
     if (!pool.length) return;
     const k = pool[Math.floor(this.r() * pool.length)];
     const s = this.world.toScreen(v3(k.x, k.y, k.z)), r = this.layer?.getBoundingClientRect();
@@ -580,7 +600,8 @@ export class SchoolDay {
     for (const k of this.agents) { if (k.hidden) continue; const s = this.world.toScreen(v3(k.x, k.y + 0.15 * k.s, k.z)), d = Math.hypot(s.x - cx, s.y - cy); if (d < bd) { bd = d; best = k; } }
     if (!best) return false;
     const old = this.bubbles.find(b => b.k === best);
-    const line = old ? old.line : best.teacher ? [['🍎', 'Well done, everyone!'], ['🔔', 'This way, class!'], ['⭐', 'Super work!']][Math.floor(this.r() * 3)] : this.lineFor(best);
+    const line = old ? old.line : best.teacher ? [['🍎', 'Well done, everyone!'], ['🔔', 'This way, class!'], ['⭐', 'Super work!']][Math.floor(this.r() * 3)]
+      : best.parent ? [['👋', 'Have a lovely day!'], ['🎒', 'Have you got your lunch box?'], ['🏠', 'See you at home time!'], ['⭐', 'What did you learn today?']][Math.floor(this.r() * 4)] : this.lineFor(best);
     if (!old) { for (const o of this.bubbles) o.el.remove(); this.bubbles = []; this.bubble(best, line, 3200); }
     say(noEmoji(line[1]));
     return true;

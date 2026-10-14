@@ -12,6 +12,7 @@ import { mountGuide } from './guide.js';
 import { mountShare, mountViewer, unpackDesign, shownCode } from './share.js';
 import { mountTourWords } from './tour.js';
 import { mountSlots } from './slots.js';
+import { mountGuided } from './guided.js';
 
 // Finn's wooden-block model from the photos: green classrooms along the beach, orange bars round the meadow,
 // a blue pool in the middle, a ring of green curves and an orange drum by the waterfall.
@@ -130,7 +131,8 @@ async function boot() {
   });
   paint();
   route();
-  if (!model.boxes.length && !shown) setTimeout(() => say('Welcome to your site! Choose a room on the left, then tap the grid to build it.'), 800);
+  const guided = !shown && location.hash !== '#rooms' && mountGuided(overlay, model, { site, world });
+  if (!model.boxes.length && !shown && !guided) setTimeout(() => say('Welcome to your site! Choose a room on the left, then tap the grid to build it.'), 800);
   window.__v2 = { world, model, site, rooms, siteView, guide, wishes };   // testing aid
   if (new URLSearchParams(location.search).has('fps')) world.stats(true);
   if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') navigator.serviceWorker.register('../sw.js', { scope: '../' }).catch(() => {});

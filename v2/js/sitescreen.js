@@ -183,6 +183,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     walls.length = 0; seatsById.clear();
     for (const g of pieces.values()) { design.remove(g); disposePiece(g); }
     pieces.clear();
+    if (siteView.gate) siteView.gate.visible = !model.at(siteView.gate.userData.sq[0], siteView.gate.userData.sq[1], 0);   // (the gate steps aside for a room built on its square)
     const zones = [];
     for (const b of model.boxes) {
       let g, room = null;

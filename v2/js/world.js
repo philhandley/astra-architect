@@ -132,6 +132,20 @@ export class World {
     for (const fn of [...this.updaters]) { try { fn(dt); } catch (e) { console.error(e); this.updaters.delete(fn); } }
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
+    if (this._stats) this._tick(dt);
+  }
+  // A small readout (frames a second, triangles, draw calls) for checking the app on the real tablet: `?fps`.
+  stats(on) {
+    if (!on) { this._stats?.el.remove(); this._stats = null; return; }
+    const el = document.createElement('div'); el.className = 'fps'; this.host.appendChild(el);
+    this._stats = { el, n: 0, t: 0, worst: 1 };
+  }
+  _tick(dt) {
+    const s = this._stats; s.n++; s.t += dt; s.worst = Math.max(s.worst, dt);
+    if (s.t < 0.5) return;
+    const r = this.renderer.info.render, fps = s.n / s.t;
+    s.el.textContent = `${fps.toFixed(0)} fps (slowest ${(1 / s.worst).toFixed(0)}) · ${(r.triangles / 1000).toFixed(0)}k tris · ${r.calls} calls · ${this.w}×${this.h} @${this.renderer.getPixelRatio().toFixed(1)}`;
+    s.n = 0; s.t = 0; s.worst = 1 / 120;
   }
   // Testing aid: run time forward even when the page is hidden.
   advance(sec) { for (let t = 0; t < sec; t += 1 / 30) this.step(1 / 30); }

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LEVEL } from './catalogue.js';
 import { mat, colonnade, courtyard, INK } from './shapes.js';
-import { Bag, FEATURES, PLANS, placeWallItems, seededRnd, wallTanks, waterTunnel, hangingPlanets, bunting, artline, mobiles } from './furnish.js';
+import { Bag, FEATURES, PLANS, placeWallItems, seededRnd, wallTanks, waterTunnel, hangingPlanets, bunting, artline, mobiles, fairylights, lanterns, climbropes, notemobiles, drone, ceilingstars, hangingwhale } from './furnish.js';
 import { outline, roundedRect, wallRuns, openings, eachPiece, runAt, TALL, WALL_T } from './plan.js';
 export { outline } from './plan.js';
 
@@ -160,7 +160,16 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
   placeWallItems(bag, b, k, plan, rnd, placed, seats);
   if (opts.walk && b.shape === 'observatory') hangingPlanets(bag, opts.top);
   if (opts.walk && ['classroom', 'ringhouse', 'art', 'lunch', 'music'].includes(b.type) && o.kind !== 'ring') bunting(bag, o, opts.top, rnd);
-  if (opts.walk && ['classroom', 'ringhouse'].includes(b.type) && o.kind !== 'ring') { artline(bag, o, opts.top, rnd); mobiles(bag, o, opts.top, rnd); }
+  if (opts.walk && ['classroom', 'ringhouse', 'art'].includes(b.type) && o.kind !== 'ring') { artline(bag, o, opts.top, rnd); mobiles(bag, o, opts.top, rnd); }
+  if (opts.walk && o.kind !== 'ring') {
+    if (b.type === 'library' || b.type === 'yoga') fairylights(bag, o, opts.top, rnd);
+    if (b.type === 'lunch') lanterns(bag, o, opts.top, rnd);
+    if (b.type === 'hall') climbropes(bag, o, opts.top, rnd);
+    if (b.type === 'music') notemobiles(bag, o, opts.top, rnd);
+    if (b.type === 'maker') drone(bag, o, opts.top, rnd);
+    if (b.type === 'yoga') ceilingstars(bag, o, opts.top, rnd);
+    if (aqua) hangingwhale(bag, o, opts.top, rnd);
+  }
   for (const [kind, count] of plan) {
     const F = FEATURES[kind];
     if (!F) continue;
@@ -171,7 +180,7 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
         if (b.type === 'pool' && o.kind === 'rr' && Math.abs(x) < (o.W - 0.2) / 2 && Math.abs(z) < (o.D - 0.2) / 2) continue;
         if (placed.some(p => Math.hypot(p.x - x, p.z - z) < p.r + F.r + 0.03)) continue;
         placed.push({ x, z, r: F.r });
-        for (const s of F.make(bag, x, z, hex, rnd)) seats.push(s);
+        for (const s of F.make(bag, x, z, hex, rnd, o)) seats.push(s);
         break;
       }
     }

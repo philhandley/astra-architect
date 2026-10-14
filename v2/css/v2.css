@@ -63,6 +63,7 @@ img.big { width: 40px; height: 40px; }
 .cam .sbtn.wide { grid-column: 1 / -1; height: 40px; }
 .site-ui.inside .tray { opacity: .5; }
 body.walking .tabs { opacity: .35; pointer-events: none; }
+.fps { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); background: rgba(38,39,45,.82); color: #fff; font: 600 13px/1 ui-monospace, Consolas, monospace; padding: 6px 10px; border-radius: 999px; pointer-events: none; z-index: 40; white-space: nowrap; }
 .sbtn:active { transform: scale(.95); }
 .hint { position: absolute; left: 50%; transform: translateX(-50%); top: 12px; max-width: min(640px, calc(100% - 560px)); background: rgba(255,255,255,.95); border-radius: 999px; box-shadow: var(--shadow); padding: 10px 20px; font-size: 16px; font-weight: 500; text-align: center; pointer-events: none !important; }
 .hint:empty { display: none; }

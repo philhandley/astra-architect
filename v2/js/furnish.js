@@ -183,6 +183,136 @@ export const WALLS = {
       s.box(WOOD, 0.006, 0.07, 0.004, x, y + 0.07, 0.006); s.box(DARK, 0.01, 0.016, 0.005, x, y + 0.112, 0.006);
     }
   } },
+  // ---- library ----
+  // A window seat: an open bench with books underneath and cushions on top.
+  readingnook: { w: 0.22, h: 0.1, d: 0.07, seat: [[-0.06, 0.005, 0.068], [0.06, 0.005, 0.068]], make(s, rnd) {
+    const col = pickC(rnd);
+    for (const sx of [-0.1, 0.1]) s.box(WOOD, 0.01, 0.052, 0.066, sx, 0.026, 0);
+    s.box(WOOD, 0.21, 0.01, 0.066, 0, 0.047, 0); s.box(WOOD, 0.19, 0.006, 0.066, 0, 0.003, 0); s.box('#e9e4da', 0.19, 0.04, 0.004, 0, 0.026, -0.031);
+    bookRow(s, -0.09, 0.09, 0.006, -0.002, 0.05, 0.026, 0.038, rnd);
+    s.box(col, 0.2, 0.016, 0.06, 0, 0.06, 0);
+    for (let i = 0; i < 3; i++) s.box(pickC(rnd), 0.04, 0.034, 0.014, -0.065 + i * 0.065, 0.085, -0.024);
+    s.box(RAINBOW[Math.floor(rnd() * 8)], 0.024, 0.004, 0.03, 0.03, 0.07, 0.01);
+  } },
+  // An alphabet frieze: letter cards in a row.
+  alphabet: { w: 0.26, h: 0.03, lift: 0.19, min: 0.14, make(s, rnd, y0) {
+    for (let i = 0; i < 9; i++) {
+      const x = -0.116 + i * 0.029, col = RAINBOW[(i + 2) % 8];
+      s.box(PAPER, 0.026, 0.028, 0.003, x, y0 + 0.015, 0.0015);
+      s.box(col, 0.004, 0.016, 0.001, x - 0.004, y0 + 0.015, 0.0035); s.box(col, 0.01, 0.004, 0.001, x + 0.001, y0 + 0.021, 0.0035); s.box(col, 0.008, 0.004, 0.001, x, y0 + 0.014, 0.0035);
+    }
+  } },
+  // Picture books face out on a stand with three ledges.
+  bookdisplay: { w: 0.14, h: 0.13, d: 0.04, make(s, rnd) {
+    s.box(WOOD, 0.14, 0.13, 0.008, 0, 0.065, -0.014);
+    for (let r = 0; r < 3; r++) {
+      const y = 0.004 + r * 0.042; s.box(WOOD, 0.14, 0.004, 0.024, 0, y, -0.002);
+      for (let k = 0; k < 3; k++) { const bx = -0.044 + k * 0.044, by = y + 0.02, col = pickC(rnd); s.box(col, 0.034, 0.036, 0.004, bx, by, -0.008); s.box(PAPER, 0.02, 0.005, 0.001, bx, by + 0.012, -0.0055); s.add(RAINBOW[Math.floor(rnd() * 8)], new THREE.CircleGeometry(0.008, 8).translate(bx, by - 0.004, -0.0055)); }
+    }
+  } },
+  // ---- hall ----
+  // A climbing wall: a board with bright holds and a crash mat beneath.
+  climbwall: { w: 0.22, h: 0.26, d: 0.03, make(s, rnd) {
+    s.box('#e9e4da', 0.22, 0.26, 0.012, 0, 0.13, -0.009);
+    for (let i = 0; i < 18; i++) s.add(pickC(rnd), new THREE.DodecahedronGeometry(0.007, 0).scale(1, 0.7, 0.6).translate(-0.09 + rnd() * 0.18, 0.03 + rnd() * 0.21, -0.001));
+    s.box('#3d8de0', 0.24, 0.016, 0.06, 0, 0.008, 0.025);
+  } },
+  // Team pennants in a row, high up.
+  banners: { w: 0.22, h: 0.09, lift: 0.17, min: 0.1, make(s, rnd, y0) {
+    s.box(STEEL, 0.22, 0.003, 0.003, 0, y0 + 0.088, 0.004);
+    for (let i = 0; i < 4; i++) { const bx = -0.078 + i * 0.052; s.add(['#e6463c', '#3d8de0', '#f7c22e', '#a3d140'][i], tri([[-0.02, 0.085], [0.02, 0.085], [0, 0]]).translate(bx, y0, 0.004)); s.add(PAPER, new THREE.CircleGeometry(0.008, 8).translate(bx, y0 + 0.062, 0.0046)); }
+  } },
+  // ---- lunch hall ----
+  // Today's menu on a chalkboard, with a pudding drawn in the corner.
+  menuboard: { w: 0.14, h: 0.11, lift: 0.12, min: 0.04, make(s, rnd, y0) {
+    s.box(WOOD, 0.14, 0.11, 0.006, 0, y0 + 0.055, 0.003); s.box('#2f4a3a', 0.126, 0.096, 0.004, 0, y0 + 0.055, 0.0065);
+    s.box(PAPER, 0.05, 0.004, 0.001, -0.03, y0 + 0.092, 0.009);
+    for (let i = 0; i < 4; i++) { const len = 0.04 + rnd() * 0.04; s.box(['#f7c22e', '#f5a3c7', '#a3d140', PAPER][i], len, 0.0025, 0.001, -0.055 + len / 2, y0 + 0.075 - i * 0.015, 0.009); }
+    s.add('#f5a3c7', new THREE.CircleGeometry(0.012, 10).translate(0.04, y0 + 0.028, 0.009)); s.add(RED, new THREE.CircleGeometry(0.004, 6).translate(0.04, y0 + 0.04, 0.0095));
+  } },
+  // A rack of coloured trays with a pot of cutlery on top.
+  trayrack: { w: 0.1, h: 0.1, d: 0.045, make(s, rnd) {
+    s.box(STEEL, 0.1, 0.1, 0.004, 0, 0.05, -0.02); for (const sx of [-0.048, 0.048]) s.box(STEEL, 0.004, 0.1, 0.044, sx, 0.05, 0);
+    for (let i = 0; i < 6; i++) s.box(RAINBOW[(i * 3) % 8], 0.09, 0.003, 0.038, 0, 0.008 + i * 0.012, 0);
+    s.box(STEEL, 0.1, 0.004, 0.044, 0, 0.102, 0);
+    s.cyl(STEEL, 0.012, 0.02, 0.025, 0.114, 0, 0.011, 8); for (let i = 0; i < 4; i++) s.box(STEEL, 0.002, 0.03, 0.002, 0.02 + i * 0.004, 0.13, (i % 2) * 0.006 - 0.003);
+  } },
+  // ---- art room ----
+  // A shelf of paint pots, a jar of brushes and a pot of glue.
+  paintshelf: { w: 0.18, h: 0.08, lift: 0.12, min: 0.05, make(s, rnd, y0) {
+    s.box(WOOD, 0.18, 0.006, 0.04, 0, y0 + 0.003, 0.02); for (const sx of [-0.08, 0.08]) s.box(WOOD, 0.006, 0.02, 0.03, sx, y0 - 0.01, 0.015);
+    for (let i = 0; i < 6; i++) s.cyl(RAINBOW[(i + 1) % 8], 0.009, 0.022, -0.07 + i * 0.022, y0 + 0.017, 0.016, 0.008, 8);
+    s.cyl('~#bfe4f3', 0.012, 0.03, 0.065, y0 + 0.021, 0.018, 0.011, 8); for (let i = 0; i < 4; i++) s.cyl(RAINBOW[i * 2], 0.0015, 0.05, 0.06 + i * 0.004, y0 + 0.04, 0.014 + (i % 2) * 0.006, 0.0015, 4);
+    s.box(PAPER, 0.016, 0.028, 0.016, 0.075, y0 + 0.02, 0.016); s.box(RED, 0.012, 0.004, 0.012, 0.075, y0 + 0.036, 0.016);
+  } },
+  // A colour wheel on the wall.
+  colourwheel: { w: 0.08, h: 0.08, lift: 0.15, min: 0.04, make(s, rnd, y0) {
+    const cy = y0 + 0.04; s.add(PAPER, new THREE.CircleGeometry(0.04, 24).translate(0, cy, 0.002));
+    ['#e6463c', '#f28b30', '#f7c22e', '#a3d140', '#3d8de0', '#7c46a8'].forEach((col, i) => s.add(col, new THREE.CircleGeometry(0.034, 6, i * Math.PI / 3, Math.PI / 3).translate(0, cy, 0.0035)));
+    s.add(PAPER, new THREE.CircleGeometry(0.009, 12).translate(0, cy, 0.005));
+  } },
+  // A paint trolley: pots of paint on top, brushes in a jar, paper on the shelf below. (It can stand in front of a window.)
+  painttrolley: { w: 0.14, h: 0.1, d: 0.05, make(s, rnd) {
+    s.box(WHITE, 0.14, 0.006, 0.05, 0, 0.097, 0); s.box(WHITE, 0.14, 0.006, 0.05, 0, 0.05, 0);
+    for (const sx of [-0.066, 0.066]) for (const sz of [-0.02, 0.02]) s.box(STEEL, 0.005, 0.1, 0.005, sx, 0.05, sz);
+    for (let i = 0; i < 5; i++) s.cyl(RAINBOW[(i + 1) % 8], 0.009, 0.022, -0.05 + i * 0.022, 0.111, 0, 0.008, 8);
+    s.cyl('~#bfe4f3', 0.012, 0.03, 0.05, 0.115, 0, 0.011, 8); for (let i = 0; i < 4; i++) s.cyl(RAINBOW[i * 2], 0.0015, 0.05, 0.045 + i * 0.004, 0.135, (i % 2) * 0.006 - 0.003, 0.0015, 4);
+    s.box(PAPER, 0.1, 0.01, 0.04, 0, 0.058, 0); s.box(RED, 0.012, 0.016, 0.012, 0.055, 0.061, 0.01);
+    for (const sx of [-0.05, 0.05]) for (const sz of [-0.02, 0.02]) s.add(DARK, new THREE.CylinderGeometry(0.008, 0.008, 0.005, 8).rotateX(Math.PI / 2).translate(sx, 0.008, sz));
+  } },
+  // ---- music room ----
+  // A stave of music along the wall.
+  notesfrieze: { w: 0.22, h: 0.045, lift: 0.19, min: 0.13, make(s, rnd, y0) {
+    for (let i = 0; i < 5; i++) s.box(DARK, 0.22, 0.0015, 0.001, 0, y0 + 0.008 + i * 0.007, 0.002);
+    for (let i = 0; i < 6; i++) { const nx = -0.09 + i * 0.036, ny = y0 + 0.012 + Math.floor(rnd() * 5) * 0.0035; s.add(DARK, new THREE.CircleGeometry(0.005, 8).scale(1.2, 0.9, 1).translate(nx, ny, 0.003)); s.box(DARK, 0.0015, 0.022, 0.001, nx + 0.005, ny + 0.011, 0.003); }
+    s.box(RED, 0.005, 0.034, 0.001, -0.105, y0 + 0.022, 0.003); s.add(RED, new THREE.CircleGeometry(0.006, 8).translate(-0.105, y0 + 0.012, 0.0032));
+  } },
+  // A rack of recorders in a row.
+  recorders: { w: 0.1, h: 0.08, lift: 0.1, min: 0.05, make(s, rnd, y0) {
+    s.box(WOOD, 0.1, 0.006, 0.02, 0, y0 + 0.07, 0.01);
+    for (let i = 0; i < 6; i++) { const rx = -0.04 + i * 0.016; s.cyl(RAINBOW[(i * 3) % 8], 0.003, 0.064, rx, y0 + 0.035, 0.01, 0.0025, 6); s.cyl(PAPER, 0.0032, 0.01, rx, y0 + 0.062, 0.01, 0.003, 6); }
+  } },
+  // A speaker stack with a little mixing desk on top.
+  speaker: { w: 0.07, h: 0.13, d: 0.05, make(s, rnd) {
+    s.box(DARK, 0.07, 0.11, 0.05, 0, 0.055, 0);
+    for (const [cy, r] of [[0.035, 0.02], [0.085, 0.012]]) { s.add('#6b6e76', new THREE.CylinderGeometry(r, r, 0.004, 14).rotateX(Math.PI / 2).translate(0, cy, 0.026)); s.add('#26272d', new THREE.CylinderGeometry(r * 0.4, r * 0.4, 0.004, 10).rotateX(Math.PI / 2).translate(0, cy, 0.028)); }
+    s.box('#8d8f96', 0.064, 0.012, 0.044, 0, 0.116, 0); for (let i = 0; i < 4; i++) { s.box(RAINBOW[i * 2], 0.004, 0.004, 0.012, -0.02 + i * 0.013, 0.124, 0.004); s.cyl(PAPER, 0.003, 0.003, -0.02 + i * 0.013, 0.1235, -0.012, 0.003, 6); }
+  } },
+  // ---- maker workshop ----
+  // Rows of little parts bins on rails.
+  partsbins: { w: 0.16, h: 0.08, lift: 0.1, min: 0.05, make(s, rnd, y0) {
+    for (let r = 0; r < 3; r++) { s.box(STEEL, 0.16, 0.004, 0.01, 0, y0 + 0.004 + r * 0.027, 0.005); for (let i = 0; i < 6; i++) s.box(RAINBOW[(i + r * 2) % 8], 0.022, 0.018, 0.02, -0.065 + i * 0.026, y0 + 0.015 + r * 0.027, 0.01); }
+  } },
+  // A big screen showing the house being designed, in green lines.
+  screen: { w: 0.14, h: 0.09, lift: 0.14, min: 0.05, make(s, rnd, y0) {
+    s.box(DARK, 0.14, 0.09, 0.006, 0, y0 + 0.045, 0.003); s.add('*#1f2a44', new THREE.PlaneGeometry(0.13, 0.08).translate(0, y0 + 0.045, 0.0065));
+    for (const [a, b2] of [[[-0.03, -0.02], [0.03, -0.02]], [[0.03, -0.02], [0.03, 0.02]], [[0.03, 0.02], [-0.03, 0.02]], [[-0.03, 0.02], [-0.03, -0.02]], [[-0.03, 0.02], [0, 0.035]], [[0, 0.035], [0.03, 0.02]]]) { const dx = b2[0] - a[0], dy = b2[1] - a[1]; s.add('*#7fe0a0', new THREE.PlaneGeometry(Math.hypot(dx, dy), 0.0025).rotateZ(Math.atan2(dy, dx)).translate((a[0] + b2[0]) / 2, y0 + 0.04 + (a[1] + b2[1]) / 2, 0.007)); }
+  } },
+  // ---- chill-out room ----
+  // A "how are you feeling?" board: a row of faces.
+  feelings: { w: 0.16, h: 0.07, lift: 0.13, min: 0.05, make(s, rnd, y0) {
+    s.box('#9fdcd0', 0.16, 0.07, 0.004, 0, y0 + 0.035, 0.002);
+    const faces = ['#f7c22e', '#a3d140', '#3d8de0', '#f28b30', '#e2457d'];
+    for (let i = 0; i < 5; i++) { const fx = -0.06 + i * 0.03; s.add(faces[i], new THREE.CircleGeometry(0.012, 12).translate(fx, y0 + 0.03, 0.005)); for (const ex of [-0.004, 0.004]) s.add(DARK, new THREE.CircleGeometry(0.0015, 5).translate(fx + ex, y0 + 0.034, 0.0056)); s.add(DARK, i % 2 ? new THREE.RingGeometry(0.004, 0.0055, 8, 1, Math.PI, Math.PI).translate(fx, y0 + 0.028, 0.0056) : new THREE.RingGeometry(0.004, 0.0055, 8, 1, 0, Math.PI).translate(fx, y0 + 0.022, 0.0056)); }
+    s.box(PAPER, 0.1, 0.006, 0.001, 0, y0 + 0.058, 0.005);
+  } },
+  // A small fish tank on a cabinet, for watching quietly.
+  calmtank: { w: 0.14, h: 0.1, d: 0.06, make(s, rnd) {
+    s.box(WHITE, 0.14, 0.06, 0.06, 0, 0.03, 0); s.box(DARK, 0.13, 0.004, 0.05, 0, 0.062, 0);
+    s.box('~#5ec4e2', 0.12, 0.06, 0.046, 0, 0.094, 0); s.box('#e8cfa4', 0.118, 0.006, 0.044, 0, 0.067, 0);
+    for (let i = 0; i < 3; i++) fishAt(s, -0.04 + i * 0.035, 0.085 + (i % 2) * 0.015, i % 2 ? 0.01 : -0.01, i % 2 ? -1 : 1, 0, 0.006, FISH_COLS[(i * 2) % 7]);
+    weedAt(s, 0.045, 0.07, 0.01, rnd); s.sphere('#8d8f96', 0.007, -0.045, 0.074, -0.01, 7);
+    s.box(DARK, 0.124, 0.006, 0.05, 0, 0.127, 0);
+  } },
+  // ---- observatory ----
+  // Mission control: three screens, a keyboard, a big red button and a chair.
+  controldesk: { w: 0.2, h: 0.09, d: 0.07, seat: [[0, 0.08, 0.045]], make(s, rnd) {
+    s.box(DARK, 0.2, 0.012, 0.07, 0, 0.064, 0); s.box('#3d405b', 0.19, 0.058, 0.012, 0, 0.029, -0.025); for (const sx of [-0.09, 0.09]) s.box('#3d405b', 0.012, 0.058, 0.066, sx, 0.029, 0);
+    for (let i = 0; i < 3; i++) { const sx = -0.062 + i * 0.062; s.box(DARK, 0.054, 0.04, 0.004, sx, 0.095, -0.02); s.add(['*#1f2a44', '*#2a4a7a', '*#1f2a44'][i], new THREE.PlaneGeometry(0.048, 0.034).translate(sx, 0.095, -0.0175)); s.cyl(DARK, 0.004, 0.008, sx, 0.074, -0.02, 0.012, 8); }
+    s.add('*#f7c22e', new THREE.CircleGeometry(0.008, 10).translate(-0.062, 0.1, -0.017)); s.add('*#e6463c', new THREE.CircleGeometry(0.004, 8).translate(0.062, 0.09, -0.017)); for (let i = 0; i < 4; i++) s.add('*#7fe0a0', new THREE.PlaneGeometry(0.03, 0.002).translate(0, 0.085 + i * 0.006, -0.017));
+    s.box(STEEL, 0.05, 0.004, 0.018, 0, 0.072, 0.012); s.cyl(RED, 0.006, 0.006, 0.06, 0.073, 0.015, 0.006, 8);
+    s.cyl(pickC(rnd), 0.02, 0.045, 0, 0.0225, 0.08);
+  } },
   // A whiteboard with today's sums and a drawing, and a pen tray.
   whiteboard: { w: 0.24, h: 0.13, lift: 0.1, min: 0.04, make(s, rnd, y0) {
     const cy = y0 + 0.07;
@@ -606,6 +736,290 @@ export const FEATURES = {
     for (let i = 0; i < 7; i++) bag.add(i % 2 ? '#fbfaf6' : RAINBOW[(i + Math.floor(rnd() * 3)) % 8], new THREE.BoxGeometry(0.36, 0.006, 0.04).translate(0, 0.003, -0.12 + i * 0.04).rotateY(rot).translate(x, 0, z));
     const seats = []; for (let i = 0; i < 8; i++) { const u = -0.14 + (i % 4) * 0.093, v = i < 4 ? -0.08 : 0.08; seats.push(rot ? [x + v, z + u, 0.004] : [x + u, z + v, 0.004]); }
     return seats; } },
+  // ---- library ----
+  // The librarian's desk: a computer, a date stamp and a crate of returned books; a chair behind it.
+  librarydesk: { r: 0.1, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, facing(x, z) + (rnd() - 0.5) * 0.6);
+    bag.within(m, s => {
+      s.box(WOOD, 0.16, 0.012, 0.07, 0, 0.07, 0); s.box('#e9e4da', 0.15, 0.064, 0.012, 0, 0.032, 0.028);
+      for (const sx of [-0.07, 0.07]) s.box('#e9e4da', 0.012, 0.064, 0.06, sx, 0.032, 0);
+      s.box(DARK, 0.04, 0.03, 0.004, -0.04, 0.095, -0.01); s.add('*#bfe4f3', new THREE.PlaneGeometry(0.034, 0.024).rotateY(Math.PI).translate(-0.04, 0.095, -0.0125)); s.cyl(DARK, 0.008, 0.004, -0.04, 0.078, -0.01, 0.012, 8); s.cyl(DARK, 0.003, 0.012, -0.04, 0.084, -0.01, 0.003, 6);
+      s.box(STEEL, 0.03, 0.004, 0.014, -0.03, 0.078, -0.028);
+      s.cyl(RED, 0.006, 0.01, 0.01, 0.081, -0.02, 0.004, 8); s.box(DARK, 0.012, 0.004, 0.012, 0.01, 0.077, -0.02);
+      s.box('#c9975f', 0.05, 0.03, 0.04, 0.05, 0.091, 0.005); bookRow(s, 0.028, 0.072, 0.092, 0.005, 0.034, 0.03, 0.04, rnd);
+      s.cyl(pickC(rnd), 0.02, 0.045, 0, 0.0225, -0.075);
+    });
+    return [atH(m, 0, -0.075, 0.045)]; } },
+  // A book trolley on four wheels.
+  bookcart: { r: 0.06, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28);
+    bag.within(m, s => {
+      for (const y of [0.012, 0.052]) s.box(STEEL, 0.1, 0.004, 0.05, 0, y, 0);
+      for (const sx of [-0.048, 0.048]) s.box(STEEL, 0.004, 0.09, 0.05, sx, 0.052, 0);
+      s.box(STEEL, 0.1, 0.004, 0.004, 0, 0.096, -0.02);
+      for (const y of [0.014, 0.054]) bookRow(s, -0.044, 0.044, y, 0, 0.04, 0.03, 0.036, rnd);
+      for (const sx of [-0.04, 0.04]) for (const sz of [-0.02, 0.02]) s.add(DARK, new THREE.CylinderGeometry(0.008, 0.008, 0.006, 8).rotateX(Math.PI / 2).translate(sx, 0.008, sz));
+    });
+    return []; } },
+  // A floor lamp with a warm glowing shade.
+  lamp: { r: 0.035, make(bag, x, z, c, rnd) {
+    bag.cyl(DARK, 0.03, 0.006, x, 0.003, z, 0.03, 12); bag.cyl(DARK, 0.004, 0.2, x, 0.1, z, 0.004, 6);
+    bag.cyl('*#ffe7a3', 0.035, 0.05, x, 0.215, z, 0.028, 12);
+    return []; } },
+  // A puppet theatre: a striped booth with two puppets on the go, and cushions for the audience.
+  puppettheatre: { r: 0.09, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, facing(x, z) + (rnd() - 0.5) * 0.8), col = pickC(rnd), seats = [];
+    bag.within(m, s => {
+      s.box(col, 0.14, 0.17, 0.05, 0, 0.085, -0.02);
+      for (let i = 0; i < 7; i++) if (i % 2) s.box(PAPER, 0.02, 0.17, 0.002, -0.06 + i * 0.02, 0.085, 0.0065);
+      s.box('#26272d', 0.1, 0.07, 0.003, 0, 0.1, 0.0085);
+      s.add(RED, tri([[-0.08, 0], [0.08, 0], [0, 0.05]]).translate(0, 0.17, 0.006));
+      for (const [px, pc] of [[-0.025, '#f28b30'], [0.025, '#3d8de0']]) { s.ball('#f2cfa8', 0.012, px, 0.09, 0.014); s.box(pc, 0.02, 0.028, 0.014, px, 0.077, 0.016); }
+      for (let i = 0; i < 3; i++) { const sx = -0.04 + i * 0.04; s.cyl(pickC(rnd), 0.02, 0.012, sx, 0.006, 0.09, 0.02, 10); seats.push(atH(m, sx, 0.09, 0.012)); }
+    });
+    return seats; } },
+  // ---- hall ----
+  // Court lines painted on the hall floor: a border, a centre line and a centre circle. (Drawn to the room.)
+  court: { r: 0.02, centre: true, make(bag, x, z, c, rnd, o) {
+    if (!o || o.kind !== 'rr') return [];
+    const W = o.W - 0.5, D = o.D - 0.5, t = 0.01;
+    if (W < 0.6 || D < 0.4) return [];
+    const line = (w, d, px, pz) => bag.box(PAPER, w, 0.002, d, px, 0.002, pz);
+    line(W, t, 0, -D / 2); line(W, t, 0, D / 2); line(t, D, -W / 2, 0); line(t, D, W / 2, 0);
+    if (W >= D) line(t, D, 0, 0); else line(W, t, 0, 0);
+    const r = Math.min(W, D) * 0.16; bag.add(PAPER, new THREE.RingGeometry(r, r + t, 32).rotateX(-Math.PI / 2).translate(0, 0.003, 0));
+    return []; } },
+  // A small goal with a net.
+  goal: { r: 0.09, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, facing(x, z) + (rnd() - 0.5) * 0.5);
+    bag.within(m, s => {
+      for (const sx of [-0.07, 0.07]) s.box(WHITE, 0.008, 0.09, 0.008, sx, 0.045, 0);
+      s.box(WHITE, 0.148, 0.008, 0.008, 0, 0.094, 0);
+      for (const sx of [-0.07, 0.07]) s.box(WHITE, 0.006, 0.006, 0.05, sx, 0.003, -0.025);
+      s.add('^#e8e4da', new THREE.PlaneGeometry(0.14, 0.09).translate(0, 0.045, -0.045));
+      s.add('^#e8e4da', new THREE.PlaneGeometry(0.14, 0.05).rotateX(-Math.PI / 2).translate(0, 0.09, -0.02));
+      s.sphere(PAPER, 0.012, 0.03, 0.012, 0.08, 8);
+    });
+    return []; } },
+  // A low balance beam.
+  balancebeam: { r: 0.1, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28);
+    bag.within(m, s => { s.box('#3d8de0', 0.2, 0.016, 0.02, 0, 0.04, 0); for (const sx of [-0.08, 0.08]) { s.box(STEEL, 0.012, 0.032, 0.012, sx, 0.016, 0); s.box(STEEL, 0.03, 0.006, 0.05, sx, 0.003, 0); } });
+    return []; } },
+  // Hula hoops leaning in a stack, and a basket of bean bags.
+  hoops: { r: 0.06, make(bag, x, z, c, rnd) {
+    for (let i = 0; i < 4; i++) bag.add(RAINBOW[(i * 2 + 1) % 8], new THREE.TorusGeometry(0.04, 0.003, 5, 16).rotateX(Math.PI / 2 - 0.25).translate(x + i * 0.006, 0.042, z + i * 0.004));
+    bag.cyl('#c9975f', 0.025, 0.03, x - 0.05, 0.015, z + 0.03, 0.02, 10);
+    for (let i = 0; i < 3; i++) bag.ball(pickC(rnd), 0.008, x - 0.05 + Math.cos(i * 2.1) * 0.01, 0.03, z + 0.03 + Math.sin(i * 2.1) * 0.01);
+    return []; } },
+  // ---- lunch hall ----
+  // A long table with a bench down each side: six places, each laid, and a bowl of fruit in the middle.
+  longtable: { r: 0.15, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() < 0.5 ? 0 : Math.PI / 2), seats = [];
+    bag.within(m, s => {
+      s.box(TABLE, 0.26, 0.012, 0.09, 0, 0.075, 0); for (const sx of [-0.1, 0.1]) s.box('#d8d4cc', 0.012, 0.07, 0.07, sx, 0.035, 0);
+      for (const sz of [-0.075, 0.075]) { s.box(pickC(rnd), 0.24, 0.01, 0.035, 0, 0.045, sz); for (const sx of [-0.1, 0.1]) s.box(STEEL, 0.008, 0.04, 0.03, sx, 0.02, sz); }
+      for (let i = 0; i < 6; i++) { const px = -0.085 + (i % 3) * 0.085, pz = i < 3 ? -0.028 : 0.028; s.cyl(PAPER, 0.016, 0.003, px, 0.0825, pz, 0.014, 12); s.ball(['#a3d140', ORANGE, '#f7c22e', RED][i % 4], 0.008, px, 0.083, pz); s.cyl(pickC(rnd), 0.005, 0.014, px + 0.024, 0.088, pz, 0.004, 8); seats.push(atH(m, px, i < 3 ? -0.075 : 0.075, 0.05)); }
+      s.cyl(PAPER, 0.018, 0.012, 0, 0.087, 0, 0.012, 12); for (let i = 0; i < 3; i++) s.sphere([RED, '#f7c22e', '#a3d140'][i], 0.008, Math.cos(i * 2.1) * 0.007, 0.097, Math.sin(i * 2.1) * 0.007);
+    });
+    return seats; } },
+  // A salad bar: bowls of colours under a glass guard, on wheels.
+  saladbar: { r: 0.09, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28);
+    bag.within(m, s => {
+      s.box(WHITE, 0.16, 0.07, 0.07, 0, 0.035, 0); s.box(STEEL, 0.17, 0.006, 0.08, 0, 0.073, 0);
+      ['#a3d140', '#e6463c', '#f7c22e', '#f28b30', '#7db45a'].forEach((col, i) => { s.cyl(STEEL, 0.014, 0.01, -0.06 + i * 0.03, 0.08, 0, 0.012, 10); s.ball(col, 0.011, -0.06 + i * 0.03, 0.082, 0); });
+      s.box('~#bfe4f3', 0.16, 0.03, 0.003, 0, 0.11, -0.03); for (const sx of [-0.075, 0.075]) s.box(STEEL, 0.004, 0.045, 0.004, sx, 0.0975, -0.03);
+      for (const sx of [-0.06, 0.06]) for (const sz of [-0.03, 0.03]) s.add(DARK, new THREE.CylinderGeometry(0.009, 0.009, 0.006, 8).rotateX(Math.PI / 2).translate(sx, 0.009, sz));
+    });
+    return []; } },
+  // A tiered fruit stand.
+  fruitstand: { r: 0.05, make(bag, x, z, c, rnd) {
+    bag.cyl(WOOD, 0.04, 0.05, x, 0.025, z, 0.04, 12);
+    for (let t = 0; t < 3; t++) {
+      const r = 0.045 - t * 0.012, y = 0.05 + t * 0.028; bag.cyl(WHITE, r, 0.004, x, y, z, r, 12); if (t < 2) bag.cyl(STEEL, 0.004, 0.028, x, y + 0.014, z, 0.004, 6);
+      const n = 7 - t * 2; for (let i = 0; i < n; i++) { const a = i / n * 6.28; bag.sphere([RED, '#f7c22e', '#f28b30', '#a3d140'][(i + t) % 4], 0.009, x + Math.cos(a) * (r - 0.012), y + 0.011, z + Math.sin(a) * (r - 0.012), 8); }
+    }
+    return []; } },
+  // ---- art room ----
+  // A potter's wheel with a pot on the go, a stool and a bucket.
+  potterywheel: { r: 0.07, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28);
+    bag.within(m, s => {
+      s.box(STEEL, 0.07, 0.05, 0.06, 0, 0.025, 0); s.cyl('#8d8f96', 0.03, 0.006, 0, 0.053, 0, 0.03, 14);
+      s.cyl('#b7855a', 0.016, 0.03, 0, 0.071, 0, 0.012, 10); s.cyl('#8d6a4a', 0.012, 0.004, 0, 0.088, 0, 0.012, 10);
+      s.cyl(STEEL, 0.02, 0.028, 0.06, 0.014, -0.02, 0.016, 10); s.cyl('~#bfe4f3', 0.017, 0.004, 0.06, 0.03, -0.02, 0.017, 10);
+      s.cyl(WOOD, 0.02, 0.04, 0, 0.02, 0.07, 0.02, 10);
+    });
+    return [atH(m, 0, 0.07, 0.04)]; } },
+  // A kiln with a round door glowing inside, and pots cooling on top.
+  kiln: { r: 0.06, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, facing(x, z) + (rnd() - 0.5) * 0.8);
+    bag.within(m, s => {
+      s.box('#8d8f96', 0.1, 0.11, 0.09, 0, 0.055, 0); s.box(DARK, 0.1, 0.01, 0.09, 0, 0.115, 0);
+      s.add('#6b6e76', new THREE.CylinderGeometry(0.03, 0.03, 0.006, 16).rotateX(Math.PI / 2).translate(0, 0.05, 0.047)); s.add('*#ff9a3c', new THREE.CircleGeometry(0.012, 12).translate(0, 0.05, 0.051));
+      s.box(STEEL, 0.03, 0.006, 0.006, 0.02, 0.05, 0.052);
+      for (let i = 0; i < 3; i++) s.cyl(['#c99a6b', '#e2457d', '#22b2bf'][i], 0.01, 0.022, -0.03 + i * 0.03, 0.131, 0, 0.007, 8);
+    });
+    return []; } },
+  // A clay table: lumps of clay, pots drying and a rolling pin, with stools round it.
+  claytable: { r: 0.11, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28), seats = [];
+    bag.within(m, s => {
+      s.box(TABLE, 0.18, 0.012, 0.1, 0, 0.07, 0); for (const [lx, lz] of [[-0.08, -0.04], [0.08, -0.04], [-0.08, 0.04], [0.08, 0.04]]) s.box('#d8d4cc', 0.01, 0.064, 0.01, lx, 0.032, lz);
+      s.box('#8d8f96', 0.16, 0.003, 0.08, 0, 0.0775, 0);
+      for (let i = 0; i < 4; i++) { const px = -0.06 + i * 0.04, pz = i % 2 ? 0.02 : -0.02; if (i % 2) s.ball('#b7855a', 0.012, px, 0.079, pz); else s.cyl('#b7855a', 0.012, 0.018, px, 0.088, pz, 0.009, 8); }
+      s.add(WOOD, new THREE.CylinderGeometry(0.005, 0.005, 0.05, 6).rotateZ(Math.PI / 2).rotateY(0.4).translate(0.05, 0.084, 0.03));
+      for (const sx of [-0.05, 0.05]) for (const sz of [-0.085, 0.085]) { s.cyl(pickC(rnd), 0.02, 0.045, sx, 0.0225, sz); seats.push(atH(m, sx, sz, 0.045)); }
+    });
+    return seats; } },
+  // ---- music room ----
+  // Three music stands with chairs, in a little arc: the school orchestra.
+  musicstands: { r: 0.11, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, facing(x, z) + (rnd() - 0.5) * 0.6), seats = [];
+    bag.within(m, s => {
+      for (let i = 0; i < 3; i++) {
+        const a = (i - 1) * 0.55, sx = Math.sin(a) * 0.07, sz = -Math.cos(a) * 0.07 + 0.04;
+        s.within(new THREE.Matrix4().makeRotationY(a).setPosition(sx, 0, sz), p => {
+          p.cyl(DARK, 0.002, 0.08, 0, 0.04, 0, 0.002, 5); for (let k = 0; k < 3; k++) p.add(DARK, new THREE.BoxGeometry(0.003, 0.003, 0.03).translate(0, 0.0015, 0.015).rotateY(k * 2.09));
+          p.add(DARK, new THREE.BoxGeometry(0.05, 0.04, 0.002).rotateX(-0.4).translate(0, 0.095, 0)); p.add(PAPER, new THREE.BoxGeometry(0.036, 0.03, 0.001).rotateX(-0.4).translate(0, 0.097, 0.0015));
+          p.cyl(pickC(rnd), 0.02, 0.045, 0, 0.0225, -0.06);
+        });
+        seats.push(atH(m, sx - Math.sin(a) * 0.06, sz - Math.cos(a) * 0.06, 0.045));
+      }
+    });
+    return seats; } },
+  // A conductor's podium with a music stand and a baton.
+  conductor: { r: 0.05, make(bag, x, z, c, rnd) {
+    bag.box(WOOD, 0.07, 0.02, 0.07, x, 0.01, z);
+    bag.cyl(DARK, 0.002, 0.09, x, 0.065, z + 0.02, 0.002, 5); bag.add(DARK, new THREE.BoxGeometry(0.05, 0.04, 0.002).rotateX(-0.4).translate(x, 0.12, z + 0.02));
+    bag.cyl(PAPER, 0.0015, 0.03, x + 0.02, 0.035, z - 0.01, 0.0015, 4);
+    return []; } },
+  // A basket of shakers: maracas and a tambourine.
+  shakers: { r: 0.05, make(bag, x, z, c, rnd) {
+    bag.cyl('#c9975f', 0.035, 0.04, x, 0.02, z, 0.03, 12);
+    for (let i = 0; i < 3; i++) { const a = i * 2.1, mx = x + Math.cos(a) * 0.015, mz = z + Math.sin(a) * 0.015; bag.ball(pickC(rnd), 0.011, mx, 0.04, mz); bag.cyl(WOOD, 0.003, 0.035, mx, 0.07, mz, 0.003, 5); }
+    bag.add('#f7c22e', new THREE.TorusGeometry(0.02, 0.004, 5, 14).rotateX(0.5).translate(x + 0.045, 0.03, z + 0.02));
+    return []; } },
+  // A microphone on a stand.
+  mic: { r: 0.03, make(bag, x, z, c, rnd) {
+    bag.cyl(DARK, 0.02, 0.004, x, 0.002, z, 0.02, 10); bag.cyl(DARK, 0.002, 0.14, x, 0.072, z, 0.002, 5);
+    bag.add(DARK, new THREE.CylinderGeometry(0.003, 0.003, 0.03, 6).rotateX(0.9).translate(x, 0.15, z + 0.01)); bag.sphere('#8d8f96', 0.008, x, 0.158, z + 0.022, 8);
+    return []; } },
+  // A double bass leaning on its stand.
+  doublebass: { r: 0.05, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28);
+    bag.within(m, s => {
+      s.within(new THREE.Matrix4().makeRotationX(-0.25).setPosition(0, 0.02, 0), p => {
+        p.add('#8a5a3b', new THREE.SphereGeometry(0.03, 10, 8).scale(1, 1.1, 0.4).translate(0, 0.04, 0)); p.add('#8a5a3b', new THREE.SphereGeometry(0.024, 10, 8).scale(1, 1.1, 0.4).translate(0, 0.085, 0));
+        p.box('#5a3a26', 0.008, 0.16, 0.008, 0, 0.17, 0); p.box(DARK, 0.012, 0.03, 0.012, 0, 0.26, 0);
+        for (let i = 0; i < 4; i++) p.box(STEEL, 0.0008, 0.22, 0.0008, -0.0045 + i * 0.003, 0.14, 0.0125);
+        p.box('#5a3a26', 0.03, 0.004, 0.004, 0, 0.06, 0.013);
+      });
+      s.box(DARK, 0.06, 0.006, 0.05, 0, 0.003, 0.02); s.box(DARK, 0.006, 0.03, 0.006, 0, 0.015, -0.03);
+    });
+    return []; } },
+  // ---- maker workshop ----
+  // A brick-building table: a green baseplate with towers going up, a tub of bricks, stools round it.
+  legotable: { r: 0.1, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28), seats = [];
+    bag.within(m, s => {
+      s.box(TABLE, 0.16, 0.012, 0.12, 0, 0.065, 0); for (const [lx, lz] of [[-0.07, -0.05], [0.07, -0.05], [-0.07, 0.05], [0.07, 0.05]]) s.box('#d8d4cc', 0.01, 0.06, 0.01, lx, 0.03, lz);
+      s.box('#a3d140', 0.14, 0.004, 0.1, 0, 0.073, 0);
+      for (let i = 0; i < 7; i++) { const bx = -0.05 + rnd() * 0.1, bz = -0.035 + rnd() * 0.07, h = 0.008 + Math.floor(rnd() * 4) * 0.008; s.box(pickC(rnd), 0.014, h, 0.014, bx, 0.075 + h / 2, bz); s.cyl(pickC(rnd), 0.003, 0.003, bx, 0.0765 + h, bz, 0.003, 6); }
+      s.box('#3d8de0', 0.05, 0.03, 0.04, 0.11, 0.015, 0.02); for (let i = 0; i < 4; i++) s.box(pickC(rnd), 0.01, 0.008, 0.01, 0.1 + (i % 2) * 0.016, 0.034, 0.012 + Math.floor(i / 2) * 0.016);
+      for (const sz of [-0.09, 0.09]) for (const sx of [-0.04, 0.04]) { s.cyl(pickC(rnd), 0.02, 0.045, sx, 0.0225, sz); seats.push(atH(m, sx, sz, 0.045)); }
+    });
+    return seats; } },
+  // A laser cutter: an open tray with an orange glass lid, and a head that runs to and fro over the wood.
+  lasercutter: { r: 0.08, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28);
+    bag.within(m, s => {
+      s.box(STEEL, 0.14, 0.05, 0.1, 0, 0.025, 0); s.box('#d8d4cc', 0.14, 0.008, 0.1, 0, 0.004, 0);
+      for (const sx of [-0.066, 0.066]) s.box(STEEL, 0.008, 0.022, 0.1, sx, 0.061, 0); for (const sz of [-0.046, 0.046]) s.box(STEEL, 0.14, 0.022, 0.008, 0, 0.061, sz);
+      s.box('#c9a46f', 0.1, 0.003, 0.06, 0, 0.0515, -0.005);
+      s.box('~#f8b878', 0.124, 0.002, 0.084, 0, 0.073, 0);
+      s.add('*#7fe0a0', new THREE.PlaneGeometry(0.02, 0.01).translate(0.045, 0.06, 0.0505)); s.cyl(RED, 0.004, 0.004, -0.05, 0.074, 0.047, 0.004, 8);
+      s.part(partGroup(h => { h.box(DARK, 0.012, 0.01, 0.012, 0, 0, 0); h.cyl(STEEL, 0.002, 0.012, 0, -0.008, 0, 0.001, 6); h.add('*#ff5a3c', new THREE.PlaneGeometry(0.003, 0.012).translate(0, -0.014, 0)); }, { glide: { axis: 'x', base: 0, amp: 0.04, speed: 1.8 + rnd(), phase: rnd() * 6 } })).position.set(0, 0.066, -0.005);
+    });
+    return []; } },
+  // A cardboard castle the children made, with a flag on top.
+  cardboardcastle: { r: 0.08, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28), CARD = '#c9a46f';
+    bag.within(m, s => {
+      s.box(CARD, 0.12, 0.08, 0.1, 0, 0.04, 0);
+      for (const [tx, tz] of [[-0.06, -0.05], [0.06, -0.05], [-0.06, 0.05], [0.06, 0.05]]) { s.box(CARD, 0.036, 0.11, 0.036, tx, 0.055, tz); for (let k = 0; k < 4; k++) s.box(CARD, 0.009, 0.012, 0.009, tx + (k % 2 ? 0.012 : -0.012), 0.116, tz + (k < 2 ? -0.012 : 0.012)); }
+      for (let k = 0; k < 4; k++) s.box(CARD, 0.012, 0.012, 0.012, -0.03 + k * 0.02, 0.086, 0.044);
+      s.box('#5a3a26', 0.03, 0.04, 0.004, 0, 0.02, 0.05); s.add(DARK, new THREE.CylinderGeometry(0.015, 0.015, 0.004, 10, 1, false, 0, Math.PI).rotateX(Math.PI / 2).translate(0, 0.04, 0.05));
+      s.cyl(STEEL, 0.0015, 0.05, 0.06, 0.135, -0.05, 0.0015, 4); s.add('^#e6463c', tri([[0, 0], [0.03, 0.008], [0, 0.016]]).translate(0.06, 0.144, -0.05));
+    });
+    return []; } },
+  // A soldering bench: a lamp, a circuit board and a coil of wire, and a stool.
+  solder: { r: 0.07, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, facing(x, z) + (rnd() - 0.5) * 0.8);
+    bag.within(m, s => {
+      s.box(WOOD, 0.12, 0.012, 0.07, 0, 0.07, 0); for (const [lx, lz] of [[-0.05, -0.025], [0.05, -0.025], [-0.05, 0.025], [0.05, 0.025]]) s.box('#d8d4cc', 0.01, 0.064, 0.01, lx, 0.032, lz);
+      s.box('#3e9a4f', 0.04, 0.003, 0.03, -0.01, 0.0775, 0.005); for (let i = 0; i < 5; i++) s.box(DARK, 0.004, 0.004, 0.004, -0.024 + i * 0.008, 0.081, 0.002 + (i % 2) * 0.008);
+      s.cyl(DARK, 0.004, 0.003, 0.04, 0.0775, -0.02, 0.004, 6); s.add(DARK, new THREE.CylinderGeometry(0.0015, 0.0015, 0.06, 4).rotateX(0.5).translate(0.04, 0.1, -0.008)); s.cyl('*#ffe7a3', 0.012, 0.012, 0.035, 0.125, 0.01, 0.008, 10);
+      s.add('#f28b30', new THREE.TorusGeometry(0.008, 0.003, 5, 10).rotateX(Math.PI / 2).translate(0.03, 0.08, 0.022));
+      s.cyl(pickC(rnd), 0.02, 0.045, 0, 0.0225, 0.07);
+    });
+    return [atH(m, 0, 0.07, 0.045)]; } },
+  // ---- chill-out room ----
+  // A hammock on a wooden stand.
+  hammock: { r: 0.1, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, rnd() * 6.28), col = pickC(rnd);
+    bag.within(m, s => {
+      for (const sx of [-0.11, 0.11]) { s.add(WOOD, new THREE.BoxGeometry(0.012, 0.11, 0.012).rotateZ(sx > 0 ? -0.5 : 0.5).translate(sx, 0.05, 0)); s.box(WOOD, 0.05, 0.01, 0.05, sx * 1.15, 0.005, 0); }
+      s.box(WOOD, 0.3, 0.01, 0.014, 0, 0.012, 0);
+      for (let i = 0; i < 8; i++) { const t0 = i / 8, t1 = (i + 1) / 8, x0 = -0.1 + 0.2 * t0, x1 = -0.1 + 0.2 * t1, y0 = 0.095 - Math.sin(t0 * Math.PI) * 0.05, y1 = 0.095 - Math.sin(t1 * Math.PI) * 0.05; s.add(col, new THREE.BoxGeometry(Math.hypot(x1 - x0, y1 - y0) + 0.002, 0.003, 0.06).rotateZ(Math.atan2(y1 - y0, x1 - x0)).translate((x0 + x1) / 2, (y0 + y1) / 2, 0)); }
+      s.add('#fbfaf6', new THREE.SphereGeometry(0.014, 8, 6).scale(1.4, 0.6, 1).translate(0.05, 0.062, 0));
+    });
+    return [atH(m, 0, 0, 0.045)]; } },
+  // A lava lamp on a little table.
+  lavalamp: { r: 0.035, make(bag, x, z, c, rnd) {
+    bag.cyl(WOOD, 0.025, 0.004, x, 0.05, z, 0.025, 10); bag.cyl(WOOD, 0.004, 0.05, x, 0.025, z, 0.004, 6); bag.cyl(WOOD, 0.02, 0.004, x, 0.002, z, 0.02, 10);
+    bag.cyl(STEEL, 0.012, 0.012, x, 0.058, z, 0.009, 10); bag.cyl('~#f5a3c7', 0.009, 0.05, x, 0.089, z, 0.014, 10); bag.cyl(STEEL, 0.006, 0.01, x, 0.119, z, 0.009, 10);
+    for (let i = 0; i < 3; i++) bag.sphere('*#e2457d', 0.005 + i * 0.001, x + (i - 1) * 0.003, 0.075 + i * 0.013, z, 6);
+    return []; } },
+  // A big nest cushion to curl up in.
+  nest: { r: 0.08, make(bag, x, z, c, rnd) {
+    const col = pickC(rnd);
+    bag.add(col, new THREE.TorusGeometry(0.05, 0.022, 7, 18).rotateX(Math.PI / 2).translate(x, 0.02, z)); bag.cyl(col, 0.05, 0.012, x, 0.006, z, 0.05, 18);
+    bag.ball(pickC(rnd), 0.014, x + 0.01, 0.012, z - 0.01);
+    return [[x, z, 0.014]]; } },
+  // ---- observatory ----
+  // The moon on a stand, craters and all.
+  moonglobe: { r: 0.04, make(bag, x, z, c, rnd) {
+    bag.cyl(DARK, 0.02, 0.004, x, 0.002, z, 0.02, 10); bag.cyl(DARK, 0.003, 0.03, x, 0.019, z, 0.003, 6);
+    bag.sphere('#d9d6cf', 0.03, x, 0.064, z, 12);
+    for (let i = 0; i < 6; i++) { const a = rnd() * 6.28, b2 = (rnd() - 0.5) * 2.4, r = 0.004 + rnd() * 0.004, nx = Math.cos(b2) * Math.cos(a), ny = Math.sin(b2), nz = Math.cos(b2) * Math.sin(a); bag.add('#b5b1a8', new THREE.CircleGeometry(r, 8).lookAt(new THREE.Vector3(nx, ny, nz)).translate(x + nx * 0.0303, 0.064 + ny * 0.0303, z + nz * 0.0303)); }
+    return []; } },
+  // A model rocket on a stand.
+  rocketmodel: { r: 0.04, make(bag, x, z, c, rnd) {
+    bag.cyl(DARK, 0.025, 0.006, x, 0.003, z, 0.025, 10); bag.cyl(STEEL, 0.003, 0.03, x, 0.02, z, 0.003, 5);
+    bag.cyl(PAPER, 0.012, 0.08, x, 0.075, z, 0.012, 10); bag.cyl(RED, 0, 0.03, x, 0.13, z, 0.012, 10);
+    for (let i = 0; i < 3; i++) { const a = i * 2.09; bag.add('^#e6463c', tri([[0, 0], [0.018, -0.02], [0, 0.03]]).rotateY(-a).translate(x + Math.cos(a) * 0.012, 0.045, z + Math.sin(a) * 0.012)); }
+    bag.add('#3d8de0', new THREE.CircleGeometry(0.004, 8).translate(x, 0.09, z + 0.0121));
+    return []; } },
+  // A meteorite in a glass case.
+  meteorite: { r: 0.045, make(bag, x, z, c, rnd) {
+    bag.box(DARK, 0.06, 0.06, 0.06, x, 0.03, z); bag.box('~#bfe4f3', 0.056, 0.05, 0.056, x, 0.085, z); bag.box(DARK, 0.06, 0.004, 0.06, x, 0.112, z);
+    bag.add('#5a5650', new THREE.DodecahedronGeometry(0.014, 0).scale(1.2, 0.8, 1).translate(x, 0.075, z));
+    bag.box(PAPER, 0.03, 0.012, 0.001, x, 0.045, z + 0.0305);
+    return []; } },
+  // An astronaut's suit on a stand, with a gold visor.
+  spacesuit: { r: 0.045, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, facing(x, z) + (rnd() - 0.5) * 0.5);
+    bag.within(m, s => {
+      s.cyl(DARK, 0.03, 0.006, 0, 0.003, 0, 0.03, 12);
+      for (const sx of [-0.012, 0.012]) s.box(PAPER, 0.018, 0.06, 0.02, sx, 0.036, 0);
+      s.box(PAPER, 0.052, 0.07, 0.03, 0, 0.1, 0); s.box('#8d8f96', 0.04, 0.05, 0.02, 0, 0.1, -0.024);
+      for (const sx of [-0.036, 0.036]) s.add(PAPER, new THREE.BoxGeometry(0.016, 0.06, 0.018).rotateZ(sx > 0 ? -0.2 : 0.2).translate(sx, 0.1, 0));
+      s.sphere(PAPER, 0.022, 0, 0.155, 0, 12); s.add('#e8c547', new THREE.SphereGeometry(0.0225, 12, 8, Math.PI * 0.2, Math.PI * 0.6, Math.PI * 0.3, Math.PI * 0.4).translate(0, 0.155, 0));
+      s.box('#3d8de0', 0.014, 0.006, 0.002, 0, 0.118, 0.016); s.box(RED, 0.01, 0.004, 0.002, -0.015, 0.112, 0.016);
+    });
+    return []; } },
   // The class teddy, sitting on the floor.
   teddy: { r: 0.045, make(bag, x, z, c, rnd) {
     const rot = rnd() * 6.28, m = frame(x, z, rot), fur = ['#c99a6b', '#8a5a3b', '#e3c9a8'][Math.floor(rnd() * 3)];
@@ -1026,13 +1440,97 @@ export function waterTunnel(bag, o, top, rnd) {
   }
 }
 
+// Pull a line's ends in towards the middle of the room until both are inside it (for round rooms), or give up.
+function fitSpan(o, x0, z0, x1, z1, m = 0.04) {
+  for (let k = 1; k >= 0.5; k -= 0.06) if (o.inside(x0 * k, z0 * k, m) && o.inside(x1 * k, z1 * k, m)) return [x0 * k, z0 * k, x1 * k, z1 * k];
+  return null;
+}
+// Walking in the library or the chill-out room: strings of warm fairy lights across the ceiling.
+export function fairylights(bag, o, top, rnd) {
+  const W = o.W / 2 - 0.1, D = o.D / 2 - 0.1, y = top - 0.03;
+  if (W < 0.1 || D < 0.1) return;
+  for (const span of [[-W, -D * 0.6, W, D * 0.6], [-W, D * 0.6, W, -D * 0.6]]) {
+    const sp = fitSpan(o, ...span); if (!sp) continue; const [x0, z0, x1, z1] = sp;
+    const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(4, Math.floor(len / 0.035)), sag = 0.03;
+    const pts = []; for (let i = 0; i <= 12; i++) { const t = i / 12; pts.push(new THREE.Vector3(x0 + (x1 - x0) * t, y - Math.sin(t * Math.PI) * sag, z0 + (z1 - z0) * t)); }
+    bag.tube('#26272d', pts, 0.0008, 24, 3);
+    for (let i = 1; i < n; i++) { const t = i / n; bag.sphere('*#ffe7a3', 0.005, x0 + (x1 - x0) * t, y - Math.sin(t * Math.PI) * sag - 0.006, z0 + (z1 - z0) * t, 6); }
+  }
+}
+// Walking in the lunch hall: paper lanterns hanging over the tables.
+export function lanterns(bag, o, top, rnd) {
+  const nx = Math.max(1, Math.round(o.W / 0.35)), nz = Math.max(1, Math.round(o.D / 0.35));
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+    const x = -o.W / 2 + o.W * (i + 0.5) / nx, z = -o.D / 2 + o.D * (j + 0.5) / nz;
+    if (!o.inside(x, z, 0.12)) continue;
+    const drop = 0.05 + rnd() * 0.03, r = 0.025 + rnd() * 0.01, col = ['*#ffd27a', '*#f5a3c7', '*#9fdcd0', '*#ffb66b'][(i + j * 2) % 4];
+    bag.cyl('#26272d', 0.0008, drop, x, top - drop / 2, z, 0.0008, 3);
+    bag.add(col, new THREE.SphereGeometry(r, 12, 8).scale(1, 0.8, 1).translate(x, top - drop - r * 0.8, z));
+    bag.cyl(DARK, 0.006, 0.004, x, top - drop - r * 1.6 - 0.002, z, 0.006, 8);
+  }
+}
+// Walking in the hall: climbing ropes hanging from the ceiling, knotted at the bottom.
+export function climbropes(bag, o, top, rnd) {
+  if (o.D < 0.6) return;
+  const z = -o.D / 2 + 0.16, L = top - 0.08;
+  for (const x of [-0.14, 0, 0.14]) {
+    if (!o.inside(x, z, 0.06)) continue;
+    bag.cyl('#c9a46f', 0.004, L, x, top - L / 2, z, 0.004, 6);
+    bag.sphere('#b48b58', 0.009, x, top - L + 0.01, z, 8);
+    bag.cyl(STEEL, 0.012, 0.006, x, top - 0.003, z, 0.012, 8);
+  }
+}
+
+// Walking in the music room: paper notes hanging from the ceiling, turning slowly.
+export function notemobiles(bag, o, top, rnd) {
+  const spots = [[-0.3, -0.25], [0.32, -0.2], [-0.25, 0.3], [0.3, 0.28], [0, 0]].map(([u, v]) => [u * o.W, v * o.D]).filter(([x, z]) => o.inside(x, z, 0.1));
+  spots.slice(0, 4).forEach(([x, z], i) => {
+    const drop = 0.07 + rnd() * 0.05, y = top - drop, col = '^' + RAINBOW[(i * 3 + 1) % 8];
+    const g = partGroup(p => { p.cyl('#e8e4da', 0.001, drop, 0, drop / 2, 0, 0.001, 3); p.add(col, new THREE.CircleGeometry(0.014, 10).scale(1.2, 0.9, 1).rotateZ(-0.4).translate(0, -0.03, 0)); p.add(col, new THREE.PlaneGeometry(0.004, 0.06).translate(0.014, 0, 0)); p.add(col, new THREE.PlaneGeometry(0.018, 0.005).rotateZ(-0.5).translate(0.022, 0.028, 0)); }, { yspin: 0.3 + i * 0.1 });
+    g.position.set(x, y, z); bag.part(g);
+  });
+}
+// Walking in the maker workshop: a drone the children built hangs from the ceiling, turning slowly.
+export function drone(bag, o, top, rnd) {
+  const x = -0.2 * o.W, z = 0.15 * o.D; if (!o.inside(x, z, 0.12)) return;
+  const drop = 0.08;
+  const g = partGroup(p => {
+    p.cyl('#e8e4da', 0.001, drop, 0, drop / 2, 0, 0.001, 3);
+    p.box(DARK, 0.03, 0.012, 0.03, 0, -0.006, 0); p.add('*#7fe0a0', new THREE.PlaneGeometry(0.008, 0.004).translate(0, -0.006, 0.0155));
+    for (const [ax, az] of [[-0.03, -0.03], [0.03, -0.03], [-0.03, 0.03], [0.03, 0.03]]) { p.add(STEEL, new THREE.BoxGeometry(0.045, 0.004, 0.006).rotateY(Math.atan2(-az, ax)).translate(ax / 2, -0.004, az / 2)); p.cyl(DARK, 0.005, 0.008, ax, -0.004, az, 0.005, 8); p.cyl('~#9fdcd0', 0.02, 0.0015, ax, 0.002, az, 0.02, 12); }
+  }, { yspin: 0.35 });
+  g.position.set(x, top - drop, z); bag.part(g);
+}
+// Walking in the chill-out room: glowing stars on the ceiling.
+export function ceilingstars(bag, o, top, rnd) {
+  for (let i = 0; i < 14; i++) {
+    const x = (rnd() - 0.5) * o.W * 0.85, z = (rnd() - 0.5) * o.D * 0.85; if (!o.inside(x, z, 0.08)) continue;
+    bag.add('*#f5b82e', new THREE.ShapeGeometry(star(0.012 + rnd() * 0.01)).rotateX(Math.PI / 2).translate(x, top - 0.046, z));
+  }
+}
+// Walking in the aquarium: a whale hangs over your head, turning slowly on its strings.
+export function hangingwhale(bag, o, top, rnd) {
+  if (!o.inside(0.25, 0, 0.1) || !o.inside(-0.25, 0, 0.1)) return;
+  const ry = 0.07, bottom = Math.max(0.21, top - 0.3), cy = bottom + ry, BLUE = '#3d8de0';
+  const g = partGroup(p => {
+    for (const px of [-0.1, 0.1]) p.cyl('#e8e4da', 0.001, top - cy - ry * 0.9, px, (top + cy + ry * 0.9) / 2, 0, 0.001, 3);
+    p.add(BLUE, new THREE.SphereGeometry(ry, 14, 10).scale(2.8, 1, 1).translate(0, cy, 0));
+    p.add('#cfe8f7', new THREE.SphereGeometry(ry * 0.97, 12, 8).scale(2.6, 0.55, 0.9).translate(0, cy - ry * 0.35, 0));
+    p.add(BLUE, new THREE.BoxGeometry(0.1, 0.012, 0.07).translate(-0.24, cy + 0.01, 0)); for (const sz of [-0.06, 0.06]) p.add(BLUE, new THREE.BoxGeometry(0.04, 0.008, 0.06).rotateY(sz > 0 ? 0.4 : -0.4).translate(-0.26, cy + 0.012, sz));
+    for (const sz of [-0.05, 0.05]) p.add(BLUE, new THREE.BoxGeometry(0.09, 0.008, 0.03).rotateY(sz > 0 ? -0.3 : 0.3).translate(0.03, cy - ry * 0.5, sz * 1.7));
+    p.sphere(DARK, 0.007, 0.13, cy + 0.01, 0.055, 6); p.sphere(DARK, 0.007, 0.13, cy + 0.01, -0.055, 6);
+  }, { wave: { axis: 'y', base: 0, amp: 0.15, speed: 0.5, phase: rnd() * 6 } });
+  bag.part(g);
+}
+
 // Walking in a classroom: a washing line of paintings pegged up across the room, and paper mobiles hanging
 // from the ceiling (a sun, clouds, a rainbow and birds) turning slowly.
 export function artline(bag, o, top, rnd) {
   const W = o.W / 2 - 0.14, D = o.D / 2 - 0.14, y = top - 0.07;
   if (W < 0.12 || D < 0.08) return;
-  const across = W >= D, x0 = across ? -W : 0.05 * W, z0 = across ? -0.2 * D : -D, x1 = across ? W : 0.05 * W, z1 = across ? -0.2 * D : D;
-  if (!o.inside(x0, z0, 0.04) || !o.inside(x1, z1, 0.04)) return;
+  const across = W >= D;
+  let x0 = across ? -W : 0.05 * W, z0 = across ? -0.2 * D : -D, x1 = across ? W : 0.05 * W, z1 = across ? -0.2 * D : D;
+  const sp = fitSpan(o, x0, z0, x1, z1); if (!sp) return; [x0, z0, x1, z1] = sp;
   const len = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(z1 - z0, x1 - x0), n = Math.max(2, Math.floor(len / 0.11));
   const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push(new THREE.Vector3(x0 + (x1 - x0) * t, y - Math.sin(t * Math.PI) * 0.025, z0 + (z1 - z0) * t)); }
   bag.tube('#e8e4da', pts, 0.0012, 20, 3);
@@ -1060,8 +1558,8 @@ export function mobiles(bag, o, top, rnd) {
 export function bunting(bag, o, top, rnd) {
   const W = o.W / 2 - 0.12, D = o.D / 2 - 0.12, y = top - 0.05;
   if (W < 0.1 || D < 0.1) return;
-  for (const [x0, z0, x1, z1] of [[-W, -D, W, D], [-W, D, W, -D]]) {
-    if (!o.inside(x0, z0, 0.04) || !o.inside(x1, z1, 0.04)) continue;
+  for (const span of [[-W, -D, W, D], [-W, D, W, -D]]) {
+    const sp = fitSpan(o, ...span); if (!sp) continue; const [x0, z0, x1, z1] = sp;
     const len = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(z1 - z0, x1 - x0), sag = 0.035, n = Math.floor(len / 0.045), c0 = Math.floor(rnd() * 8);
     const pts = []; for (let i = 0; i <= 12; i++) { const t = i / 12; pts.push(new THREE.Vector3(x0 + (x1 - x0) * t, y - Math.sin(t * Math.PI) * sag, z0 + (z1 - z0) * t)); }
     bag.tube('#e8e4da', pts, 0.0012, 24, 3);
@@ -1089,15 +1587,15 @@ export const PLANS = {
     [A >= 3 ? 'carpet' : A >= 2 ? 'rug' : 'rugS', 1], ['teacherdesk', 1], ['flipchart', 1], ['roundTable', A >= 2 ? Math.round(A * 1.6) : 1], ['blocks', 1], ['teddy', 1], ['tent', A >= 2 ? 1 : 0], ['sofa2', A >= 2 ? 1 : 0], ['playmat', A >= 2 ? 1 : 0], ['artwall', A >= 3 ? 1 : 0], ['kidney', A >= 2 ? 1 : 0], ['mountain', A >= 4 ? 1 : 0], ['sandtray', A >= 2 ? 1 : 0], ['naturetable', A >= 3 ? 1 : 0], ['globe', A >= 3 ? 1 : 0], ['beanbag', A + 1], ['roundTable', A >= 2 ? 0 : 1]],      // (no plants: Phil asked)
   ringhouse: A => PLANS.classroom(A),
   treehouse: A => [['rug', 1], ['beanbag', 2]],
-  hall: A => [['wallbars', 3], ['parachute', 1], ['climbframe', 1], ['softplay', A >= 4 ? 1 : 0], ['trampoline', A >= 4 ? 1 : 0], ['gymmat', Math.max(2, Math.round(A / 2))], ['vault', 1], ['balls', 1], ['bench', A >= 4 ? 2 : 1], ['hoop', 1], ['cones', A >= 4 ? 1 : 0], ['beanbag', Math.round(A / 3)]],
-  library: A => [['books', 2 + A], ['shelf', Math.max(1, A - 1)], ['storychair', 1], ['tree', A >= 2 ? 1 : 0], ['cave', 1], ['globe', 1], ['beanbag', A * 2], ['rug', 1]],
-  lunch: A => [['servery', 1], ['art', 1], ['lunchTable', Math.max(2, A * 2)], ['water', 1], ['bins', 1]],
-  art: A => [['rack', 1], ['art', 2 + A], ['painttable', Math.max(1, A)], ['artwall', 1], ['easel', A + 1], ['sculpture', A >= 2 ? 1 : 0]],
-  maker: A => [['pegboard', 1 + Math.floor(A / 2)], ['cubbies', 1], ['printers', 1], ['robot', 1], ['workbench', A >= 2 ? 1 : 0], ['rover', A >= 2 ? 1 : 0], ['cardrocket', 1], ['kidney', A >= 3 ? 1 : 0]],
-  music: A => [['guitars', 1], ['piano', 1], ['art', 1], ['drums', 1], ['xylophone', 1], ['stage', A >= 2 ? 1 : 0], ['beanbag', A + 1]],
-  yoga: A => [['eggchair', 1], ['bubbletube', 1], ['fountain', 1], ['cushions', A >= 2 ? 1 : 0], ['rug', 1], ['yogamat', 2 + A]],
-  aquarium: A => [['touchpool', A >= 2 ? 1 : 0], ['tank', A >= 2 ? Math.min(3, A - 1) : 1], ['jelly', A >= 3 ? 1 : 0], ['beanbag', Math.max(1, A - 1)]],
+  hall: A => [['climbwall', 1], ['wallbars', 3], ['banners', 1], ['clock', 1], ['piano', 1], ['court', 1], ['stage', 1], ['parachute', 1], ['climbframe', 1], ['goal', 2], ['softplay', 1], ['trampoline', 1], ['gymmat', Math.max(3, Math.round(A * 0.7))], ['vault', 1], ['balancebeam', 1], ['balls', 2], ['hoops', 1], ['bench', 3], ['hoop', 2], ['cones', 2], ['beanbag', 2]],
+  library: A => [['readingnook', 1], ['books', 1 + A], ['alphabet', 1], ['bookdisplay', 1], ['clock', 1], ['poster', A >= 2 ? 1 : 0], [A >= 2 ? 'rug' : 'rugS', 1], ['storychair', 1], ['librarydesk', 1], ['shelf', Math.max(1, A - 1)], ['tree', A >= 2 ? 1 : 0], ['cave', 1], ['puppettheatre', A >= 2 ? 1 : 0], ['bookcart', 1], ['lamp', 1], ['globe', 1], ['sofa2', A >= 2 ? 1 : 0], ['beanbag', A * 2]],
+  lunch: A => [['servery', 1], ['menuboard', 1], ['trayrack', 1], ['sink', 1], ['clock', 1], ['art', 1], ['longtable', Math.max(1, Math.floor(A / 2))], ['lunchTable', Math.max(2, A + 1)], ['saladbar', A >= 2 ? 1 : 0], ['fruitstand', 1], ['water', 1], ['bins', 1]],
+  art: A => [['rack', 1], ['painttrolley', 1], ['colourwheel', 1], ['coatpegs', 1], ['paintshelf', A >= 2 ? 1 : 0], ['sink', A >= 2 ? 1 : 0], ['art', 1 + A], ['painttable', Math.max(1, A)], ['easel', 2], ['potterywheel', 1], ['kiln', 1], ['artwall', 1], ['claytable', A >= 2 ? 1 : 0], ['sculpture', A >= 2 ? 1 : 0], ['easel', Math.max(0, A - 1)]],
+  maker: A => [['pegboard', 1 + Math.floor(A / 2)], ['partsbins', 1], ['screen', 1], ['cubbies', 1], ['clock', 1], ['printers', 1], ['robot', 1], ['legotable', 1], ['lasercutter', A >= 2 ? 1 : 0], ['workbench', A >= 2 ? 1 : 0], ['rover', A >= 2 ? 1 : 0], ['solder', A >= 2 ? 1 : 0], ['cardrocket', 1], ['cardboardcastle', A >= 2 ? 1 : 0], ['kidney', A >= 3 ? 1 : 0]],
+  music: A => [['guitars', 1], ['notesfrieze', 1], ['recorders', 1], ['piano', 1], ['speaker', A >= 2 ? 1 : 0], ['art', 1], ['clock', 1], ['drums', 1], ['xylophone', 1], ['musicstands', 1], ['shakers', 1], ['doublebass', 1], ['conductor', A >= 2 ? 1 : 0], ['stage', A >= 2 ? 1 : 0], ['mic', A >= 2 ? 1 : 0], ['beanbag', A + 1]],
+  yoga: A => [['feelings', 1], ['calmtank', 1], ['poster', 1], ['clock', A >= 2 ? 1 : 0], ['eggchair', 1], ['bubbletube', 1], ['hammock', 1], [A >= 2 ? 'rug' : 'rugS', 1], ['nest', 1], ['lavalamp', 1], ['fountain', A >= 2 ? 1 : 0], ['cushions', A >= 2 ? 1 : 0], ['tent', A >= 2 ? 1 : 0], ['yogamat', 1 + A], ['sofa2', A >= 3 ? 1 : 0]],
+  aquarium: A => [['touchpool', A >= 2 ? 1 : 0], ['tank', A >= 2 ? Math.min(3, A - 1) : 1], ['jelly', A >= 3 ? 1 : 0], ['naturetable', A >= 2 ? 1 : 0], ['bench', A >= 3 ? 1 : 0], ['beanbag', Math.max(1, A - 1)]],
   archway: A => [],
-  observatory: A => [['poster', 2 + A], ['telescope', 1], ['orrery', 1], ['planet', 1 + A], ['beanbag', A * 2 + 2]],
+  observatory: A => [['poster', 1 + A], ['controldesk', 1], ['telescope', 1], ['orrery', 1], ['planet', 1 + A], ['moonglobe', 1], ['rocketmodel', 1], ['meteorite', 1], ['spacesuit', 1], ['beanbag', A * 2 + 1]],
   pool: A => [['lounger', 2 + Math.floor(A / 3)], ['lifeguard', 1], ['kickboards', 1]],
 };

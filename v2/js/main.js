@@ -121,6 +121,7 @@ async function boot() {
   route();
   if (!model.boxes.length && !shown) setTimeout(() => say('Welcome to your site! Choose a room on the left, then tap the grid to build it.'), 800);
   window.__v2 = { world, model, site, rooms, siteView, guide, wishes };   // testing aid
+  if (new URLSearchParams(location.search).has('fps')) world.stats(true);
   if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') navigator.serviceWorker.register('../sw.js', { scope: '../' }).catch(() => {});
 }
 boot();

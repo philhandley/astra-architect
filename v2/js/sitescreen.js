@@ -11,6 +11,7 @@ import { cutRoom, outline, CUTTABLE, storeyFloor, SINGLE_SPACE } from './inside.
 import { SchoolDay, Trails, PERIODS } from './day.js';
 import { startWalk } from './walk.js';
 import { startTour } from './tour.js';
+import { mountMood, MOOD_NAMES, MOOD_LINES } from './mood.js';
 import { Crowd } from './crowd.js';
 import { WHY } from './model.js';
 import { icon, winSwatch } from './icons.js';
@@ -32,6 +33,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
         <button class="sbtn" data-a="in" aria-label="Closer">${icon('in')}<span>Closer</span></button>
         <button class="sbtn" data-a="out" aria-label="Further">${icon('out')}<span>Further</span></button>
         <button class="sbtn wide" data-a="home" aria-label="See the whole site">${icon('whole')}<span>Whole site</span></button>
+        <button class="sbtn wide sky" data-a="sky" aria-label="Change the sky">${icon('sun')}<span>Day</span></button>
       </div>
       <button class="sbtn grow" data-a="grow" aria-label="Make the site bigger">${icon('expand')}<span>Bigger site</span></button>
     </div>
@@ -206,6 +208,13 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     updateLaunch();
   }
   model.onChange(() => { if (S.day) stopDay(); redraw(); });
+  // The sky button: day, sunset, night, rain.
+  const mood = mountMood(world), MOOD_ICON = { day: 'sun', sunset: 'sunset', night: 'moon', rain: 'rain' };
+  function setSky(m, { quiet = false } = {}) {
+    mood.set(m, { instant: quiet });
+    const b = sideEl.querySelector('.sbtn.sky'); if (b) b.innerHTML = `${icon(MOOD_ICON[m])}<span>${MOOD_NAMES[m]}</span>`;
+    if (!quiet) { sfx.whoosh(); say(MOOD_LINES[m]); }
+  }
   const ghostUp = new THREE.MeshLambertMaterial({ color: '#ffffff', transparent: true, opacity: 0.22, depthWrite: false });
   ghostUp.userData.ghost = true;
 
@@ -278,7 +287,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   world.updaters.add(dt => {
     const t = performance.now() / 1000;
     for (const g of pieces.values()) g.traverse(o => {
-      if (o.userData.spin) o.rotation.z += dt * o.userData.spin;
+      if (o.userData.spin) o.rotation.z += dt * o.userData.spin * (world.wind || 1);
       if (o.userData.yspin) o.rotation.y += dt * o.userData.yspin;
       if (o.userData.swing) o.rotation.x = Math.sin(t * o.userData.swing.speed) * o.userData.swing.amp;
       if (o.userData.rock) o.rotation.z = Math.sin(t * o.userData.rock.speed) * o.userData.rock.amp;
@@ -988,8 +997,9 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     if (a === 'in') zoomBy(1.3);
     if (a === 'out') zoomBy(1 / 1.3);
     if (a === 'home') frameSite();
+    if (a === 'sky') { const ms = Object.keys(MOOD_ICON); setSky(ms[(ms.indexOf(mood.mood) + 1) % ms.length]); }
     if (a === 'grow') { if (S.siteEdit) stopGrow(); else startGrow(); }
-    if (a === 'print') import('./print.js').then(m => m.openPrint(world, model, siteView, { design, crowd, handles }));
+    if (a === 'print') { if (mood.mood !== 'day') setSky('day', { quiet: true }); import('./print.js').then(m => m.openPrint(world, model, siteView, { design, crowd, handles })); }
   });
   function zoomBy(f) {
     const b = model.byId.get(S.selected);

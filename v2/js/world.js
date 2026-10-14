@@ -21,7 +21,11 @@ export class World {
     this.scene = scene;
 
     // Soft daylight: a big bright sky and a warm sun from the west, so shadows fall where we can see them.
-    scene.add(new THREE.HemisphereLight('#ffffff', '#e6dfd0', 1.62));
+    const hemi = new THREE.HemisphereLight('#ffffff', '#e6dfd0', 1.62);
+    scene.add(hemi);
+    this.hemi = hemi;
+    this.sunDir = new THREE.Vector3(-0.62, 1.05, 0.55).normalize();   // (mood.js moves the sun for sunset and night)
+    this.wind = 1;                                                     // (how fast turbines and windsocks go; rain blows harder)
     const sun = new THREE.DirectionalLight('#fff4e2', 1.95);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -57,9 +61,9 @@ export class World {
   }
 
   setSunFocus(x, z) {
-    const dir = new THREE.Vector3(-0.62, 1.05, 0.55).normalize();
+    this.sunFocus = { x, z };
     this.sun.target.position.set(x, 0, z);
-    this.sun.position.set(x, 0, z).addScaledVector(dir, 40);
+    this.sun.position.set(x, 0, z).addScaledVector(this.sunDir, 40);
     this.sun.target.updateMatrixWorld();
   }
 

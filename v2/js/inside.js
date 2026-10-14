@@ -179,8 +179,8 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
         if (!o.inside(x, z, WALL + (aqua ? 0.11 : 0) + F.r + 0.02) && !F.centre) continue;
         if (b.type === 'pool' && o.kind === 'rr' && Math.abs(x) < (o.W - 0.2) / 2 && Math.abs(z) < (o.D - 0.2) / 2) continue;
         if (placed.some(p => Math.hypot(p.x - x, p.z - z) < p.r + F.r + 0.03)) continue;
-        placed.push({ x, z, r: F.r });
-        for (const s of F.make(bag, x, z, hex, rnd, o)) seats.push(s);
+        placed.push({ x, z, r: F.r, low: !!F.low });
+        for (const s of F.make(bag, x, z, hex, rnd, o)) seats.push(s.length > 3 || Math.hypot(s[0] - x, s[1] - z) < 0.02 ? s : [s[0], s[1], s[2] || 0, Math.atan2(x - s[0], z - s[1])]);      // (sitters face the piece they sit at)
         break;
       }
     }
@@ -207,7 +207,7 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
     for (const p of bag.parts) { p.traverse(m => { m.userData.noInk = true; }); moving.add(p); }
     g.add(moving);
   }
-  return { group: g, seats: seats.map(([x, z, h = 0]) => [x, floorY + 0.02 + h, z]), inside: o.inside, floorY: floorY + 0.02, segments, swim };
+  return { group: g, seats: seats.map(([x, z, h = 0, yaw]) => [x, floorY + 0.02 + h, z, yaw]), obstacles: placed.filter(p => !p.low).map(p => ({ x: p.x, z: p.z, r: p.r })), inside: o.inside, floorY: floorY + 0.02, segments, swim };
 }
 
 export { CUT, SINGLE as SINGLE_SPACE };

@@ -7,7 +7,8 @@ import * as THREE from 'three';
 import { PROGRAMMES, SHAPES, LEVEL } from './catalogue.js';
 import { GRID, square, site } from './site.js';
 import { outline, storeyFloor, CUTTABLE } from './inside.js';
-import { seeded } from './crowd.js';
+import { seeded, nudgeClear } from './crowd.js';
+import { openings, wallRuns, runAt } from './plan.js';
 import { emo, esc, say, sfx } from './ui.js';
 
 // The timetable. go: own (the class's own classroom), room (one of these kinds of room, else their classroom),
@@ -93,10 +94,13 @@ export class Trails {
 
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
 
+// Of a room's doorways, the one nearest a square outside.
+const nearestEntry = (zone, sq) => { const E = zone?.entries; if (!E?.length) return null; let best = null, bd = Infinity; for (const e of E) { const d = Math.hypot(e.out[0] - sq[0] - 0.5, e.out[1] - sq[1] - 0.5); if (d < bd) { bd = d; best = e; } } return best; };
+
 export class SchoolDay {
   // seatsOf(boxId): world-space seats in a room or on a piece (benches, steps), if any.
-  constructor({ world, model, crowd, yOf, seatsOf, layer, onPeriod, onEnd }) {
-    Object.assign(this, { world, model, crowd, yOf, seatsOf, layer, onPeriod, onEnd });
+  constructor({ world, model, crowd, yOf, seatsOf, obstaclesOf, layer, onPeriod, onEnd }) {
+    Object.assign(this, { world, model, crowd, yOf, seatsOf, obstaclesOf, layer, onPeriod, onEnd });
     this.t = 0; this.period = -1; this.running = false;
     this.tick = dt => this.update(dt);
     this.bubbles = [];
@@ -144,7 +148,12 @@ export class SchoolDay {
       let zone;
       if (CUTTABLE.has(b.shape) && PROGRAMMES[type] && type !== 'archway') {
         const o = outline(b), fy = y0 + storeyFloor(b, b.level) + 0.02;
-        zone = { ox: cx, oy: fy, oz: cz, w: b.w, d: b.d, inside: o.inside, margin: 0.12, boxId: b.id, indoor: true };
+        zone = { ox: cx, oy: fy, oz: cz, w: b.w, d: b.d, inside: o.inside, margin: 0.12, boxId: b.id, indoor: true, obstacles: this.obstaclesOf?.(b.id) || [] };
+        // The real doorways (plan.js), so people go in and out through them and not through the wall beside.
+        if (b.level === 0) try {
+          const bb = { ...b, links: m.links(b) }, runs = wallRuns(bb, 0);
+          zone.entries = openings(bb, 0, runs).filter(op => op.door && !op.arch).map(op => { const p = runAt(runs[op.run], (op.s0 + op.s1) / 2); return { out: [cx + p.x + p.nx * 0.24, cz + p.z + p.nz * 0.24], in: [cx + p.x - p.nx * 0.2, cz + p.z - p.nz * 0.2] }; }).filter(e => !this.blocked(Math.floor(e.out[0]), Math.floor(e.out[1])));
+        } catch (e) { /* no doorway found: straight in */ }
       } else {
         const topY = TOP_Y[b.shape] ?? 0.012, pad = ['tree', 'slide', 'playground', 'zipline', 'rocket', 'weather', 'greenhouse', 'observatory'].includes(b.type) || b.shape === 'tree' ? 0.5 : -0.1;
         zone = { rect: { x0: b.x - pad, z0: b.z - pad, x1: b.x + b.w + pad, z1: b.z + b.d + pad }, oy: y0 + topY, boxId: b.id, ok: pad > 0 ? (x, z) => !this.blocked(Math.floor(x), Math.floor(z)) || this.model.at(Math.floor(x), Math.floor(z), 0)?.id === b.id : null };
@@ -327,6 +336,8 @@ export class SchoolDay {
       const outs = from.doors || [from.door];
       startSq = outs.reduce((a, b) => (at(b) + Math.hypot(b[0] + 0.5 - pos.x, b[1] + 0.5 - pos.z) < at(a) + Math.hypot(a[0] + 0.5 - pos.x, a[1] + 0.5 - pos.z) ? b : a));
       if (from.climb) path.push(v3(from.climb.x, from.zone.oy, from.climb.z), v3(from.climb.x, 0.012, from.climb.z));
+      const ent = nearestEntry(from.zone, startSq);
+      if (ent) path.push(v3(ent.in[0], from.zone.oy, ent.in[1]), v3(ent.out[0], 0.012, ent.out[1]));
       path.push(v3(startSq[0] + 0.5 + J() * 0.5, 0.012, startSq[1] + 0.5 + J() * 0.5));
     } else {
       startSq = [Math.floor(pos.x), Math.floor(pos.z)];
@@ -336,7 +347,11 @@ export class SchoolDay {
     let i = startSq[0] + startSq[1] * W, guard = 0;
     while (f.next[i] >= 0 && guard++ < 200) { i = f.next[i]; const x = i % W, z = (i - x) / W; path.push(v3(x + 0.5 + J(), Math.max(0.012, square(x, z)?.base || 0), z + 0.5 + J())); }
     if (dest !== 'gate' && dest.climb) path.push(v3(dest.climb.x, 0.012, dest.climb.z), v3(dest.climb.x, dest.zone.oy, dest.climb.z));
-    if (dest !== 'gate' && dest.zone.indoor) path.push(v3(dest.zone.ox, dest.zone.oy, dest.zone.oz));
+    if (dest !== 'gate' && dest.zone.indoor) {
+      const last = path.length ? [Math.floor(path[path.length - 1].x), Math.floor(path[path.length - 1].z)] : startSq, ent = nearestEntry(dest.zone, last);
+      if (ent) path.push(v3(ent.out[0], 0.012, ent.out[1]), v3(ent.in[0], dest.zone.oy, ent.in[1]), v3(ent.in[0] * 0.7 + dest.zone.ox * 0.3, dest.zone.oy, ent.in[1] * 0.7 + dest.zone.oz * 0.3));
+      else path.push(v3(dest.zone.ox, dest.zone.oy, dest.zone.oz));
+    }
     return path;
   }
   sendGroup(g, dest, P) {
@@ -370,7 +385,7 @@ export class SchoolDay {
   sendOne(k, dest) {
     const from = k.at;
     const target = dest === 'yard' ? { door: this.yardSquare(), zone: this.yard, type: 'yard', seats: [] } : dest;
-    k.path = this.plan(from, k, target === 'gate' ? 'gate' : target, 0.5); k.pi = 0; k.mode = 'path'; k.dest = target; k.seat = null; k.at = null;
+    k.path = this.plan(from, k, target === 'gate' ? 'gate' : target, 0.2); k.pi = 0; k.mode = 'path'; k.dest = target; k.seat = null; k.at = null;
   }
   yardSquare() { return this.land[Math.floor(this.r() * this.land.length)]; }
   leaveQueue(k) {
@@ -403,7 +418,7 @@ export class SchoolDay {
       this.next();
     }
     for (const g of this.groups) this.moveTeacher(g, dt);
-    for (const k of this.agents) if (!k.teacher || k.mode !== 'lead') this.moveOne(k, dt);
+    for (const k of this.agents) if (!k.teacher || k.mode !== 'lead') { this.moveOne(k, dt); this.keepClear(k); }
     for (const k of this.agents) {
       const n = k.needs;
       n.energy = Math.max(0, Math.min(1, n.energy + (k.moving ? (k.pose === 'run' ? -0.045 : -0.02) : k.mode === 'sit' ? 0.025 : 0.005) * dt));
@@ -413,6 +428,17 @@ export class SchoolDay {
     this.separate(dt);
     this.wearPaths(dt);
     this.talk(dt);
+  }
+  // Indoors, nobody walks through the furniture or out through a wall: a gentle push out of any piece they are
+  // in (so they slide round it), and back into the room if a push took them through the wall.
+  keepClear(k) {
+    if (k.mode === 'sit' || k.hidden) return;
+    const inZ = z => z?.indoor && z.inside(k.x - z.ox, k.z - z.oz, -0.02);
+    if (k.mode === 'toSeat') { const z = k.zone, s = k.seat; if (z?.obstacles?.length && s) nudgeClear(k, z.obstacles.filter(o => Math.hypot(s[0] - o.x, s[2] - o.z) > o.r + 0.01), 0.01); return; }
+    if (k.mode === 'path' || k.mode === 'follow') { for (const z of [k.zone, k.dest?.zone]) if (inZ(z) && z.obstacles?.length) nudgeClear(k, z.obstacles, 0.012); return; }
+    const z = k.zone; if (!z?.indoor) return;
+    if (z.obstacles?.length) nudgeClear(k, z.obstacles, 0.015);
+    if (!z.inside(k.x - z.ox, k.z - z.oz, 0.06)) { k.x += (z.ox - k.x) * 0.08; k.z += (z.oz - k.z) * 0.08; }
   }
   stepTo(k, x, y, z, speed, dt, near = 0.012) {
     const dx = x - k.x, dz = z - k.z, dy = y - k.y, d = Math.hypot(dx, dz, dy);
@@ -498,7 +524,7 @@ export class SchoolDay {
       }
       case 'toSeat': {
         const s = k.seat;
-        if (this.stepTo(k, s[0], s[1], s[2], k.speed * 0.8, dt, 0.01)) { k.mode = 'sit'; k.x = s[0]; k.z = s[2]; k.y = s[1]; k.yaw = Math.atan2((k.zone.ox ?? k.x) - k.x, (k.zone.oz ?? k.z) - k.z); }
+        if (this.stepTo(k, s[0], s[1], s[2], k.speed * 0.8, dt, 0.01)) { k.mode = 'sit'; k.x = s[0]; k.z = s[2]; k.y = s[1]; k.yaw = s[3] ?? Math.atan2((k.zone.ox ?? k.x) - k.x, (k.zone.oz ?? k.z) - k.z); }
         return;
       }
       case 'sit': {
@@ -526,15 +552,19 @@ export class SchoolDay {
   }
   // Children step round each other instead of walking through.
   separate(dt) {
-    const A = this.agents, R = 0.05;
+    // Nobody walks through anyone: two bodies keep about 0.038 of their combined scale apart; someone sitting
+    // stays put and the walker steps round them.
+    const A = this.agents;
     for (let i = 0; i < A.length; i++) {
-      const a = A[i]; if (a.mode === 'sit') continue;
+      const a = A[i]; if (a.hidden) continue;
       for (let j = i + 1; j < A.length; j++) {
-        const b = A[j]; if (b.mode === 'sit' || Math.abs(a.y - b.y) > 0.1) continue;
-        const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz);
+        const b = A[j]; if (b.hidden || Math.abs(a.y - b.y) > 0.1 || (a.mode === 'sit' && b.mode === 'sit')) continue;
+        const R = 0.038 * (a.s + b.s), dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz);
         if (d >= R || d < 1e-5) continue;
-        const push = (R - d) * 0.5, ux = dx / d, uz = dz / d;
-        a.x -= ux * push; a.z -= uz * push; b.x += ux * push; b.z += uz * push;
+        const ux = dx / d, uz = dz / d, gap = R - d;
+        if (a.mode === 'sit') { b.x += ux * gap; b.z += uz * gap; }
+        else if (b.mode === 'sit') { a.x -= ux * gap; a.z -= uz * gap; }
+        else { const push = gap * 0.5; a.x -= ux * push; a.z -= uz * push; b.x += ux * push; b.z += uz * push; }
         // Two children playing bump into each other: sometimes they stop for a chat.
         if (a.mode === 'wander' && b.mode === 'wander' && a.g.activity === 'break' && this.r() < 0.006 && this.agents.filter(c => c.mode === 'chat').length < 6) {
           a.mode = b.mode = 'chat'; a.chatT = b.chatT = 2.2 + this.r(); a.yaw = Math.atan2(dx, dz); b.yaw = Math.atan2(-dx, -dz);

@@ -22,6 +22,8 @@ const frame = (x, z, rot = 0, y = 0) => new THREE.Matrix4().makeRotationY(rot).s
 const at = (m, x, z) => { const v = new THREE.Vector3(x, 0, z).applyMatrix4(m); return [v.x, v.z]; };
 // A seat is [x, z, h]: where a child sits and how high the seat is above the floor (0: on the floor).
 const atH = (m, x, z, h) => [...at(m, x, z), h];
+// The same, with the way the sitter faces: the frame's front (+z), turned by `turn`.
+const atF = (m, x, z, h, turn = 0) => [...at(m, x, z), h, Math.atan2(m.elements[8], m.elements[10]) + turn];
 // The turn that points a piece's front (+z in its own frame) at the middle of the room.
 const facing = (x, z) => Math.atan2(-x, -z);
 const tri = (pts) => { const s = new THREE.Shape(); pts.forEach(([x, y], i) => (i ? s.lineTo(x, y) : s.moveTo(x, y))); s.closePath(); return new THREE.ShapeGeometry(s); };
@@ -306,7 +308,7 @@ export const WALLS = {
   } },
   // ---- observatory ----
   // Mission control: three screens, a keyboard, a big red button and a chair.
-  controldesk: { w: 0.2, h: 0.09, d: 0.07, seat: [[0, 0.08, 0.045]], make(s, rnd) {
+  controldesk: { w: 0.2, h: 0.09, d: 0.07, seat: [[0, 0.08, 0.045]], face: 'wall', make(s, rnd) {
     s.box(DARK, 0.2, 0.012, 0.07, 0, 0.064, 0); s.box('#3d405b', 0.19, 0.058, 0.012, 0, 0.029, -0.025); for (const sx of [-0.09, 0.09]) s.box('#3d405b', 0.012, 0.058, 0.066, sx, 0.029, 0);
     for (let i = 0; i < 3; i++) { const sx = -0.062 + i * 0.062; s.box(DARK, 0.054, 0.04, 0.004, sx, 0.095, -0.02); s.add(['*#1f2a44', '*#2a4a7a', '*#1f2a44'][i], new THREE.PlaneGeometry(0.048, 0.034).translate(sx, 0.095, -0.0175)); s.cyl(DARK, 0.004, 0.008, sx, 0.074, -0.02, 0.012, 8); }
     s.add('*#f7c22e', new THREE.CircleGeometry(0.008, 10).translate(-0.062, 0.1, -0.017)); s.add('*#e6463c', new THREE.CircleGeometry(0.004, 8).translate(0.062, 0.09, -0.017)); for (let i = 0; i < 4; i++) s.add('*#7fe0a0', new THREE.PlaneGeometry(0.03, 0.002).translate(0, 0.085 + i * 0.006, -0.017));
@@ -391,7 +393,7 @@ export const WALLS = {
     if (rnd() < 0.6) { s.cyl('#f0e2c0', 0.014, 0.004, 0.05, 0.068, 0, 0.012, 10); s.sphere('~#5ec4e2', 0.019, 0.05, 0.085, 0, 12); s.add(ORANGE, new THREE.SphereGeometry(0.006, 6, 4).scale(1.6, 1, 0.6).translate(0.052, 0.084, 0.003)); s.add(ORANGE, new THREE.ConeGeometry(0.004, 0.006, 4).rotateZ(Math.PI / 2).translate(0.041, 0.084, 0.003)); }
   } },
   // An upright piano against the wall, with its stool.
-  piano: { w: 0.18, h: 0.13, d: 0.11, seat: [[0, 0.035, 0.05]], make(s, rnd) {
+  piano: { w: 0.18, h: 0.13, d: 0.11, seat: [[0, 0.035, 0.05]], face: 'wall', make(s, rnd) {
     const body = '#2b2d3a', z0 = -0.055;
     s.box(body, 0.16, 0.13, 0.05, 0, 0.065, z0 + 0.025); s.box(pickC(rnd), 0.162, 0.008, 0.052, 0, 0.126, z0 + 0.025);
     s.box(body, 0.152, 0.012, 0.03, 0, 0.074, z0 + 0.065); s.box(PAPER, 0.144, 0.004, 0.024, 0, 0.082, z0 + 0.066);
@@ -502,7 +504,7 @@ export function placeWallItems(bag, b, k, plan, rnd, placed, seats) {
         // (The piece's z axis points into the room; floor pieces stand with their back to the wall.)
         const m = frame(x, z, Math.atan2(-p.nx, -p.nz));
         bag.within(m, s => W.make(s, rnd, y0));
-        if (W.seat) for (const [a, c, h = 0] of W.seat) seats.push([...at(m, a, c), h]);
+        if (W.seat) for (const [a, c, h = 0] of W.seat) seats.push([...at(m, a, c), h, Math.atan2(m.elements[8], m.elements[10]) + (W.face === 'wall' ? Math.PI : 0)]);      // (facing the room, or the wall for a piano or a desk of screens)
         break;
       }
     }
@@ -576,14 +578,14 @@ export const FEATURES = {
     for (let i = 0; i < 4; i++) { const a = rot + Math.PI + (i - 1.5) * 0.5, sx = x + Math.sin(a) * 0.07, sz = z + Math.cos(a) * 0.07; bag.cyl(pickC(rnd), 0.022, 0.045, sx, 0.0225, sz); seats.push([sx, sz, 0.045]); }
     tableClutter(bag, x + Math.sin(rot) * 0.02, z + Math.cos(rot) * 0.02, 0.093, rnd, 0.06);
     return seats; } },
-  rug: { r: 0.17, make(bag, x, z, c, rnd) {
+  rug: { r: 0.17, low: true, make(bag, x, z, c, rnd) {
     const col = pickC(rnd);
     bag.cyl(col, 0.15, 0.006, x, 0.003, z, 0.15, 28); bag.cyl('#ffffff', 0.1, 0.007, x, 0.0035, z, 0.1, 24); bag.cyl(col, 0.05, 0.008, x, 0.004, z, 0.05, 16);
     const seats = [];
     for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2, sx = x + Math.cos(a) * 0.11, sz = z + Math.sin(a) * 0.11; bag.ball(pickC(rnd), 0.022, sx, 0.006, sz); seats.push([sx, sz, 0.026]); }
     return seats; } },
   // The same, smaller, for a one-square room.
-  rugS: { r: 0.125, make(bag, x, z, c, rnd) {
+  rugS: { r: 0.125, low: true, make(bag, x, z, c, rnd) {
     const col = pickC(rnd);
     bag.cyl(col, 0.11, 0.006, x, 0.003, z, 0.11, 24); bag.cyl('#ffffff', 0.072, 0.007, x, 0.0035, z, 0.072, 20); bag.cyl(col, 0.035, 0.008, x, 0.004, z, 0.035, 14);
     const seats = [];
@@ -643,7 +645,7 @@ export const FEATURES = {
     bag.cyl(STEEL, 0.003, 0.11, x + 0.02, 0.095, z + 0.08, 0.003, 6); bag.sphere(DARK, 0.007, x + 0.02, 0.152, z + 0.08);
     const seats = []; for (let i = 0; i < 6; i++) { const a = Math.PI * (0.15 + i * 0.14), sx = x + Math.cos(a) * 0.2, sz = z + Math.sin(a) * 0.2; seats.push([sx, sz]); }
     return seats; } },
-  yogamat: { r: 0.07, make(bag, x, z, c, rnd) { const rot = rnd() * 6.28; bag.add(pickC(rnd), new THREE.BoxGeometry(0.06, 0.008, 0.15).rotateY(rot).translate(x, 0.004, z)); return [[x, z, 0.006]]; } },
+  yogamat: { r: 0.07, low: true, make(bag, x, z, c, rnd) { const rot = rnd() * 6.28; bag.add(pickC(rnd), new THREE.BoxGeometry(0.06, 0.008, 0.15).rotateY(rot).translate(x, 0.004, z)); return [[x, z, 0.006]]; } },
 
   // ---- the classroom ----
   // The teacher's desk: a chair behind it, a mug, a pile of books and a pot of pens.
@@ -717,9 +719,9 @@ export const FEATURES = {
       for (const sx of [-0.035, 0.035]) s.box('#fbfaf6', 0.056, 0.012, 0.05, sx, 0.046, 0.004);
       s.ball(pickC(rnd), 0.016, 0.045, 0.05, -0.01); s.box(RAINBOW[Math.floor(rnd() * 8)], 0.024, 0.005, 0.03, -0.04, 0.054, 0.006);
     });
-    return [atH(m, -0.035, 0.0, 0.05), atH(m, 0.035, 0.0, 0.05)]; } },
+    return [atF(m, -0.035, 0.0, 0.05), atF(m, 0.035, 0.0, 0.05)]; } },
   // A road play mat with two toy cars.
-  playmat: { r: 0.1, make(bag, x, z, c, rnd) {
+  playmat: { r: 0.1, low: true, make(bag, x, z, c, rnd) {
     const m = frame(x, z, rnd() * 6.28);
     bag.within(m, s => {
       s.box('#8fcf5b', 0.2, 0.004, 0.16, 0, 0.002, 0);
@@ -731,7 +733,7 @@ export const FEATURES = {
     });
     return [at(m, 0, 0.12), at(m, 0.12, 0)]; } },
   // A big striped carpet for a bigger classroom's story corner.
-  carpet: { r: 0.2, make(bag, x, z, c, rnd) {
+  carpet: { r: 0.2, low: true, make(bag, x, z, c, rnd) {
     const rot = rnd() < 0.5 ? 0 : Math.PI / 2;
     for (let i = 0; i < 7; i++) bag.add(i % 2 ? '#fbfaf6' : RAINBOW[(i + Math.floor(rnd() * 3)) % 8], new THREE.BoxGeometry(0.36, 0.006, 0.04).translate(0, 0.003, -0.12 + i * 0.04).rotateY(rot).translate(x, 0, z));
     const seats = []; for (let i = 0; i < 8; i++) { const u = -0.14 + (i % 4) * 0.093, v = i < 4 ? -0.08 : 0.08; seats.push(rot ? [x + v, z + u, 0.004] : [x + u, z + v, 0.004]); }
@@ -780,7 +782,7 @@ export const FEATURES = {
     return seats; } },
   // ---- hall ----
   // Court lines painted on the hall floor: a border, a centre line and a centre circle. (Drawn to the room.)
-  court: { r: 0.02, centre: true, make(bag, x, z, c, rnd, o) {
+  court: { r: 0.02, low: true, centre: true, make(bag, x, z, c, rnd, o) {
     if (!o || o.kind !== 'rr') return [];
     const W = o.W - 0.5, D = o.D - 0.5, t = 0.01;
     if (W < 0.6 || D < 0.4) return [];
@@ -1172,14 +1174,14 @@ export const FEATURES = {
 
   // ---- the hall ----
   // A rainbow play parachute spread on the floor, with children all round it.
-  parachute: { r: 0.19, make(bag, x, z, c, rnd) {
+  parachute: { r: 0.19, low: true, make(bag, x, z, c, rnd) {
     const r = 0.16, rot = rnd() * 6;
     for (let i = 0; i < 12; i++) bag.floor(RAINBOW[i % 8], new THREE.CircleGeometry(r, 3, rot + (i / 12) * Math.PI * 2, Math.PI * 2 / 12), x, 0.003, z);
     bag.floor(PAPER, new THREE.CircleGeometry(0.025, 12), x, 0.0034, z);
     const seats = []; for (let i = 0; i < 8; i++) { const a = rot + (i / 8) * Math.PI * 2; seats.push([x + Math.cos(a) * (r + 0.015), z - Math.sin(a) * (r + 0.015)]); }
     return seats; } },
   // A thick blue gym mat.
-  gymmat: { r: 0.1, make(bag, x, z, c, rnd) { const rot = rnd() * 6.28; bag.add('#3d8de0', new THREE.BoxGeometry(0.1, 0.016, 0.17).rotateY(rot).translate(x, 0.008, z)); bag.add('#6aa8ec', new THREE.BoxGeometry(0.084, 0.002, 0.154).rotateY(rot).translate(x, 0.017, z)); return [[x, z, 0.014]]; } },
+  gymmat: { r: 0.1, low: true, make(bag, x, z, c, rnd) { const rot = rnd() * 6.28; bag.add('#3d8de0', new THREE.BoxGeometry(0.1, 0.016, 0.17).rotateY(rot).translate(x, 0.008, z)); bag.add('#6aa8ec', new THREE.BoxGeometry(0.084, 0.002, 0.154).rotateY(rot).translate(x, 0.017, z)); return [[x, z, 0.014]]; } },
   // A wooden climbing frame: two A-frames joined by rungs, with a slide board hooked on one side.
   climbframe: { r: 0.15, make(bag, x, z, c, rnd) {
     const m = frame(x, z, rnd() * 6.28), H = 0.17, half = 0.07;
@@ -1217,7 +1219,7 @@ export const FEATURES = {
   bench: { r: 0.14, make(bag, x, z, c, rnd) {
     const m = frame(x, z, rnd() * 6.28);
     bag.within(m, s => { s.box(WOOD, 0.26, 0.012, 0.04, 0, 0.045, 0); for (const sx of [-0.1, 0.1]) { s.box(STEEL, 0.008, 0.039, 0.036, sx, 0.0195, 0); } s.box('#c9975f', 0.24, 0.006, 0.012, 0, 0.012, 0); });
-    return [atH(m, -0.08, 0, 0.05), atH(m, 0, 0, 0.05), atH(m, 0.08, 0, 0.05)]; } },
+    return [atF(m, -0.08, 0, 0.05), atF(m, 0, 0, 0.05), atF(m, 0.08, 0, 0.05)]; } },
   // Little orange cones and a rope ladder on the floor, for races.
   cones: { r: 0.13, make(bag, x, z, c, rnd) {
     const m = frame(x, z, rnd() * 6.28);
@@ -1248,7 +1250,7 @@ export const FEATURES = {
     for (let i = 0; i < 9; i++) bag.sphere(PAPER, 0.0035 + rnd() * 0.003, x + (rnd() - 0.5) * 0.02, 0.05 + i * 0.02 + rnd() * 0.01, z + (rnd() - 0.5) * 0.02, 6);
     return []; } },
   // Floor cushions round a low table with a singing bowl on it.
-  cushions: { r: 0.1, make(bag, x, z, c, rnd) {
+  cushions: { r: 0.1, low: true, make(bag, x, z, c, rnd) {
     bag.cyl(WOOD, 0.036, 0.006, x, 0.028, z); bag.cyl(WOOD, 0.006, 0.025, x, 0.0125, z, 0.006, 6);
     bag.cyl(GOLD, 0.012, 0.01, x, 0.036, z, 0.008, 10);
     const seats = [], off = rnd() * 6;
@@ -1300,7 +1302,7 @@ export const FEATURES = {
       s.cyl(DARK, 0.002, 0.04, 0.075, 0.072, -0.01, 0.002, 4); s.cyl('*#ffe7a3', 0.009, 0.014, 0.075, 0.095, -0.01, 0.016, 10);
       s.box(RAINBOW[Math.floor(rnd() * 8)], 0.02, 0.006, 0.026, 0.075, 0.055, -0.01);
     });
-    return [atH(m, 0, 0.005, 0.047)]; } },
+    return [atF(m, 0, 0.005, 0.047)]; } },
   // A globe on a stand.
   globe: { r: 0.045, make(bag, x, z, c, rnd) {
     bag.cyl(WOOD, 0.02, 0.006, x, 0.003, z, 0.024, 10); bag.cyl(WOOD, 0.004, 0.06, x, 0.033, z, 0.004, 6);

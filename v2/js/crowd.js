@@ -19,6 +19,14 @@ const look = p => kidLook(Math.floor(p.ph * 1e6));
 // (Looks made elsewhere, like the teachers', may leave some of these out.)
 const LOOK_DEFAULTS = { shoes: '#fbfaf6', hat: '#e6463c', bag: null };
 
+// Keep someone out of the furniture: a gentle push out of any circle they are in, so they slide round it.
+export function nudgeClear(p, obstacles, pad = 0.02) {
+  for (const o of obstacles) {
+    const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz), R = o.r + pad;
+    if (d < R && d > 1e-5) { const push = Math.min(R - d, 0.02); p.x += dx / d * push; p.z += dz / d * push; }
+  }
+}
+
 export class Crowd {
   constructor(world) {
     this.world = world;
@@ -90,7 +98,7 @@ export class Crowd {
   addZone(z, r) {
     for (const s of z.seats || []) {
       if (r() > (z.fill ?? 0.8) || this.people.length >= MAX) continue;
-      this.people.push({ kind: 'sit', boxId: z.boxId, x: z.ox + s[0], y: z.oy + s[1], z: z.oz + s[2], s: 0.72 + r() * 0.08, ph: r() * 6, yaw: Math.PI + (r() - 0.5) * 0.6 });
+      this.people.push({ kind: 'sit', boxId: z.boxId, x: z.ox + s[0], y: z.oy + s[1], z: z.oz + s[2], s: 0.72 + r() * 0.08, ph: r() * 6, yaw: s[3] ?? Math.PI + (r() - 0.5) * 0.6 });
     }
     for (let i = 0; i < (z.walkers || 0) && this.people.length < MAX; i++) {
       const p = { kind: z.kind || 'walk', zone: z, s: z.adults && i === 0 ? 1 : 0.72 + r() * 0.1, ph: r() * 6, wait: r() * 2, speed: (z.speed || 0.32) * (0.8 + r() * 0.4), yaw: r() * 6.28, r };
@@ -102,7 +110,10 @@ export class Crowd {
     for (let k = 0; k < 30; k++) {
       if (z.rect) { const x = z.rect.x0 + r() * (z.rect.x1 - z.rect.x0), zz = z.rect.z0 + r() * (z.rect.z1 - z.rect.z0); if (!z.ok || z.ok(x, zz)) return [x, zz]; continue; }
       const lx = (r() - 0.5) * z.w, lz = (r() - 0.5) * z.d;
-      if (z.inside(lx, lz, z.margin ?? 0.08)) return [z.ox + lx, z.oz + lz];
+      if (!z.inside(lx, lz, z.margin ?? 0.08)) continue;
+      const wx = z.ox + lx, wz = z.oz + lz;
+      if (z.obstacles?.some(o => Math.hypot(wx - o.x, wz - o.z) < o.r + 0.03)) continue;      // (not on a table)
+      return [wx, wz];
     }
     return [z.ox ?? 0, z.oz ?? 0];
   }
@@ -138,7 +149,7 @@ export class Crowd {
         else {
           const dx = p.tx - p.x, dz = p.tz - p.z, dd = Math.hypot(dx, dz);
           if (dd < 0.02) { p.wait = 0.4 + p.r() * (p.kind === 'run' ? 0.3 : 2.2); [p.tx, p.tz] = this.pick(p.zone, p.r); }
-          else { const st = Math.min(dd, p.speed * dt); p.x += dx / dd * st; p.z += dz / dd * st; p.yaw = Math.atan2(dx, dz); moving = true; }
+          else { const st = Math.min(dd, p.speed * dt); p.x += dx / dd * st; p.z += dz / dd * st; p.yaw = Math.atan2(dx, dz); moving = true; if (p.zone?.obstacles) nudgeClear(p, p.zone.obstacles); }
         }
       }
       if (moving) p.walk = (p.walk || 0) + dt * ((p.kind === 'agent' ? p.pose : p.kind) === 'run' ? 16 : 10);

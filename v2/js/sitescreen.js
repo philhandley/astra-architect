@@ -178,9 +178,9 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     return { g, room };
   }
   const walls = [];          // wall lines on the floor being walked (for bumping into)
-  const seatsById = new Map();
+  const seatsById = new Map(), obstaclesById = new Map();
   function redraw() {
-    walls.length = 0; seatsById.clear();
+    walls.length = 0; seatsById.clear(); obstaclesById.clear();
     for (const g of pieces.values()) { design.remove(g); disposePiece(g); }
     pieces.clear();
     if (siteView.gate) siteView.gate.visible = !model.at(siteView.gate.userData.sq[0], siteView.gate.userData.sq[1], 0);   // (the gate steps aside for a room built on its square)
@@ -191,11 +191,13 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       else g = makeGroup(b);
       design.add(g); pieces.set(b.id, g);
       if (gone.has(b.id) && !gone.get(b.id).landing) { g.traverse(o => { if (o.userData.rocket) o.visible = false; }); setArms(b.id, 1); }
-      zones.push(...peopleFor(b, g, room));
+      const zs = peopleFor(b, g, room); zones.push(...zs);
+      const obs = (room?.obstacles || []).map(o => ({ x: b.x + b.w / 2 + o.x, z: b.z + b.d / 2 + o.z, r: o.r }));
+      obstaclesById.set(b.id, obs); for (const z of zs) if (z.inside && z.margin) z.obstacles = obs;
       // Where people can sit, in the world: room seats, or the benches and steps of a piece.
       const cx = b.x + b.w / 2, cz = b.z + b.d / 2, y0 = yOf(b);
       let st = room?.seats; if (!st) g.traverse(o => { if (o.userData.seats) st = o.userData.seats; });
-      seatsById.set(b.id, (st || []).map(([x, y, z]) => [cx + x, y0 + y, cz + z]));
+      seatsById.set(b.id, (st || []).map(([x, y, z, yaw]) => [cx + x, y0 + y, cz + z, yaw]));
     }
     zones.push(...strollers());
     levelGround();
@@ -931,7 +933,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   }
 
   // ---------- the school day ----------
-  const day = new SchoolDay({ world, model, crowd, yOf, seatsOf: id => seatsById.get(id), layer: ui.querySelector('.bubbles'), onPeriod: (i, P) => drawDaybar(i, P), onEnd: facts => { endDay(); setTimeout(() => hooks.dayDone?.(PERIODS, facts), 900); } });
+  const day = new SchoolDay({ world, model, crowd, yOf, seatsOf: id => seatsById.get(id), obstaclesOf: id => obstaclesById.get(id), layer: ui.querySelector('.bubbles'), onPeriod: (i, P) => drawDaybar(i, P), onEnd: facts => { endDay(); setTimeout(() => hooks.dayDone?.(PERIODS, facts), 900); } });
   function startDay() {
     if (!model.boxes.some(b => ['classroom', 'ringhouse', 'treehouse'].includes(b.type))) { sfx.no(); toast('Build a classroom first!'); say('Build a classroom first, so the children have somewhere to learn.'); return; }
     if (S.walking) return;

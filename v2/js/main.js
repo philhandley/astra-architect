@@ -50,11 +50,15 @@ async function boot() {
         <button class="ab" data-a="photo" type="button">${icon('camera')} Photo</button>
         <button class="ab" data-a="print3d" type="button">${icon('blocks')} 3D print</button>
         <button class="ab" data-a="share" type="button">${icon('share')} Share</button>
-        <button class="ab" data-a="finn" type="button">${icon('blocks')} Finn's model</button>
-        <button class="ab" data-a="clear" type="button">${icon('leaf')} Empty site</button>
-        <button class="ab" data-a="reset" type="button">${icon('undo')} Reset site</button>
-        <button class="ab round" data-a="speech" type="button" aria-label="Read aloud">${icon('speaker')}</button>
-        <button class="ab round" data-a="sound" type="button" aria-label="Sounds">${icon('music')}</button>
+        <button class="ab round more-btn" data-a="more" type="button" aria-label="More">${icon('more')}</button>
+        <div class="more-menu" hidden>
+          <button class="mi" data-a="finn" type="button">${icon('blocks')}<span>Finn's model</span><small>Put the wooden-block model on the site</small></button>
+          <button class="mi" data-a="speech" type="button">${icon('speaker')}<span>Read aloud</span><small>Buttons say their names</small></button>
+          <button class="mi" data-a="sound" type="button">${icon('music')}<span>Sounds</span><small>Taps and whooshes</small></button>
+          <div class="mi-rule"></div>
+          <button class="mi warn" data-a="clear" type="button">${icon('leaf')}<span>Empty site</span><small>Take every room away</small></button>
+          <button class="mi warn" data-a="reset" type="button">${icon('undo')}<span>Reset site</span><small>Back to the first site, trees and all</small></button>
+        </div>
       </div>
     </header>
     <main class="stage"><div class="world"></div><div class="overlay"></div><div class="rooms-host" hidden></div></main>
@@ -93,8 +97,13 @@ async function boot() {
   const acts = shell.querySelector('.acts');
   const sp = acts.querySelector('[data-a="speech"]'), so = acts.querySelector('[data-a="sound"]');
   const paint = () => { sp.classList.toggle('off', !speechOn); so.classList.toggle('off', !soundOn); };
+  const more = acts.querySelector('.more-menu'), moreBtn = acts.querySelector('.more-btn');
+  const showMore = on => { more.hidden = !on; moreBtn.classList.toggle('on', on); };
+  document.addEventListener('pointerdown', e => { if (!more.hidden && !e.target.closest('.more-menu, .more-btn')) showMore(false); }, true);
   acts.addEventListener('click', e => {
     const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+    if (a === 'more') { sfx.tap(); showMore(more.hidden); return; }
+    if (!['speech', 'sound'].includes(a)) showMore(false);
     if (a === 'speech') { setSpeech(!speechOn); paint(); toast(speechOn ? 'Read-aloud on' : 'Read-aloud off'); }
     if (a === 'sound') { setSound(!soundOn); paint(); sfx.tap(); }
     if (a === 'share') { sfx.tap(); if (location.hash === '#rooms') location.hash = '#site'; share.open(); }

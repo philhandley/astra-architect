@@ -24,13 +24,15 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       <button class="sbtn inside" data-a="inside" aria-label="Look inside">${icon('inside')}<span>Inside</span></button>
       <button class="sbtn day" data-a="day" aria-label="School day">${icon('bell')}<span>School day</span></button>
       <button class="sbtn" data-a="walk" aria-label="Walk inside">${icon('walk')}<span>Walk</span></button>
-      <button class="sbtn" data-a="left" aria-label="Turn left">${icon('left')}<span>Turn</span></button>
-      <button class="sbtn" data-a="right" aria-label="Turn right">${icon('right')}<span>Turn</span></button>
-      <button class="sbtn" data-a="in" aria-label="Closer">${icon('in')}<span>Closer</span></button>
-      <button class="sbtn" data-a="out" aria-label="Further">${icon('out')}<span>Further</span></button>
-      <button class="sbtn" data-a="home" aria-label="See the whole site">${icon('whole')}<span>Whole site</span></button>
-      <button class="sbtn grow" data-a="grow" aria-label="Make the site bigger">${icon('expand')}<span>Bigger site</span></button>
       <button class="sbtn" data-a="print" aria-label="Print drawings">${icon('print')}<span>Print</span></button>
+      <div class="cam" aria-label="Camera">
+        <button class="sbtn" data-a="left" aria-label="Turn left">${icon('left')}<span>Left</span></button>
+        <button class="sbtn" data-a="right" aria-label="Turn right">${icon('right')}<span>Right</span></button>
+        <button class="sbtn" data-a="in" aria-label="Closer">${icon('in')}<span>Closer</span></button>
+        <button class="sbtn" data-a="out" aria-label="Further">${icon('out')}<span>Further</span></button>
+        <button class="sbtn wide" data-a="home" aria-label="See the whole site">${icon('whole')}<span>Whole site</span></button>
+      </div>
+      <button class="sbtn grow" data-a="grow" aria-label="Make the site bigger">${icon('expand')}<span>Bigger site</span></button>
     </div>
     <div class="floors" hidden></div>
     <div class="bubbles"></div>
@@ -67,6 +69,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     }
   }
   function setTool(id) {
+    stopMove();
     if (S.siteEdit) stopGrow();
     if (S.inside) setInside(false);
     S.tool = id;
@@ -443,6 +446,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   });
 
   function select(id, { quiet = false } = {}) {
+    stopMove();
     S.selected = id;
     ui.querySelector('.swatches')?.remove();
     const b = id ? model.byId.get(id) : null;
@@ -450,7 +454,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     placeHandles();
     drawSelbar(b);
     if (!quiet) { sfx.tap(); say(PROGRAMMES[b.type].name); cheer(b); }
-    setHint('Drag a blue arrow to make it bigger or smaller. Drag the room to move it.');
+    setHint('Tap Move to put it somewhere else. Drag a blue arrow to make it bigger or smaller.');
   }
   function drawSelbar(b) {
     const P = PROGRAMMES[b.type];
@@ -466,10 +470,54 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     btn('colour', 'Colour', x => swatches(b, x));
     if (WINDOWED.has(b.shape) && b.surface !== 'glass') btn('windows', 'Windows', x => windowsPick(b, x));
     if (!NO_SURFACE.has(b.shape)) btn('surface', 'Walls', x => surfaces(b, x));
+    btn('move', 'Move', () => startMove(b), 'move');
     btn('turn', 'Turn', () => turnBox(b));
     btn('copy', 'Copy', () => copyBox(b));
     btn('bin', 'Bin', () => { const fell = model.remove(b.id); sfx.bin(); if (fell) toast('The rooms on top came down too. Undo brings them back.'); select(null); }, 'no');
     btn('done', 'Done', () => select(null), 'ok');
+  }
+  // ---------- moving a room: tap Move, then tap (or drag to) where it should go ----------
+  // The room stays put and a ghost shows where it would land, green when it fits; a tap or a lifted finger drops it.
+  function startMove(b) {
+    S.move = { id: b.id };
+    handles.visible = false; clearGhost();
+    siteView.setGridStrong(true);
+    selbar.innerHTML = '';
+    const P = PROGRAMMES[b.type];
+    selbar.append(h(`<div class="selname">${emo(P.emoji)}<div><b>${esc(P.name)}</b><span>moving</span></div></div>`));
+    selbar.append(h(`<span class="selhint">Tap where it should go</span>`));
+    const cancel = h(`<button class="selbtn" type="button">${icon('close')}<span>Cancel</span></button>`);
+    cancel.addEventListener('click', e => { e.stopPropagation(); sfx.tap(); stopMove(); select(b.id, { quiet: true }); });
+    selbar.append(cancel);
+    sfx.tap(); say(`Tap where the ${P.name.toLowerCase()} should go.`);
+    setHint(`${emo(P.emoji)} Tap a square to move the ${esc(P.name.toLowerCase())} there, or on top of a room to stack it.`);
+  }
+  function stopMove() { if (!S.move) return; S.move = null; clearGhost(); siteView.setGridStrong(!!S.tool); }
+  // Where the moving room would land for a tap here: centred on the square, nudged a little if that helps.
+  function moveTarget(clientX, clientY) {
+    const b = model.byId.get(S.move?.id); if (!b) return null;
+    const skip = new Set([b.id, ...model.above(b).map(x => x.id)]);
+    const t = under(clientX, clientY, skip) || target(clientX, clientY, skip);
+    if (!t) return null;
+    const x0 = t.x - Math.floor((b.w - 1) / 2), z0 = t.z - Math.floor((b.d - 1) / 2);
+    let first = null;
+    for (const [dx, dz] of [[0, 0], [-1, 0], [0, -1], [1, 0], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) {
+      const patch = { x: x0 + dx, z: z0 + dz, level: t.level }, r = model.test(b.id, patch);
+      if (r.ok) return { patch, ok: true, box: { ...b, ...patch } };
+      if (!first) first = { patch, ok: false, why: r.why, box: { ...b, ...patch } };
+    }
+    return first;
+  }
+  function dropAt(clientX, clientY) {
+    const b = model.byId.get(S.move?.id); if (!b) { stopMove(); return; }
+    const m = moveTarget(clientX, clientY);
+    if (!m) { sfx.no(); toast('Tap a square on the ground, or on top of a room.'); return; }
+    if (!m.ok) { sfx.no(); toast(WHY[m.why] || 'It will not fit there.'); return; }
+    const moved = m.patch.x !== b.x || m.patch.z !== b.z || m.patch.level !== b.level;
+    if (moved) { model.update(b.id, m.patch); sfx.place(m.patch.level); }
+    stopMove();
+    select(b.id, { quiet: true });
+    if (moved) say('Moved!');
   }
   function nextShape(b) {
     const list = PROGRAMMES[b.type].shapes, s = list[(list.indexOf(b.shape) + 1) % list.length];
@@ -598,6 +646,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   // ---------- the inside view ----------
   function topFloor() { return Math.max(0, ...model.boxes.map(b => b.level + b.h - 1)); }
   function setInside(on, { quiet = false } = {}) {
+    ui.classList.toggle('inside', !!on);
     S.inside = on;
     if (on) { S.tool = null; select(null); drawTray(); S.floor = Math.min(S.floor, topFloor()); }
     tray.hidden = on;
@@ -724,6 +773,13 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       return;
     }
     if (S.inside) { S.drag = { mode: 'tap', start, moved: false }; return; }
+    if (S.move) {
+      S.drag = { mode: 'tap', start, moved: false };
+      world.controls.enabled = false;
+      const m = moveTarget(e.clientX, e.clientY); if (m) showGhost(m.box, m.ok);
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* synthetic events in tests */ }
+      return;
+    }
     // An arrow badge?
     if (handles.visible) {
       const ray = world.rayFrom(e.clientX, e.clientY);
@@ -759,11 +815,13 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   const onMove = e => {
     const d = S.drag;
     if (!d) {
+      if (S.move && e.pointerType === 'mouse' && e.buttons === 0 && !ui.hidden) { const m = moveTarget(e.clientX, e.clientY); if (m) showGhost(m.box, m.ok); else clearGhost(); return; }
       if (S.tool && e.pointerType === 'mouse' && e.buttons === 0 && !ui.hidden) { const t = target(e.clientX, e.clientY); if (t) { const nb = proposal(t); showGhost(nb.box, nb.ok); } else clearGhost(); }
       return;
     }
     if (e.pointerId !== d.start.id) return;
     if (Math.hypot(e.clientX - d.start.x, e.clientY - d.start.y) > 8) d.moved = true;
+    if (d.mode === 'tap' && S.move) { const m = moveTarget(e.clientX, e.clientY); if (m) showGhost(m.box, m.ok); return; }
     if (d.mode === 'tap') { if (d.moved) clearGhost(); return; }
     if (!d.moved) return;
     if (d.mode === 'resize') {
@@ -829,8 +887,10 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       placeHandles();
       return;
     }
+    if (d.mode === 'tap' && S.move) { dropAt(e.clientX, e.clientY); return; }
     if (d.mode === 'tap' && !d.moved) handleTap(e.clientX, e.clientY);
   };
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && S.move) { const id = S.move.id; stopMove(); select(id, { quiet: true }); } });
   canvas.addEventListener('pointerdown', onDown, { capture: true });
   canvas.addEventListener('pointermove', onMove);
   canvas.addEventListener('pointerup', onUp);
@@ -899,7 +959,8 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     S.walkMode = true; S.floor = 0;
     setInside(true, { quiet: true });
     ui.hidden = true;
-    S.walking = startWalk({ world, model, root, yOf, crowd, walls: () => walls, setFloor: l => { S.floor = l; redraw(); }, onExit: () => { S.walking = null; ui.hidden = false; S.walkMode = false; setInside(false, { quiet: true }); } });
+    document.body.classList.add('walking');
+    S.walking = startWalk({ world, model, root, yOf, crowd, walls: () => walls, setFloor: l => { S.floor = l; redraw(); }, onExit: () => { S.walking = null; ui.hidden = false; S.walkMode = false; document.body.classList.remove('walking'); setInside(false, { quiet: true }); } });
   }
 
   function handleTap(x, y) {

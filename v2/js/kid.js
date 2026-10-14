@@ -1,10 +1,10 @@
 // The children. Two designs, both from the passes in dev/characters.html (Phil found the picture-book toys too
 // childish, then asked for ten passes with research into designed and architectural characters):
-// - 'scale' (the default): like architects' scale figures. About five and a half heads tall, two small dot eyes
+// - 'scale': like architects' scale figures. About five and a half heads tall, two small dot eyes
 //   (FACE false: faceless), simple solid hair, square shoulders, a straight-cut top (some with Breton stripes or a
 //   white collar), an A-line coat or a skirt on some, slim trousers, rounded sneakers, a slim backpack, sometimes a
 //   bucket hat or a beanie; fresh colours mixed with muted ones.
-// - 'crew': a hoodie with a band of colour across the chest (some with the hood showing, some with a skirt),
+// - 'crew' (the default, Phil's pick): a hoodie with a band of colour across the chest (some with the hood showing, some with a skirt),
 //   joggers, chunky sneakers with white soles, pill eyes, stylish hair (a fade, curls, a bun, braids, long hair, a
 //   swoop, an afro, a cap worn backwards, a beanie), headphones on a few; muted colours.
 // - 'muted': the scale-figure kids as in pass 7 (Phil's pick to try): muted colours, a slightly bigger head, more
@@ -17,18 +17,18 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 export const KIDS = (() => {
   try {
     const q = new URLSearchParams(location.search).get('kids');
-    if (q === 'crew' || q === 'scale' || q === 'muted') { localStorage.setItem('astraarch-kids', q); return q; }
-    const saved = localStorage.getItem('astraarch-kids');
-    return saved === 'crew' || saved === 'muted' ? saved : 'scale';
-  } catch (e) { return 'scale'; }
+    if (q === 'crew' || q === 'scale' || q === 'muted') { localStorage.setItem('astraarch-kids2', q); return q; }
+    const saved = localStorage.getItem('astraarch-kids2');
+    return saved === 'scale' || saved === 'muted' ? saved : 'crew';
+  } catch (e) { return 'crew'; }
 })();
 const CREW = KIDS === 'crew', MUTED = KIDS === 'muted';
 
 // The body (feet at y = 0, facing +z; a grown-up is the same figure drawn bigger).
 export const HIP = CREW ? 0.086 : 0.088, SHOULDER = CREW ? 0.146 : 0.149, LEG_X = CREW ? 0.0135 : 0.0118, ARM_X = CREW ? 0.031 : 0.0285;
-export const SEAT = HIP - 0.004;                        // where a sitting child's bum is, above their feet
+export const SEAT = CREW ? 0.076 : 0.083;               // the bottom of the top: where a sitting child's bum is, above their feet
 export const REACH = SHOULDER + (CREW ? 0.057 : 0.063);  // how high their hands are with their arms straight up
-export const SIT_DROP = HIP - 0.05;                      // how far the crowd lowers a sitting child: hips just above a stool
+export const SIT_DROP = SEAT;                            // how far the crowd lowers a sitting child: bum on the seat
 export const SWIM_DROP = 0.138;                          // and a swimmer, so the head is just out of the water
 export const FACE = true;                                // eyes (false: faceless, like a scale figure)
 const R = CREW ? 0.0335 : MUTED ? 0.0305 : 0.0295, HEAD_Y = 0.189;
@@ -70,6 +70,7 @@ const CURLY = new Set(['curls', 'afro']);
 // Parts that only some children have (each lists just those children in crowd.js); a child's look holds the
 // colour of each extra it has (or nothing). Extra parts on the legs, in a fixed colour (the crew's white soles).
 export const EXTRAS = CREW ? ['band', 'hood', 'skirt', 'phones', 'bag'] : ['coat', 'skirt', 'collar', 'stripes', 'bag'];
+export const OFF_WHEN_SEATED = new Set(['skirt', 'coat']);      // (they would hang through the seat)
 export const LEG_EXTRAS = CREW ? [['sole', '#efe9dc']] : [];
 
 // A look from a whole number: the outfit, skin, hair and extras are each picked independently.
@@ -204,7 +205,8 @@ export function miniKid(pose = 'stand') {
   };
   add('torso', L.top); add('head', L.skin); add('eyes', '#2a2523');
   const hair = HAIRDOS[L.style]; add(hair, HATS.has(hair) ? L.hat : L.hair);
-  for (const x of EXTRAS) if (L[x]) add(x, L[x]);
+  const seated = pose === 'sit' || pose === 'ride' || pose === 'swing';
+  for (const x of EXTRAS) if (L[x] && !(seated && OFF_WHEN_SEATED.has(x))) add(x, L[x]);
   for (const s of [-1, 1]) {
     const leg = new THREE.Group(); leg.position.set(s * LEG_X, HIP, 0); leg.rotation.x = legX; leg.userData.limb = 'leg'; leg.userData.s = s; add('leg', L.shorts, leg); add('shoe', L.shoes, leg); for (const [x, col] of LEG_EXTRAS) add(x, col, leg); k.add(leg);
     const arm = new THREE.Group(); arm.position.set(s * ARM_X, SHOULDER, 0); arm.rotation.set(armX, 0, s * out); arm.userData.limb = 'arm'; arm.userData.s = s; add('arm', L.sleeve, arm); add('hand', L.skin, arm); k.add(arm);

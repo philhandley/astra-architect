@@ -197,7 +197,7 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
     for (const p of bag.parts) { p.traverse(m => { m.userData.noInk = true; }); moving.add(p); }
     g.add(moving);
   }
-  return { group: g, seats: seats.map(([x, z]) => [x, floorY + 0.02, z]), inside: o.inside, floorY: floorY + 0.02, segments, swim };
+  return { group: g, seats: seats.map(([x, z, h = 0]) => [x, floorY + 0.02 + h, z]), inside: o.inside, floorY: floorY + 0.02, segments, swim };
 }
 
 export { CUT, SINGLE as SINGLE_SPACE };

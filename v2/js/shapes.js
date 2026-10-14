@@ -964,7 +964,7 @@ Object.assign(BUILD, {
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2, x = Math.cos(a) * R * 0.75, z = Math.sin(a) * R * 0.75;
       g.add(mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.08, 12).translate(x, 0.08, z), mat(i % 2 ? c : '#f28b30')));
-      seats.push([x * 1.12, 0.04, z * 1.12]);
+      seats.push([x, 0.12, z]);      // (the stool's top)
     }
     // A big yellow question mark set in the floor in the middle.
     const qm = R * 0.12, qy = 0.0455, turn = g => g.rotateY(Math.PI / 4);      // (turned to read from the usual view)

@@ -6,7 +6,9 @@
 // ink line shares the matrices of its part. Each hairstyle (and the bag) lists only the children who have it, so
 // nobody draws hair they aren't wearing.
 import * as THREE from 'three';
-import { HIP, SHOULDER, LEG_X, ARM_X, SIT_DROP, SWIM_DROP, kidParts, kidLook, HAIR_PART, HATS, EXTRAS, LEG_EXTRAS, INKED, drawn, toon, KID_LINE, inkOf } from './kid.js';
+import { HIP, SHOULDER, LEG_X, ARM_X, SIT_DROP, SWIM_DROP, kidParts, kidLook, HAIR_PART, HATS, EXTRAS, LEG_EXTRAS, OFF_WHEN_SEATED, INKED, drawn, toon, KID_LINE, inkOf } from './kid.js';
+
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 
 const MAX = 800;
 export function seeded(seed) {
@@ -161,7 +163,7 @@ export class Crowd {
     if (lean) base.multiply(rot.makeRotationX(lean));
     M.torso.setMatrixAt(i, base);         // also the head and face
     if (p.hair) M[p.hair].setMatrixAt(p.hi, base);
-    if (p.xi) for (const x of EXTRAS) if (p.xi[x] >= 0) M[x].setMatrixAt(p.xi[x], base);
+    if (p.xi) for (const x of EXTRAS) if (p.xi[x] >= 0) M[x].setMatrixAt(p.xi[x], kind === 'sit' && OFF_WHEN_SEATED.has(x) ? ZERO : base);
     const limb = (mesh, x, yy, rx, rz) => { part.makeTranslation(x, yy, 0).multiply(rot.makeRotationFromEuler(e.set(rx, 0, rz))); mesh.setMatrixAt(i, part.premultiply(base)); };
     limb(M.legL, -LEG_X, HIP, legL, 0);
     limb(M.legR, LEG_X, HIP, legR, 0);

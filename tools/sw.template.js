@@ -57,7 +57,9 @@ self.addEventListener('fetch', event => {
       return res;
     } catch (err) {
       if (req.mode === 'navigate') {
-        const shell = await cache.match('./') || await cache.match('index.html');
+        // (The v2 app lives in its own folder with its own page: give it back its own shell, not the root's.)
+        const inV2 = url.pathname.includes('/v2/');
+        const shell = (inV2 && (await cache.match('v2/') || await cache.match('v2/index.html'))) || await cache.match('./') || await cache.match('index.html');
         if (shell) return shell;
       }
       throw err;

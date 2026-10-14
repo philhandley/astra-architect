@@ -55,6 +55,7 @@ async function boot() {
         <button class="ab" data-a="share" type="button">${icon('share')} Share</button>
         <button class="ab round more-btn" data-a="more" type="button" aria-label="More">${icon('more')}</button>
         <div class="more-menu" hidden>
+          <button class="mi" data-a="install" type="button" hidden>${icon('expand')}<span>Install on this tablet</span><small>Its own icon, and it works without Wi-Fi</small></button>
           <button class="mi" data-a="tour" type="button">${icon('play')}<span>Play the tour</span><small>Fly round the school with Finn's words</small></button>
           <button class="mi" data-a="tourwords" type="button">${icon('talk')}<span>Tour words</span><small>Pick what each room says</small></button>
           <div class="mi-rule"></div>
@@ -107,6 +108,11 @@ async function boot() {
   const sp = acts.querySelector('[data-a="speech"]'), so = acts.querySelector('[data-a="sound"]');
   const paint = () => { sp.classList.toggle('off', !speechOn); so.classList.toggle('off', !soundOn); };
   const more = acts.querySelector('.more-menu'), moreBtn = acts.querySelector('.more-btn');
+  // Chrome offers to install when it can; the shared site already has sister apps installed, so the browser's own
+  // menu may say "already installed": this button asks for this app by itself.
+  let installEvent = null;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvent = e; acts.querySelector('[data-a="install"]').hidden = false; });
+  window.addEventListener('appinstalled', () => { installEvent = null; acts.querySelector('[data-a="install"]').hidden = true; toast('Installed! Look for Architect on the home screen.'); });
   const showMore = on => { more.hidden = !on; moreBtn.classList.toggle('on', on); };
   document.addEventListener('pointerdown', e => { if (!more.hidden && !e.target.closest('.more-menu, .more-btn')) showMore(false); }, true);
   acts.addEventListener('click', e => {
@@ -118,6 +124,7 @@ async function boot() {
     if (a === 'share') { sfx.tap(); if (location.hash === '#rooms') location.hash = '#site'; share.open(); }
     if (a === 'tour') { sfx.tap(); if (location.hash === '#rooms') location.hash = '#site'; setTimeout(() => site.tour(), 80); }
     if (a === 'tourwords') { sfx.tap(); tourWords.open(); }
+    if (a === 'install' && installEvent) { sfx.tap(); installEvent.prompt(); installEvent.userChoice.then(() => { installEvent = null; acts.querySelector('[data-a="install"]').hidden = true; }); }
     if (a === 'slots' && slots) { sfx.tap(); if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => slots.open(), 400); } else slots.open(); }
     if (a === 'photo') { if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => site.photo(), 400); } else site.photo(); }
     if (a === 'print3d') { sfx.tap(); if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => site.print3d(), 400); } else site.print3d(); }

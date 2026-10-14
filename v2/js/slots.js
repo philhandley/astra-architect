@@ -25,6 +25,7 @@ export function mountSlots(root, model, { world, site }) {
   }
   // A small picture of the school as it is now (the whole site, framed).
   function thumb() {
+    const cam = world.camera, ctl = world.controls, keep = { pos: cam.position.clone(), target: ctl.target.clone(), zoom: cam.zoom };
     try {
       site.frameSite(true);
       world.step(0);
@@ -33,6 +34,7 @@ export function mountSlots(root, model, { world, site }) {
       g.drawImage(src, (c.width - w) / 2, (c.height - hh) / 2, w, hh);
       return c.toDataURL('image/jpeg', 0.72);
     } catch (e) { return null; }
+    finally { cam.position.copy(keep.pos); ctl.target.copy(keep.target); cam.zoom = keep.zoom; cam.updateProjectionMatrix(); ctl.update(); }
   }
   function saveCurrent(withThumb = false) {
     ensure();

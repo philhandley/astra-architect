@@ -1056,6 +1056,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     tour() {
       if (S.walking) { toast('Come out of the walk first.'); return; }
       if (S.touring) return;
+      if (!model.boxes.length) { sfx.no(); toast('Build your school first, then take the tour.'); return; }
       if (S.day) stopDay();
       select(null); S.tool = null; drawTray();
       ui.hidden = true; document.body.classList.add('walking');

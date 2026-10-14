@@ -66,6 +66,7 @@ export function groupsOf(model, { all = false } = {}) {
 
 // Where to look to see these boxes, and how close.
 function frameOf(boxes) {
+  if (!boxes.length) return [10, 7, 1];
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
   for (const b of boxes) { x0 = Math.min(x0, b.x); z0 = Math.min(z0, b.z); x1 = Math.max(x1, b.x + b.w); z1 = Math.max(z1, b.z + b.d); }
   const E = Math.max(x1 - x0, z1 - z0, 1);
@@ -95,7 +96,7 @@ export function startTour({ world, model, root, setInside, onExit }) {
   function show(k) {
     i = (k + stops.length) % stops.length; t = 0;
     const s = stops[i];
-    if (s.kind === 'intro') { setInside(false); const [cx, cz] = model.boxes.length ? frameOf(model.boxes) : [10, 7]; world.frame(cx, cz, model.boxes.length ? frameOf(model.boxes)[2] : 1); pic.innerHTML = emo('🏫'); small.textContent = 'Show and tell'; p.textContent = "Finn's Dream School. Come and have a look round!"; dwell = 5; }
+    if (s.kind === 'intro') { setInside(false); const [cx, cz, zoom] = frameOf(model.boxes); world.frame(cx, cz, zoom); pic.innerHTML = emo('🏫'); small.textContent = 'Show and tell'; p.textContent = "Finn's Dream School. Come and have a look round!"; dwell = 5; }
     else if (s.kind === 'room') { setInside(false); const P = PROGRAMMES[s.g.type], [cx, cz, zoom] = frameOf(s.g.boxes); world.frame(cx, cz, zoom); pic.innerHTML = emo(P.emoji); small.textContent = P.name + (s.g.boxes.length > 1 ? ` × ${s.g.boxes.length}` : ''); p.textContent = captionFor(s.g.type, model.notes); dwell = 6.5; }
     else if (s.kind === 'inside') { setInside(true); const [cx, cz, zoom] = frameOf(model.boxes); world.frame(cx, cz, Math.min(zoom * 1.3, 2.2)); pic.innerHTML = icon('inside'); small.textContent = 'Inside'; p.textContent = 'Take the roofs off and peek inside.'; dwell = 8; }
     else { setInside(false); const [cx, cz, zoom] = frameOf(model.boxes); world.frame(cx, cz, zoom); pic.innerHTML = emo('⭐'); small.textContent = 'The end'; p.textContent = endLine(); dwell = 1e9; }

@@ -20,6 +20,7 @@ export let speechOn = (() => { try { return localStorage.getItem('astraarch2.spe
 export function setSpeech(on) { speechOn = on; try { localStorage.setItem('astraarch2.speech', on ? 'on' : 'off'); } catch (e) { /* ignore */ } if (!on) hush(); }
 export function say(text) {
   if (!synth || !text || !speechOn) return;
+  if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;      // (nothing speaks before the first tap)
   synth.cancel();
   const parts = String(text).match(/[^.!?]+[.!?]*/g) || [String(text)];
   for (const p of parts) {

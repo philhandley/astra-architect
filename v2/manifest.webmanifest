@@ -1,0 +1,20 @@
+{
+  "name": "Astra Architect",
+  "short_name": "Architect",
+  "description": "Finn's dream school: build it in rooms, look inside, walk through it, watch a school day.",
+  "id": "/astra-architect/v2/",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#f6f3ec",
+  "theme_color": "#f6f3ec",
+  "lang": "en-GB",
+  "categories": ["education", "kids"],
+  "icons": [
+    { "src": "../assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "../assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

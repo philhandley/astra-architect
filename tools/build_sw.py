@@ -37,7 +37,8 @@ def main():
         h.update(p.read_bytes())
     h.update((ROOT / 'tools' / 'sw.template.js').read_bytes())
     version = h.hexdigest()[:10]
-    local = ['./'] + [p.relative_to(ROOT).as_posix() for p in files]
+    # ('./' and 'v2/' are the two pages as the browser asks for them when it navigates; the index.html files are the same bytes.)
+    local = ['./', 'v2/'] + [p.relative_to(ROOT).as_posix() for p in files]
     addons = set()
     for p in list((ROOT / 'js').rglob('*.js')) + list((ROOT / 'v2').rglob('*.js')):
         for m in re.finditer(r"""['"]three/addons/([^'"]+)['"]""", p.read_text(encoding='utf-8')):

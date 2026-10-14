@@ -56,7 +56,7 @@ export class World {
     this.running = false;
     this._loop = this._loop.bind(this);
     new ResizeObserver(() => this.resize()).observe(host);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) this.stop(); else this.start(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { this._wasRunning = this.running; this.stop(); } else if (this._wasRunning !== false) this.start(); });
     this.resize();
   }
 
@@ -78,6 +78,7 @@ export class World {
 
   // Look at a point from the isometric angle (keeps the current turn of the board).
   frame(x, z, zoom, instant = false) {
+    if (![x, z, zoom].every(Number.isFinite)) return;      // (a bad frame would strand the camera for good)
     const c = this.controls, cam = this.camera;
     const off = cam.position.clone().sub(c.target);
     const t0 = c.target.clone(), z0 = cam.zoom, t1 = new THREE.Vector3(x, 0, z);

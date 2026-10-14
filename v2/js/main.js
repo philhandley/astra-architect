@@ -48,6 +48,7 @@ async function boot() {
       <div class="acts">
         <button class="ab wishbtn" data-a="wishes" type="button"></button>
         <button class="ab" data-a="photo" type="button">${icon('camera')} Photo</button>
+        <button class="ab" data-a="print3d" type="button">${icon('blocks')} 3D print</button>
         <button class="ab" data-a="share" type="button">${icon('share')} Share</button>
         <button class="ab" data-a="finn" type="button">${icon('blocks')} Finn's model</button>
         <button class="ab" data-a="clear" type="button">${icon('leaf')} Empty site</button>
@@ -98,6 +99,7 @@ async function boot() {
     if (a === 'sound') { setSound(!soundOn); paint(); sfx.tap(); }
     if (a === 'share') { sfx.tap(); if (location.hash === '#rooms') location.hash = '#site'; share.open(); }
     if (a === 'photo') { if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => site.photo(), 400); } else site.photo(); }
+    if (a === 'print3d') { sfx.tap(); if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => site.print3d(), 400); } else site.print3d(); }
     if (a === 'finn') {
       if (model.boxes.length && !confirm('Put Finn\'s wooden-block model on the site? (Undo brings back what is there now.)')) return;
       model.snapshot(); model.boxes = FINNS_MODEL.map((b, i) => ({ ...b, id: i + 1, x: b.x + model.pad.w, z: b.z + model.pad.n })); model.nextId = FINNS_MODEL.length + 1; model.changed({ loaded: true });

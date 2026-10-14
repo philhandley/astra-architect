@@ -963,6 +963,13 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       const flash = h('<div class="flash"></div>'); ui.append(flash); setTimeout(() => flash.remove(), 600);
       sfx.whoosh(); say('Snap! A photo of your school.');
     },
+    // A file for a 3D printer, from the outside view of the whole school.
+    print3d() {
+      if (S.walking) { toast('Come out of the walk first.'); return; }
+      if (S.day) stopDay();
+      if (S.inside) setInside(false, { quiet: true });
+      import('./print3d.js').then(m => m.openPrint3D({ design, model, yOf }));
+    },
     screenOf(x, z, y = 0) { return world.toScreen(new THREE.Vector3(x + 0.5, y, z + 0.5)); },
     show(on) { ui.hidden = !on; design.visible = on; crowd.mesh.visible = on; handles.visible = on && !!S.selected && !S.inside; },
     refreshTray: drawTray,

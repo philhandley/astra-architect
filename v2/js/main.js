@@ -10,6 +10,7 @@ import { icon, MARK } from './icons.js';
 import { mountWishes } from './wishes.js';
 import { mountGuide } from './guide.js';
 import { mountShare, mountViewer, unpackDesign, shownCode } from './share.js';
+import { mountTourWords } from './tour.js';
 
 // Finn's wooden-block model from the photos: green classrooms along the beach, orange bars round the meadow,
 // a blue pool in the middle, a ring of green curves and an orange drum by the waterfall.
@@ -52,6 +53,9 @@ async function boot() {
         <button class="ab" data-a="share" type="button">${icon('share')} Share</button>
         <button class="ab round more-btn" data-a="more" type="button" aria-label="More">${icon('more')}</button>
         <div class="more-menu" hidden>
+          <button class="mi" data-a="tour" type="button">${icon('play')}<span>Play the tour</span><small>Fly round the school with Finn's words</small></button>
+          <button class="mi" data-a="tourwords" type="button">${icon('talk')}<span>Tour words</span><small>Pick what each room says</small></button>
+          <div class="mi-rule"></div>
           <button class="mi" data-a="finn" type="button">${icon('blocks')}<span>Finn's model</span><small>Put the wooden-block model on the site</small></button>
           <button class="mi" data-a="speech" type="button">${icon('speaker')}<span>Read aloud</span><small>Buttons say their names</small></button>
           <button class="mi" data-a="sound" type="button">${icon('music')}<span>Sounds</span><small>Taps and whooshes</small></button>
@@ -78,7 +82,8 @@ async function boot() {
   const wishes = shown ? { award() {}, addStar() {} } : mountWishes(shell.querySelector('.stage'), model, { button: shell.querySelector('.wishbtn'), celebrate: () => { if (location.hash !== '#rooms') site.celebrate(); } });
   const guide = mountGuide(overlay, model, { site, wishes });
   const share = mountShare(overlay, model);
-  if (shown) mountViewer(overlay);
+  const tourWords = mountTourWords(overlay, model);
+  if (shown) mountViewer(overlay, { tour: () => site.tour() });
   site.hooks.dayDone = (periods, facts) => guide.debrief(periods, facts);
   site.hooks.bigQuestion = () => guide.bigQuestion();
 
@@ -107,6 +112,8 @@ async function boot() {
     if (a === 'speech') { setSpeech(!speechOn); paint(); toast(speechOn ? 'Read-aloud on' : 'Read-aloud off'); }
     if (a === 'sound') { setSound(!soundOn); paint(); sfx.tap(); }
     if (a === 'share') { sfx.tap(); if (location.hash === '#rooms') location.hash = '#site'; share.open(); }
+    if (a === 'tour') { sfx.tap(); if (location.hash === '#rooms') location.hash = '#site'; setTimeout(() => site.tour(), 80); }
+    if (a === 'tourwords') { sfx.tap(); tourWords.open(); }
     if (a === 'photo') { if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => site.photo(), 400); } else site.photo(); }
     if (a === 'print3d') { sfx.tap(); if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => site.print3d(), 400); } else site.print3d(); }
     if (a === 'finn') {

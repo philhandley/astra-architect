@@ -10,6 +10,7 @@ import { buildPiece, disposePiece, ghostMaterial, addInk, INK } from './shapes.j
 import { cutRoom, outline, CUTTABLE, storeyFloor, SINGLE_SPACE } from './inside.js';
 import { SchoolDay, Trails, PERIODS } from './day.js';
 import { startWalk } from './walk.js';
+import { startTour } from './tour.js';
 import { Crowd } from './crowd.js';
 import { WHY } from './model.js';
 import { icon, winSwatch } from './icons.js';
@@ -1030,6 +1031,15 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       if (S.day) stopDay();
       if (S.inside) setInside(false, { quiet: true });
       import('./print3d.js').then(m => m.openPrint3D({ design, model, yOf }));
+    },
+    // The tour (tour.js): the camera flies round the school with a line for each kind of room.
+    tour() {
+      if (S.walking) { toast('Come out of the walk first.'); return; }
+      if (S.touring) return;
+      if (S.day) stopDay();
+      select(null); S.tool = null; drawTray();
+      ui.hidden = true; document.body.classList.add('walking');
+      S.touring = startTour({ world, model, root, setInside: on => setInside(on, { quiet: true }), onExit: () => { S.touring = null; ui.hidden = false; document.body.classList.remove('walking'); setInside(false, { quiet: true }); frameSite(); } });
     },
     screenOf(x, z, y = 0) { return world.toScreen(new THREE.Vector3(x + 0.5, y, z + 0.5)); },
     show(on) { ui.hidden = !on; design.visible = on; crowd.mesh.visible = on; handles.visible = on && !!S.selected && !S.inside; },

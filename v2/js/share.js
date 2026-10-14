@@ -81,6 +81,10 @@ export async function packDesign(model) {
     w.put(xs[n] - x0, xb); w.put(zs[n] - z0, zb);
     last[t] = prev = { ...look, ...s };
   });
+  // Tour words (tour.js): which line each kind of room says, when Finn picked one. Readers from before skip this.
+  const notes = Object.entries(model.notes || {}).filter(([t, i]) => i > 0 && TYPES.includes(t)).slice(0, 63);
+  w.put(+!!notes.length, 1);
+  if (notes.length) { w.gamma(notes.length); for (const [t, i] of notes) { w.put(TYPES.indexOf(t), 6); w.gamma(Math.min(i, 30) + 1); } }
   return w.text();
 }
 function unpack3(text) {
@@ -116,7 +120,9 @@ function unpack3(text) {
     last[t] = prev = { ...look, ...s };
   }
   if (r.i > r.b.length) throw new Error('not a design');      // (the link was cut short)
-  return { boxes, pad, grown };
+  const notes = {};
+  if (r.i < r.b.length && r.get(1)) { const m = r.ungamma(); for (let k = 0; k < m && k < 64; k++) { const t = TYPES[r.get(6)], i = r.ungamma() - 1; if (t && i > 0) notes[t] = i; } }
+  return { boxes, pad, grown, notes };
 }
 
 // Format 2 (links made before format 3): every room in 49 bits, squeezed when that was shorter. Only read now.
@@ -184,12 +190,13 @@ export function mountShare(root, model) {
 }
 
 // Opened from a link: a welcome card, with big buttons for the ways to look round.
-export function mountViewer(root) {
+export function mountViewer(root, { tour } = {}) {
   const sheet = h(`<div class="nova-sheet"><div class="nova-card view-card">
     <div class="nova-head">${emo('🏫', 'emo head-pic')}<div><small>Show and tell</small><h2>Finn's Dream School</h2></div></div>
-    <p class="share-text">Finn designed this school. Have a look round! You can look inside, walk through it and watch a school day. You can look, but not change anything.</p>
+    <p class="share-text">Finn designed this school. Take the tour, or have a look round yourself: look inside, walk through it and watch a school day. You can look, but not change anything.</p>
     <div class="view-go">
-      <button class="fbtn ok" type="button" data-go="look">${icon('whole')}<span>Look around</span></button>
+      <button class="fbtn ok tourgo" type="button" data-go="tour">${icon('play')}<span>Take the tour</span></button>
+      <button class="fbtn" type="button" data-go="look">${icon('whole')}<span>Look around</span></button>
       <button class="fbtn" type="button" data-go="inside">${icon('inside')}<span>Look inside</span></button>
       <button class="fbtn" type="button" data-go="walk">${icon('walk')}<span>Walk through</span></button>
       <button class="fbtn" type="button" data-go="day">${icon('bell')}<span>School day</span></button>
@@ -201,6 +208,7 @@ export function mountViewer(root) {
     if (!b && e.target !== sheet) return;
     sfx.tap(); sheet.hidden = true;
     const go = b?.dataset.go;
-    if (go && go !== 'look') root.querySelector(`.side .sbtn[data-a="${go}"]`)?.click();
+    if (go === 'tour') tour?.();
+    else if (go && go !== 'look') root.querySelector(`.side .sbtn[data-a="${go}"]`)?.click();
   });
 }

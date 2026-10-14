@@ -214,13 +214,13 @@ export const WALLS = {
   } },
   // ---- hall ----
   // A climbing wall: a board with bright holds and a crash mat beneath.
-  climbwall: { w: 0.22, h: 0.26, d: 0.03, make(s, rnd) {
-    s.box('#e9e4da', 0.22, 0.26, 0.012, 0, 0.13, -0.009);
-    for (let i = 0; i < 18; i++) s.add(pickC(rnd), new THREE.DodecahedronGeometry(0.007, 0).scale(1, 0.7, 0.6).translate(-0.09 + rnd() * 0.18, 0.03 + rnd() * 0.21, -0.001));
+  climbwall: { w: 0.22, h: 0.24, d: 0.03, make(s, rnd) {
+    s.box('#e9e4da', 0.22, 0.24, 0.012, 0, 0.12, -0.009);
+    for (let i = 0; i < 18; i++) s.add(pickC(rnd), new THREE.DodecahedronGeometry(0.007, 0).scale(1, 0.7, 0.6).translate(-0.09 + rnd() * 0.18, 0.03 + rnd() * 0.19, -0.001));
     s.box('#3d8de0', 0.24, 0.016, 0.06, 0, 0.008, 0.025);
   } },
   // Team pennants in a row, high up.
-  banners: { w: 0.22, h: 0.09, lift: 0.17, min: 0.1, make(s, rnd, y0) {
+  banners: { w: 0.22, h: 0.09, lift: 0.15, min: 0.1, make(s, rnd, y0) {
     s.box(STEEL, 0.22, 0.003, 0.003, 0, y0 + 0.088, 0.004);
     for (let i = 0; i < 4; i++) { const bx = -0.078 + i * 0.052; s.add(['#e6463c', '#3d8de0', '#f7c22e', '#a3d140'][i], tri([[-0.02, 0.085], [0.02, 0.085], [0, 0]]).translate(bx, y0, 0.004)); s.add(PAPER, new THREE.CircleGeometry(0.008, 8).translate(bx, y0 + 0.062, 0.0046)); }
   } },
@@ -241,14 +241,14 @@ export const WALLS = {
   } },
   // ---- art room ----
   // A shelf of paint pots, a jar of brushes and a pot of glue.
-  paintshelf: { w: 0.18, h: 0.08, lift: 0.12, min: 0.05, make(s, rnd, y0) {
+  paintshelf: { w: 0.18, h: 0.08, lift: 0.12, min: 0.035, make(s, rnd, y0) {
     s.box(WOOD, 0.18, 0.006, 0.04, 0, y0 + 0.003, 0.02); for (const sx of [-0.08, 0.08]) s.box(WOOD, 0.006, 0.02, 0.03, sx, y0 - 0.01, 0.015);
     for (let i = 0; i < 6; i++) s.cyl(RAINBOW[(i + 1) % 8], 0.009, 0.022, -0.07 + i * 0.022, y0 + 0.017, 0.016, 0.008, 8);
     s.cyl('~#bfe4f3', 0.012, 0.03, 0.065, y0 + 0.021, 0.018, 0.011, 8); for (let i = 0; i < 4; i++) s.cyl(RAINBOW[i * 2], 0.0015, 0.05, 0.06 + i * 0.004, y0 + 0.04, 0.014 + (i % 2) * 0.006, 0.0015, 4);
     s.box(PAPER, 0.016, 0.028, 0.016, 0.075, y0 + 0.02, 0.016); s.box(RED, 0.012, 0.004, 0.012, 0.075, y0 + 0.036, 0.016);
   } },
   // A colour wheel on the wall.
-  colourwheel: { w: 0.08, h: 0.08, lift: 0.15, min: 0.04, make(s, rnd, y0) {
+  colourwheel: { w: 0.08, h: 0.08, lift: 0.15, min: 0.035, make(s, rnd, y0) {
     const cy = y0 + 0.04; s.add(PAPER, new THREE.CircleGeometry(0.04, 24).translate(0, cy, 0.002));
     ['#e6463c', '#f28b30', '#f7c22e', '#a3d140', '#3d8de0', '#7c46a8'].forEach((col, i) => s.add(col, new THREE.CircleGeometry(0.034, 6, i * Math.PI / 3, Math.PI / 3).translate(0, cy, 0.0035)));
     s.add(PAPER, new THREE.CircleGeometry(0.009, 12).translate(0, cy, 0.005));
@@ -270,7 +270,7 @@ export const WALLS = {
     s.box(RED, 0.005, 0.034, 0.001, -0.105, y0 + 0.022, 0.003); s.add(RED, new THREE.CircleGeometry(0.006, 8).translate(-0.105, y0 + 0.012, 0.0032));
   } },
   // A rack of recorders in a row.
-  recorders: { w: 0.1, h: 0.08, lift: 0.1, min: 0.05, make(s, rnd, y0) {
+  recorders: { w: 0.1, h: 0.08, lift: 0.1, min: 0.035, make(s, rnd, y0) {
     s.box(WOOD, 0.1, 0.006, 0.02, 0, y0 + 0.07, 0.01);
     for (let i = 0; i < 6; i++) { const rx = -0.04 + i * 0.016; s.cyl(RAINBOW[(i * 3) % 8], 0.003, 0.064, rx, y0 + 0.035, 0.01, 0.0025, 6); s.cyl(PAPER, 0.0032, 0.01, rx, y0 + 0.062, 0.01, 0.003, 6); }
   } },
@@ -292,7 +292,7 @@ export const WALLS = {
   } },
   // ---- chill-out room ----
   // A "how are you feeling?" board: a row of faces.
-  feelings: { w: 0.16, h: 0.07, lift: 0.13, min: 0.05, make(s, rnd, y0) {
+  feelings: { w: 0.16, h: 0.07, lift: 0.13, min: 0.04, make(s, rnd, y0) {
     s.box('#9fdcd0', 0.16, 0.07, 0.004, 0, y0 + 0.035, 0.002);
     const faces = ['#f7c22e', '#a3d140', '#3d8de0', '#f28b30', '#e2457d'];
     for (let i = 0; i < 5; i++) { const fx = -0.06 + i * 0.03; s.add(faces[i], new THREE.CircleGeometry(0.012, 12).translate(fx, y0 + 0.03, 0.005)); for (const ex of [-0.004, 0.004]) s.add(DARK, new THREE.CircleGeometry(0.0015, 5).translate(fx + ex, y0 + 0.034, 0.0056)); s.add(DARK, i % 2 ? new THREE.RingGeometry(0.004, 0.0055, 8, 1, Math.PI, Math.PI).translate(fx, y0 + 0.028, 0.0056) : new THREE.RingGeometry(0.004, 0.0055, 8, 1, 0, Math.PI).translate(fx, y0 + 0.022, 0.0056)); }
@@ -352,7 +352,7 @@ export const WALLS = {
     }
   } },
   // A round clock, high on the wall.
-  clock: { w: 0.07, h: 0.06, lift: 0.185, min: 0.12, make(s, rnd, y0) {
+  clock: { w: 0.07, h: 0.06, lift: 0.185, min: 0.09, make(s, rnd, y0) {
     const cy = y0 + 0.03;
     s.add(pickC(rnd), new THREE.CylinderGeometry(0.03, 0.03, 0.006, 16).rotateX(Math.PI / 2).translate(0, cy, 0.003));
     s.add(PAPER, new THREE.CircleGeometry(0.025, 16).translate(0, cy, 0.0065));
@@ -475,18 +475,19 @@ function freeStretches(run, ops, corner = 0.075) {
 // Put the wall pieces of a room's plan on its outside walls, clear of doors, windows and each other. Floor-standing
 // ones claim their bit of floor in `placed`, so loose furniture keeps away from them.
 export function placeWallItems(bag, b, k, plan, rnd, placed, seats) {
-  const wanted = plan.filter(([kind, n]) => WALLS[kind] && n > 0);
-  if (!wanted.length) return;
+  const wanted = plan.filter(([kind, n]) => WALLS[kind] && n > 0), missed = [];
+  if (!wanted.length) return missed;
   const runs = wallRuns(b, k), ops = openings(b, k, runs), used = runs.map(() => []);
   for (const [kind, count] of wanted) {
     const W = WALLS[kind], spans = [];
     // A window only blocks the wall where the piece can't fit under it (hung low) or stand in front of it.
-    const fits = op => (W.d ? W.h <= op.y0 + 0.1 : op.y0 - 0.012 - W.h >= W.min) || op.y0 > (W.d ? W.h : W.lift + W.h);
+    const fits = op => (W.d ? W.h <= op.y0 + 0.1 || op.s1 - op.s0 <= 0.1 : op.y0 - 0.012 - W.h >= W.min || op.s1 - op.s0 <= 0.065) || op.y0 > (W.d ? W.h : W.lift + W.h);
     runs.forEach((run, ri) => {
       if (!run.outer || run.colonnade) return;
       const block = ops.filter(op => op.run === ri && (op.door || !fits(op)));
       for (const [a, c] of freeStretches(run, block)) if (c - a >= W.w + 0.01) spans.push({ ri, run, a, c });
     });
+    let got = 0;
     for (let n = 0; n < count && spans.length; n++) {
       for (let t = 0; t < 30; t++) {
         const sp = spans[Math.floor(rnd() * spans.length)], u = sp.a + W.w / 2 + 0.005 + rnd() * (sp.c - sp.a - W.w - 0.01);
@@ -505,10 +506,33 @@ export function placeWallItems(bag, b, k, plan, rnd, placed, seats) {
         const m = frame(x, z, Math.atan2(-p.nx, -p.nz));
         bag.within(m, s => W.make(s, rnd, y0));
         if (W.seat) for (const [a, c, h = 0] of W.seat) seats.push([...at(m, a, c), h, Math.atan2(m.elements[8], m.elements[10]) + (W.face === 'wall' ? Math.PI : 0)]);      // (facing the room, or the wall for a piano or a desk of screens)
+        got++;
         break;
       }
     }
+    if (!got && !W.d) missed.push(kind);
   }
+  return missed;
+}
+// Long strips that only make sense high on a wall (they are left out when there is no wall for them).
+export const STRIPS = new Set(['clock', 'frieze', 'numberline', 'alphabet', 'notesfrieze', 'banners']);
+// A wall piece with no wall to hang on (a room of big windows): the same thing on a stand with little wheels, like
+// a mobile whiteboard, standing in the room and facing into it.
+export function standFor(kind) {
+  const W = WALLS[kind];
+  return { r: W.w / 2 + 0.03, make(bag, x, z, c, rnd) {
+    const m = frame(x, z, facing(x, z) + (rnd() - 0.5) * 0.4), y0 = 0.07, top = y0 + W.h + 0.008, hw = W.w / 2 + 0.006;
+    bag.within(m, s => {
+      s.box('#e9e4da', W.w + 0.012, W.h + 0.016, 0.008, 0, y0 + W.h / 2, -0.004);
+      for (const sx of [-hw, hw]) {
+        s.box(STEEL, 0.007, top, 0.007, sx, top / 2, -0.004);
+        s.box(STEEL, 0.008, 0.005, 0.06, sx, 0.009, -0.004);
+        for (const sz of [-0.03, 0.022]) s.add(DARK, new THREE.CylinderGeometry(0.006, 0.006, 0.005, 8).rotateZ(Math.PI / 2).translate(sx, 0.006, sz - 0.004));
+      }
+      W.make(s, rnd, y0);
+    });
+    return [];
+  } };
 }
 
 // ---------- loose furniture ----------
@@ -599,7 +623,7 @@ export const FEATURES = {
   cave: { r: 0.12, make(bag, x, z, c, rnd) {
     // A cosy reading cave: half a dome with a cushion inside.
     const col = pickC(rnd), rot = rnd() * 6.28;
-    bag.add(col, new THREE.SphereGeometry(0.11, 14, 8, rot, Math.PI * 1.35, 0, Math.PI / 2).translate(x, 0, z));
+    bag.add('^' + col, new THREE.SphereGeometry(0.11, 14, 8, rot, Math.PI * 1.35, 0, Math.PI / 2).translate(x, 0, z));
     bag.ball('#ffffff', 0.04, x, 0, z);
     return [[x, z, 0.04]]; } },
   beanbag: { r: 0.06, make(bag, x, z, c, rnd) { bag.ball(pickC(rnd), 0.05, x, 0, z); return [[x, z, 0.048]]; } },
@@ -1548,9 +1572,9 @@ export function mobiles(bag, o, top, rnd) {
     const drop = 0.08 + rnd() * 0.05, y = top - drop;
     const g = partGroup(p => {
       p.cyl('#e8e4da', 0.001, drop, 0, drop / 2, 0, 0.001, 3);
-      if (i % 3 === 0) { p.add('*#f7c22e', new THREE.CircleGeometry(0.022, 12).translate(0, 0, 0)); for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; p.add('#f7c22e', new THREE.BoxGeometry(0.004, 0.014, 0.002).translate(0, 0.03, 0).rotateZ(a)); } }
+      if (i % 3 === 0) { p.add('*#f7c22e', new THREE.CylinderGeometry(0.022, 0.022, 0.003, 12).rotateX(Math.PI / 2)); for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; p.add('#f7c22e', new THREE.BoxGeometry(0.004, 0.014, 0.002).translate(0, 0.03, 0).rotateZ(a)); } }
       else if (i % 3 === 1) { for (const [cx, r] of [[-0.012, 0.012], [0.004, 0.016], [0.02, 0.011]]) p.sphere('#ffffff', r, cx, -0.004, 0, 9); for (let k = 0; k < 5; k++) p.add('#7fd8f0', new THREE.CylinderGeometry(0.002, 0.002, 0.03, 4).translate(-0.016 + k * 0.009, -0.035, 0)); }
-      else { ['#e6463c', '#f28b30', '#f7c22e', '#5f9e6e', '#3d8de0', '#7c46a8'].forEach((c, k) => p.add(c, new THREE.RingGeometry(0.03 - k * 0.0045, 0.034 - k * 0.0045, 14, 1, 0, Math.PI).translate(0, -0.02, 0))); }
+      else { ['#e6463c', '#f28b30', '#f7c22e', '#5f9e6e', '#3d8de0', '#7c46a8'].forEach((c, k) => p.add('^' + c, new THREE.RingGeometry(0.03 - k * 0.0045, 0.034 - k * 0.0045, 14, 1, 0, Math.PI).translate(0, -0.02, 0))); }
     }, { yspin: 0.25 + i * 0.1 });
     g.position.set(x, y, z); bag.part(g);
   });

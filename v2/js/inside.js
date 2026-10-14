@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LEVEL } from './catalogue.js';
 import { mat, colonnade, courtyard, INK } from './shapes.js';
-import { Bag, FEATURES, PLANS, placeWallItems, seededRnd, wallTanks, waterTunnel, hangingPlanets, bunting, artline, mobiles, fairylights, lanterns, climbropes, notemobiles, drone, ceilingstars, hangingwhale } from './furnish.js';
+import { Bag, FEATURES, PLANS, STRIPS, standFor, placeWallItems, seededRnd, wallTanks, waterTunnel, hangingPlanets, bunting, artline, mobiles, fairylights, lanterns, climbropes, notemobiles, drone, ceilingstars, hangingwhale } from './furnish.js';
 import { outline, roundedRect, wallRuns, openings, eachPiece, runAt, TALL, WALL_T } from './plan.js';
 export { outline } from './plan.js';
 
@@ -157,11 +157,15 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
     if (opts.walk && b.shape === 'arch' && o.kind === 'rr') waterTunnel(bag, o, opts.top, rnd);
   }
   // Things on and against the walls first (clear of doors and windows), then loose furniture in the floor left.
-  placeWallItems(bag, b, k, plan, rnd, placed, seats);
+  const missed = placeWallItems(bag, b, k, plan, rnd, placed, seats) || [];
+  // What found no wall stands in the room on wheels instead (one in a small room, up to three in a big one).
+  const stands = missed.filter(kd => !STRIPS.has(kd)).slice(0, area >= 2 ? 3 : 1).map(kd => [kd, 1, standFor(kd)]);
+  const floorPlan = plan.filter(([kd]) => FEATURES[kd]).map(([kd, n]) => [kd, n, FEATURES[kd]]);
+  floorPlan.splice(Math.min(3, floorPlan.length), 0, ...stands);
   if (opts.walk && b.shape === 'observatory') hangingPlanets(bag, opts.top);
-  if (opts.walk && ['classroom', 'ringhouse', 'art', 'lunch', 'music'].includes(b.type) && o.kind !== 'ring') bunting(bag, o, opts.top, rnd);
-  if (opts.walk && ['classroom', 'ringhouse', 'art'].includes(b.type) && o.kind !== 'ring') { artline(bag, o, opts.top, rnd); mobiles(bag, o, opts.top, rnd); }
-  if (opts.walk && o.kind !== 'ring') {
+  if (opts.walk && ['classroom', 'ringhouse', 'art', 'lunch', 'music'].includes(b.type) && o.kind === 'rr') bunting(bag, o, opts.top, rnd);
+  if (opts.walk && ['classroom', 'ringhouse', 'art'].includes(b.type) && o.kind === 'rr') { artline(bag, o, opts.top, rnd); mobiles(bag, o, opts.top, rnd); }
+  if (opts.walk && o.kind === 'rr') {
     if (b.type === 'library' || b.type === 'yoga') fairylights(bag, o, opts.top, rnd);
     if (b.type === 'lunch') lanterns(bag, o, opts.top, rnd);
     if (b.type === 'hall') climbropes(bag, o, opts.top, rnd);
@@ -170,17 +174,19 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
     if (b.type === 'yoga') ceilingstars(bag, o, opts.top, rnd);
     if (aqua) hangingwhale(bag, o, opts.top, rnd);
   }
-  for (const [kind, count] of plan) {
-    const F = FEATURES[kind];
-    if (!F) continue;
+  for (const [kind, count, F] of floorPlan) {
+    const centre = F.centre && o.inside(0, 0, 0.1);
     for (let n = 0; n < count; n++) {
       for (let tries = 0; tries < 60; tries++) {
-        const x = F.centre ? 0 : (rnd() - 0.5) * (b.w - 0.1), z = F.centre ? 0 : (rnd() - 0.5) * (b.d - 0.1);
-        if (!o.inside(x, z, WALL + (aqua ? 0.11 : 0) + F.r + 0.02) && !F.centre) continue;
+        const x = centre ? 0 : (rnd() - 0.5) * (b.w - 0.1), z = centre ? 0 : (rnd() - 0.5) * (b.d - 0.1);
+        if (!centre && !o.inside(x, z, WALL + (aqua ? 0.11 : 0) + F.r + 0.02)) continue;
         if (b.type === 'pool' && o.kind === 'rr' && Math.abs(x) < (o.W - 0.2) / 2 && Math.abs(z) < (o.D - 0.2) / 2) continue;
         if (placed.some(p => Math.hypot(p.x - x, p.z - z) < p.r + F.r + 0.03)) continue;
-        placed.push({ x, z, r: F.r, low: !!F.low });
-        for (const s of F.make(bag, x, z, hex, rnd, o)) seats.push(s.length > 3 || Math.hypot(s[0] - x, s[1] - z) < 0.02 ? s : [s[0], s[1], s[2] || 0, Math.atan2(x - s[0], z - s[1])]);      // (sitters face the piece they sit at)
+        const me = { x, z, r: F.r, low: !!F.low }; placed.push(me);
+        for (const s of F.make(bag, x, z, hex, rnd, o)) {
+          if (!o.inside(s[0], s[1], WALL + 0.025) || placed.some(p => p !== me && !p.low && Math.hypot(p.x - s[0], p.z - s[1]) < p.r * 0.85)) continue;      // (no sitting in a wall or a table)
+          seats.push(s.length > 3 || Math.hypot(s[0] - x, s[1] - z) < 0.02 ? s : [s[0], s[1], s[2] || 0, Math.atan2(x - s[0], z - s[1])]);      // (sitters face the piece they sit at)
+        }
         break;
       }
     }

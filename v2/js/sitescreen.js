@@ -115,7 +115,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   }
   // White V-trusses under a cantilever of two squares or more: a V under each overhanging square, its arms up to
   // the underside and its foot on whatever is below (a roof, or the ground). Added in the piece's own frame.
-  const TRUSS = new THREE.MeshLambertMaterial({ color: '#fbfaf6' });
+  const TRUSS = new THREE.MeshLambertMaterial({ color: '#fbfaf6' }); TRUSS.userData.shared = true;      // (kept across redraws)
   function addTrusses(g, b) {
     if (!(b.level > 0)) return;
     const sq = model.squares(b), has = (x, z) => sq.some(([a, c]) => a === x && c === z), held = (x, z) => !!model.at(x, z, b.level - 1);

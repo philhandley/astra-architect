@@ -1032,6 +1032,13 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       if (S.inside) setInside(false, { quiet: true });
       import('./print3d.js').then(m => m.openPrint3D({ design, model, yOf }));
     },
+    // Another design was put in the model (slots.js): make the land again at its size and draw everything.
+    reloadLand() {
+      if (S.day) stopDay();
+      if (S.inside) setInside(false, { quiet: true });
+      select(null); S.tool = null; drawTray(); model.history = [];
+      resize(0, 0);
+    },
     // The tour (tour.js): the camera flies round the school with a line for each kind of room.
     tour() {
       if (S.walking) { toast('Come out of the walk first.'); return; }

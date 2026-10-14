@@ -11,6 +11,7 @@ import { mountWishes } from './wishes.js';
 import { mountGuide } from './guide.js';
 import { mountShare, mountViewer, unpackDesign, shownCode } from './share.js';
 import { mountTourWords } from './tour.js';
+import { mountSlots } from './slots.js';
 
 // Finn's wooden-block model from the photos: green classrooms along the beach, orange bars round the meadow,
 // a blue pool in the middle, a ring of green curves and an orange drum by the waterfall.
@@ -56,6 +57,7 @@ async function boot() {
           <button class="mi" data-a="tour" type="button">${icon('play')}<span>Play the tour</span><small>Fly round the school with Finn's words</small></button>
           <button class="mi" data-a="tourwords" type="button">${icon('talk')}<span>Tour words</span><small>Pick what each room says</small></button>
           <div class="mi-rule"></div>
+          <button class="mi" data-a="slots" type="button">${icon('site')}<span>My schools</span><small>Keep up to four designs and swap between them</small></button>
           <button class="mi" data-a="finn" type="button">${icon('blocks')}<span>Finn's model</span><small>Put the wooden-block model on the site</small></button>
           <button class="mi" data-a="speech" type="button">${icon('speaker')}<span>Read aloud</span><small>Buttons say their names</small></button>
           <button class="mi" data-a="sound" type="button">${icon('music')}<span>Sounds</span><small>Taps and whooshes</small></button>
@@ -83,6 +85,7 @@ async function boot() {
   const guide = mountGuide(overlay, model, { site, wishes });
   const share = mountShare(overlay, model);
   const tourWords = mountTourWords(overlay, model);
+  const slots = shown ? null : mountSlots(overlay, model, { world, site });
   if (shown) mountViewer(overlay, { tour: () => site.tour() });
   site.hooks.dayDone = (periods, facts) => guide.debrief(periods, facts);
   site.hooks.bigQuestion = () => guide.bigQuestion();
@@ -114,6 +117,7 @@ async function boot() {
     if (a === 'share') { sfx.tap(); if (location.hash === '#rooms') location.hash = '#site'; share.open(); }
     if (a === 'tour') { sfx.tap(); if (location.hash === '#rooms') location.hash = '#site'; setTimeout(() => site.tour(), 80); }
     if (a === 'tourwords') { sfx.tap(); tourWords.open(); }
+    if (a === 'slots' && slots) { sfx.tap(); if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => slots.open(), 400); } else slots.open(); }
     if (a === 'photo') { if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => site.photo(), 400); } else site.photo(); }
     if (a === 'print3d') { sfx.tap(); if (location.hash === '#rooms') { location.hash = '#site'; setTimeout(() => site.print3d(), 400); } else site.print3d(); }
     if (a === 'finn') {

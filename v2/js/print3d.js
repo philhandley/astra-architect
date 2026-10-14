@@ -90,7 +90,7 @@ function preview(canvas, geometry, mm) {
   canvas.addEventListener('pointerup', () => { drag = null; });
   const tick = () => { if (!alive) return; if (spinning) yaw += 0.004; turn.rotation.y = yaw; renderer.render(scene, cam); requestAnimationFrame(tick); };
   tick();
-  return () => { alive = false; renderer.dispose(); g.dispose(); plate.geometry.dispose(); };
+  return () => { alive = false; renderer.dispose(); renderer.forceContextLoss(); g.dispose(); plate.geometry.dispose(); };      // (give the GL context back: the browser only allows a few)
 }
 
 const round = v => Math.round(v);

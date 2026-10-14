@@ -52,7 +52,7 @@ export function mountMood(world) {
     world.scene.background = skyFor(m);
     world.wind = L.wind;
     if (L.rain && !rain) { rain = makeRain(); world.scene.add(rain); }
-    if (!L.rain && rain) { world.scene.remove(rain); rain.geometry.dispose(); rain = null; }
+    if (!L.rain && rain) { world.scene.remove(rain); rain.geometry.dispose(); rain.material.dispose(); rain = null; }
     let t = instant ? 1 : 0;
     if (fn) world.updaters.delete(fn);
     fn = dt => {

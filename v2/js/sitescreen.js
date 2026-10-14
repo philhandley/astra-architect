@@ -374,8 +374,11 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   // ---------- ghost (preview) ----------
   let ghost = null;
   const okMat = ghostMaterial(true), noMat = ghostMaterial(false);
+  let ghostKey = '';
   function showGhost(b, ok) {
-    clearGhost();
+    const key = [b.x, b.z, b.w, b.d, b.h, b.level, b.shape, b.rot, b.type, ok].join(',');
+    if (ghost && key === ghostKey) return;
+    clearGhost(); ghostKey = key;
     ghost = makeGroup({ ...b, id: -1 }, ok ? okMat : noMat);
     ghost.traverse(o => { o.userData.boxId = undefined; o.raycast = () => {}; });
     design.add(ghost);

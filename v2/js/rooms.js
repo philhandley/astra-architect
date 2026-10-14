@@ -11,7 +11,7 @@ import { h, esc, emo, say, sfx } from './ui.js';
 class Studio {
   constructor(w, h) {
     this.r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-    this.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     this.r.setSize(w, h, false);
     this.r.outputColorSpace = THREE.SRGBColorSpace;
     this.r.shadowMap.enabled = true; this.r.shadowMap.type = THREE.PCFSoftShadowMap;

@@ -1,9 +1,12 @@
 // The design: a list of programme boxes on the grid, with Minecraft-like rules.
 // box = { id, type, shape, colour, x, z, w, d, level, h }  (x, z = the corner square; w, d in squares; level, h in storeys)
 import { PROGRAMMES, SHAPES, MAX_LEVELS, MAX_SIZE, colourHex } from './catalogue.js';
-import { GRID, square } from './site.js';
+import { GRID, square, MAX_PAD } from './site.js';
 
 const KEY = 'astraarch2';
+// A room as saved or shared is only kept if it is something the app knows how to draw, with whole-number sizes.
+const sound = b => b && PROGRAMMES[b.type] && SHAPES[b.shape] && ['x', 'z', 'w', 'd', 'h', 'level'].every(k => Number.isInteger(b[k])) && b.w >= 1 && b.d >= 1 && b.h >= 1 && b.level >= 0 && b.level + b.h <= MAX_LEVELS;
+const padOf = p => Object.fromEntries(['w', 'e', 'n', 's'].map(k => [k, Math.max(0, Math.min(MAX_PAD, Math.round(+p?.[k] || 0)))]));
 const k3 = (x, z, l) => `${x},${z},${l}`;
 
 export class Model {
@@ -18,7 +21,7 @@ export class Model {
     this.notes = {};             // programme -> which line it says on the tour (tour.js word bank)
     this.history = [];
     this.listeners = new Set();
-    if (shown) { this.boxes = shown.boxes; this.nextId = shown.boxes.length + 1; this.pad = shown.pad; this.grown = shown.grown; this.notes = shown.notes || {}; } else this.load();
+    if (shown) { this.boxes = (shown.boxes || []).filter(sound); this.nextId = this.boxes.reduce((n, b) => Math.max(n, b.id || 0), 0) + 1; this.pad = padOf(shown.pad); this.grown = shown.grown || []; this.notes = shown.notes || {}; } else this.load();
     this.reindex();
   }
 
@@ -26,7 +29,7 @@ export class Model {
   load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY) || 'null');
-      if (s) { this.boxes = s.boxes || []; this.nextId = s.nextId || 1; this.styles = s.styles || {}; this.grown = s.grown || []; this.pad = { w: 0, e: 0, n: 0, s: 0, ...(s.pad || {}) }; this.notes = s.notes || {}; }
+      if (s) { this.boxes = (s.boxes || []).filter(sound); this.nextId = Math.max(s.nextId || 1, this.boxes.reduce((n, b) => Math.max(n, b.id || 0), 0) + 1); this.styles = s.styles || {}; this.grown = s.grown || []; this.pad = padOf(s.pad); this.notes = s.notes || {}; }
     } catch (e) { /* a fresh start */ }
   }
   save() { if (this.readOnly) return; try { localStorage.setItem(KEY, JSON.stringify({ boxes: this.boxes, nextId: this.nextId, styles: this.styles, grown: this.grown, pad: this.pad, notes: this.notes })); } catch (e) { /* storage full or blocked */ } }

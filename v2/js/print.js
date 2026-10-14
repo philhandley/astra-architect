@@ -9,12 +9,12 @@ import { icon } from './icons.js';
 import { h, esc, sfx, say } from './ui.js';
 import { INK } from './shapes.js';
 
-const FLOOR_NAMES = ['Ground floor', 'First floor', 'Second floor', 'Third floor'];
+const FLOOR_NAMES = ['Ground floor', 'First floor', 'Second floor', 'Third floor', 'Fourth floor', 'Fifth floor', 'Sixth floor', 'Seventh floor'];
 const INKC = '#1d1f24';
 
 export async function openPrint(world, model, siteView, { design, handles }) {
   say('Making your drawings.');
-  const top = Math.min(3, Math.max(0, ...model.boxes.map(b => b.level + b.h - 1)));
+  const top = Math.min(FLOOR_NAMES.length - 1, Math.max(0, ...model.boxes.map(b => b.level + b.h - 1)));
   const floors = Array.from({ length: top + 1 }, (_, l) => l);
   const cut = cuts(model);
   // Every drawing in one colour scheme, made the first time that scheme is chosen.

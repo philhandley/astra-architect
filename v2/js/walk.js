@@ -99,6 +99,7 @@ export function startWalk({ world, model, root, yOf, walls = () => [], setFloor,
       if (xi >= b.x && xi < b.x + b.w && zi >= b.z && zi < b.z + b.d) return yOf(b) + storeyFloor(b, me.floor) + 0.02;
     }
     if (me.floor > 0) return null;
+    const q = square(xi, zi); if (q && (q.zone === 'water' || q.zone === 'rocks')) return null;      // (not out over the sea)
     return Math.max(groundAt(x, z), site().sea + 0.02);
   }
   const fn = dt => {

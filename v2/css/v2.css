@@ -114,7 +114,7 @@ body.walking .tabs { opacity: .35; pointer-events: none; }
 .sbtn:active { transform: scale(.95); }
 .hint { position: absolute; left: 50%; transform: translateX(-50%); top: 12px; max-width: min(640px, calc(100% - 560px)); background: rgba(255,255,255,.95); border-radius: 999px; box-shadow: var(--shadow); padding: 10px 20px; font-size: 16px; font-weight: 500; text-align: center; pointer-events: none !important; }
 .hint:empty { display: none; }
-.selbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 14px; display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,.97); border-radius: 26px; box-shadow: var(--shadow); padding: 8px; }
+.selbar { position: absolute; left: calc(50% + 84px); transform: translateX(-50%); bottom: 14px; display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,.97); border-radius: 26px; box-shadow: var(--shadow); padding: 8px; }
 .selname { display: flex; align-items: center; gap: 10px; padding: 0 12px 0 6px; cursor: pointer; }
 .selname img { width: 36px; height: 36px; }
 .selname b { display: block; font-size: 17px; }

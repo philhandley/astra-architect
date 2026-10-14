@@ -113,7 +113,7 @@ export class SchoolDay {
     const b = this.model.at(x, z, 0);
     return !!(b && !WALK_THROUGH.has(b.shape) && !WALK_THROUGH.has(b.type));
   }
-  cost(x, z) { const q = square(x, z); return q.build ? 1 : 2.5; }
+  cost(x, z) { const q = square(x, z); return q.build ? 1 : 8; }      // (through the trees only when there is no other way)
 
   // ---------- places in the school ----------
   findPlaces() {
@@ -244,7 +244,7 @@ export class SchoolDay {
     });
     // Parents: they bring the children to the gate, wave them off, and come back at home time. They walk in from
     // and out to the edge of the meadow nearest the gate (the way to the road).
-    this.parents = [];
+    this.parents = []; this.exit = null;
     if (this.groups.length) {
       const PG = { activity: 'arrive', kids: [], home: null, trail: [], gi: -1 };
       const edge = this.land.filter(([, z]) => Math.abs(z - gate[1]) <= 2).sort((a, b) => a[0] - b[0])[0] || this.land[0];
@@ -420,7 +420,7 @@ export class SchoolDay {
       if (this.period >= PERIODS.length - 1) { this.stop(); return; }
       this.next();
     }
-    for (const g of this.groups) this.moveTeacher(g, dt);
+    for (const g of this.groups) { this.moveTeacher(g, dt); this.keepClear(g.teacher); }
     for (const k of this.agents) if (!k.teacher || k.mode !== 'lead') { this.moveOne(k, dt); this.keepClear(k); }
     for (const k of this.agents) {
       const n = k.needs;
@@ -438,7 +438,7 @@ export class SchoolDay {
     if (k.mode === 'sit' || k.hidden) return;
     const inZ = z => z?.indoor && z.inside(k.x - z.ox, k.z - z.oz, -0.02);
     if (k.mode === 'toSeat') { const z = k.zone, s = k.seat; if (z?.obstacles?.length && s) nudgeClear(k, z.obstacles.filter(o => Math.hypot(s[0] - o.x, s[2] - o.z) > o.r + 0.01), 0.01); return; }
-    if (k.mode === 'path' || k.mode === 'follow') { for (const z of [k.zone, k.dest?.zone]) if (inZ(z) && z.obstacles?.length) nudgeClear(k, z.obstacles, 0.012); return; }
+    if (k.mode === 'path' || k.mode === 'follow' || k.mode === 'lead') { for (const z of [k.zone, k.dest?.zone]) if (inZ(z) && z.obstacles?.length) nudgeClear(k, z.obstacles, 0.012); return; }
     const z = k.zone; if (!z?.indoor) return;
     if (z.obstacles?.length) nudgeClear(k, z.obstacles, 0.015);
     if (!z.inside(k.x - z.ox, k.z - z.oz, 0.06)) { const to = k.lastIn || [z.ox, z.oz]; k.x += (to[0] - k.x) * 0.15; k.z += (to[1] - k.z) * 0.15; } else k.lastIn = [k.x, k.z];

@@ -24,7 +24,7 @@ export function mountGuide(root, model, { site, wishes }) {
   root.append(sheet);
   const card = sheet.querySelector('.nova-card');
   const close = () => { sheet.hidden = true; };
-  sheet.addEventListener('click', e => { if (e.target === sheet) close(); });
+  sheet.addEventListener('click', e => { if (e.target === sheet) { if (card.querySelector('.bq-opts.day')) wishes.award('day'); close(); } });
 
   let bqIndex = (() => { try { return +localStorage.getItem('astraarch2-bq') || 0; } catch (e) { return 0; } })();
   function bigQuestion() {

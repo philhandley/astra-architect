@@ -59,8 +59,10 @@ export const sfx = {
   cheer() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.07, 0.22, 'triangle', 0.1)); },
 };
 
+let toastEl = null, toastT = 0;
 export function toast(text) {
-  const t = h(`<div class="toast">${esc(text)}</div>`);
+  toastEl?.remove(); clearTimeout(toastT);
+  const t = toastEl = h(`<div class="toast">${esc(text)}</div>`);
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2600);
+  toastT = setTimeout(() => { t.remove(); if (toastEl === t) toastEl = null; }, 2600);
 }

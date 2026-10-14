@@ -38,9 +38,8 @@ export const CAPTIONS = {
   weather: ['The weather station tells us if it will rain.'],
   stairs: ['Stairs up to the roof.'],
   bridge: ['A bridge from one building to the next.'],
-  tube: ['A tube to crawl through between the buildings.'],
   ramp: ['A ramp, so everyone can get up.'],
-  canopy: ['A roof over the path, so you stay dry.'],
+  walkway: ['A roof over the path, so you stay dry.'],
   archway: ['You go in under the archway.'],
 };
 const GENERAL = ['This is my favourite bit.', 'I made this bit myself.', 'A grown-up helped me with this one.'];
@@ -52,7 +51,7 @@ export function phrasesFor(type) {
 export function captionFor(type, notes) { const p = phrasesFor(type); return p[Math.min(notes?.[type] || 0, p.length - 1)]; }
 
 // The kinds of thing on the site, in the order they were built, one group each. (Trees and links don't get a stop.)
-const QUIET = new Set(['tree', 'stairs', 'bridge', 'tube', 'ramp', 'canopy', 'archway', 'turbine', 'weather']);
+const QUIET = new Set(['tree', 'stairs', 'bridge', 'walkway', 'ramp', 'archway', 'turbine', 'weather']);
 export function groupsOf(model, { all = false } = {}) {
   const groups = [], seen = new Map();
   for (const b of model.boxes) {
@@ -80,9 +79,9 @@ export function startTour({ world, model, root, setInside, onExit }) {
     <button class="walk-exit tour-exit" type="button">${icon('close')}<span>Stop the tour</span></button>
     <div class="tour-card"><div class="tour-pic"></div><div class="tour-text"><small></small><p></p></div></div>
     <div class="tour-bar">
-      <button class="tbtn" data-t="back" type="button" aria-label="Back">${icon('left')}</button>
+      <button class="tbtn" data-t="back" type="button" aria-label="Back">${icon('back')}</button>
       <button class="tbtn big" data-t="pause" type="button" aria-label="Pause">${icon('pause')}</button>
-      <button class="tbtn" data-t="next" type="button" aria-label="Next">${icon('right')}</button>
+      <button class="tbtn" data-t="next" type="button" aria-label="Next">${icon('next')}</button>
     </div>
     <div class="tour-dots">${stops.map(() => '<i></i>').join('')}</div>
   </div>`);

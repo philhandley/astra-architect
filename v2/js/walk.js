@@ -46,10 +46,10 @@ export function startWalk({ world, model, root, yOf, walls = () => [], setFloor,
     const r = joy.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     let dx = (e.clientX - cx) / (r.width / 2), dy = (e.clientY - cy) / (r.height / 2);
     const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; }
-    stick = { x: dx, y: dy }; auto = null;
+    stick = { x: dx, y: dy };
     knob.style.transform = `translate(${dx * 38}px, ${dy * 38}px)`;
   };
-  joy.addEventListener('pointerdown', e => { jid = e.pointerId; try { joy.setPointerCapture(jid); } catch (err) { /* test */ } jmove(e); });
+  joy.addEventListener('pointerdown', e => { if (jid !== null) return; jid = e.pointerId; try { joy.setPointerCapture(jid); } catch (err) { /* test */ } jmove(e); });
   joy.addEventListener('pointermove', e => { if (e.pointerId === jid) jmove(e); });
   const jend = e => { if (e.pointerId !== jid) return; jid = null; stick = { x: 0, y: 0 }; knob.style.transform = ''; };
   joy.addEventListener('pointerup', jend); joy.addEventListener('pointercancel', jend);
@@ -59,10 +59,11 @@ export function startWalk({ world, model, root, yOf, walls = () => [], setFloor,
   const cv = world.canvas;
   const onDown = e => { look = { x: e.clientX, y: e.clientY, yaw: me.yaw, pitch: me.pitch, id: e.pointerId }; e.stopPropagation(); };
   const onMove = e => { if (!look || e.pointerId !== look.id) return; me.yaw = look.yaw - (e.clientX - look.x) * 0.006; me.pitch = Math.max(-0.9, Math.min(0.6, look.pitch - (e.clientY - look.y) * 0.004)); };
-  const onUp = () => { look = null; };
+  const onUp = e => { if (!look || e.pointerId === look.id) look = null; };
   cv.addEventListener('pointerdown', onDown, { capture: true });
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
 
   // A button for every room: glide there.
   const rooms = ui.querySelector('.walk-rooms');
@@ -119,6 +120,8 @@ export function startWalk({ world, model, root, yOf, walls = () => [], setFloor,
       if (!free(tx, tz)) { if (free(nx, me.z)) tz = me.z; else if (free(me.x, nz)) tx = me.x; else { tx = me.x; tz = me.z; } }
       const f = floorAt(tx, tz);
       if (f !== null) { me.x = tx; me.z = tz; me.y += (f - me.y) * Math.min(1, dt * 8); }
+      // Upstairs with no floor under you (a glide cut short): come back down to the ground.
+      if (me.floor > 0 && floorAt(me.x, me.z) === null) { me.lost = (me.lost || 0) + dt; if (me.lost > 0.8) { me.floor = 0; setFloor(0); me.lost = 0; } } else me.lost = 0;
       const step = Math.abs(sp) > 0 ? Math.abs(Math.sin(performance.now() / 120)) * 0.006 : 0;
       me.bob = step;
     }
@@ -139,6 +142,7 @@ export function startWalk({ world, model, root, yOf, walls = () => [], setFloor,
     cv.removeEventListener('pointerdown', onDown, { capture: true });
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
     ui.remove();
   }
   return { stop, me };          // (me: where the walker is, for tests)

@@ -158,6 +158,7 @@ export class SchoolDay {
         const topY = TOP_Y[b.shape] ?? 0.012, pad = ['tree', 'slide', 'playground', 'zipline', 'rocket', 'weather', 'greenhouse', 'observatory'].includes(b.type) || b.shape === 'tree' ? 0.5 : -0.1;
         zone = { rect: { x0: b.x - pad, z0: b.z - pad, x1: b.x + b.w + pad, z1: b.z + b.d + pad }, oy: y0 + topY, boxId: b.id, ok: pad > 0 ? (x, z) => !this.blocked(Math.floor(x), Math.floor(z)) || this.model.at(Math.floor(x), Math.floor(z), 0)?.id === b.id : null };
       }
+      if (zone?.entries?.length) { doors = zone.entries.map(e => [Math.floor(e.out[0]), Math.floor(e.out[1])]); door = doors[0]; }      // (routes end at a real doorway)
       door = door || [Math.floor(cx), Math.floor(cz)];
       const place = { b, type, door, doors: doors?.length ? doors : [door], climb, zone, seats: (this.seatsOf?.(b.id) || []).slice(), cap: sq.length * (CLASSES.has(type) ? 7 : 6), ride: RIDES[b.shape] || 0 };
       if (place.ride) {
@@ -216,9 +217,12 @@ export class SchoolDay {
     // The yard: all the open land you can build on.
     const land = []; for (let z = 0; z < GRID.d; z++) for (let x = 0; x < GRID.w; x++) if (ok(x + 0.5, z + 0.5)) land.push([x, z]);
     this.land = land.length ? land : [gate];
+    this.yardPool = Array.from({ length: 8 }, () => this.land[Math.floor(r() * this.land.length)]);
     const xs = this.land.map(l => l[0]), zs = this.land.map(l => l[1]);
     this.yard = { rect: { x0: Math.min(...xs), z0: Math.min(...zs), x1: Math.max(...xs) + 1, z1: Math.max(...zs) + 1 }, ok, oy: 0.012 };
     this.gateZone = { rect: { x0: gate[0] + 0.1, z0: gate[1] + 0.1, x1: gate[0] + 0.9, z1: gate[1] + 0.9 }, oy: Math.max(0.012, square(gate[0], gate[1])?.base || 0) };
+    // At home time the whole school comes to the gate: room to stand around it, then they go.
+    this.homeZone = { rect: { x0: gate[0] - 0.9, z0: gate[1] - 0.9, x1: gate[0] + 1.9, z1: gate[1] + 1.9 }, oy: this.gateZone.oy, ok: (x, z) => !this.blocked(Math.floor(x), Math.floor(z)) };
     // Classes: one for each classroom (two for a big ring of classrooms), each with a teacher.
     const homes = [];
     for (const p of this.places.filter(p => CLASSES.has(p.type))) { homes.push(p); if (p.type === 'ringhouse') homes.push(p); }
@@ -280,12 +284,11 @@ export class SchoolDay {
   }
   next() {
     this.period++;
-    this.fields = new Map();
     const P = PERIODS[this.period];
     this.onPeriod?.(this.period, P);
     if (this.parents?.length && this.exit) {
       if (this.period === 1) for (const p of this.parents) { this.sendOne(p, this.exit); p.wait = this.r() * 2; }
-      if (P.go === 'gate') { for (const p of this.parents) { p.hidden = false; p.x = this.exit.door[0] + 0.2 + this.r() * 0.6; p.z = this.exit.door[1] + 0.2 + this.r() * 0.6; p.y = this.exit.zone.oy; p.at = null; this.sendOne(p, 'gate'); p.wait = this.r() * 0.8; } sfx.bell?.(); }
+      if (P.go === 'gate') { for (const p of this.parents) { p.hidden = false; p.x = this.exit.door[0] + 0.2 + this.r() * 0.6; p.z = this.exit.door[1] + 0.2 + this.r() * 0.6; p.y = this.exit.zone.oy; p.at = null; this.sendOne(p, 'gate'); p.wait = this.r() * 0.8; } }
     }
     const fill = new Map();
     const pick = types => {
@@ -332,7 +335,7 @@ export class SchoolDay {
     const at = ([x, z]) => f.dist[x + z * W];
     // Out of a room by the way out that is quickest overall (counting the steps to reach it).
     let startSq;
-    if (from && from !== 'gate' && from.zone?.indoor) {
+    if (from && from !== 'gate' && from.zone?.indoor && from.zone.inside(pos.x - from.zone.ox, pos.z - from.zone.oz, -0.05)) {
       const outs = from.doors || [from.door];
       startSq = outs.reduce((a, b) => (at(b) + Math.hypot(b[0] + 0.5 - pos.x, b[1] + 0.5 - pos.z) < at(a) + Math.hypot(a[0] + 0.5 - pos.x, a[1] + 0.5 - pos.z) ? b : a));
       if (from.climb) path.push(v3(from.climb.x, from.zone.oy, from.climb.z), v3(from.climb.x, 0.012, from.climb.z));
@@ -387,7 +390,7 @@ export class SchoolDay {
     const target = dest === 'yard' ? { door: this.yardSquare(), zone: this.yard, type: 'yard', seats: [] } : dest;
     k.path = this.plan(from, k, target === 'gate' ? 'gate' : target, 0.2); k.pi = 0; k.mode = 'path'; k.dest = target; k.seat = null; k.at = null;
   }
-  yardSquare() { return this.land[Math.floor(this.r() * this.land.length)]; }
+  yardSquare() { return this.yardPool[Math.floor(this.r() * this.yardPool.length)]; }
   leaveQueue(k) {
     if (k.ride) { const i = k.ride.queue.indexOf(k); if (i >= 0) k.ride.queue.splice(i, 1); if (k.ride.busy === k) k.ride.busy = null; k.ride = null; }
     if (k.hidden) { k.hidden = false; }
@@ -395,7 +398,7 @@ export class SchoolDay {
   // What a child does on arriving: find a seat, or wander about the place.
   arrive(k) {
     const d = k.dest; k.at = d; k.path = null;
-    if (d === 'gate') { k.mode = 'wander'; k.zone = this.gateZone; k.tx = k.x; k.tz = k.z; return; }
+    if (d === 'gate') { const home = this.period === PERIODS.length - 1; k.mode = 'wander'; k.zone = home ? this.homeZone : this.gateZone; k.tx = k.x; k.tz = k.z; if (home && !k.teacher && !k.parent) k.goneT = 2 + this.r() * 5; return; }
     if (d.type === 'exit') { k.hidden = true; k.mode = 'idle'; k.moving = false; return; }
     k.zone = d.zone;
     const playing = k.g.activity === 'break';
@@ -438,7 +441,7 @@ export class SchoolDay {
     if (k.mode === 'path' || k.mode === 'follow') { for (const z of [k.zone, k.dest?.zone]) if (inZ(z) && z.obstacles?.length) nudgeClear(k, z.obstacles, 0.012); return; }
     const z = k.zone; if (!z?.indoor) return;
     if (z.obstacles?.length) nudgeClear(k, z.obstacles, 0.015);
-    if (!z.inside(k.x - z.ox, k.z - z.oz, 0.06)) { k.x += (z.ox - k.x) * 0.08; k.z += (z.oz - k.z) * 0.08; }
+    if (!z.inside(k.x - z.ox, k.z - z.oz, 0.06)) { const to = k.lastIn || [z.ox, z.oz]; k.x += (to[0] - k.x) * 0.15; k.z += (to[1] - k.z) * 0.15; } else k.lastIn = [k.x, k.z];
   }
   stepTo(k, x, y, z, speed, dt, near = 0.012) {
     const dx = x - k.x, dz = z - k.z, dy = y - k.y, d = Math.hypot(dx, dz, dy);
@@ -540,9 +543,10 @@ export class SchoolDay {
           const to = this.chooseFun(k); k.again = 3 + this.r() * 2;
           if (to !== 'yard') { this.sendOne(k, to); return; }
         }
-        if (k.tx === undefined) [k.tx, k.tz] = this.crowd.pick(k.zone, this.r);
+        if (k.goneT !== undefined && (k.goneT -= dt) <= 0) { k.hidden = true; k.mode = 'idle'; k.moving = false; return; }      // (gone home)
+        if (k.tx === undefined) [k.tx, k.tz] = this.crowd.pick(k.zone, this.r, k);
         if (this.stepTo(k, k.tx, k.zone.oy, k.tz, k.speed * (k.g.activity === 'break' ? 1.1 : 0.5), dt, 0.02)) {
-          k.wait = 0.4 + this.r() * (k.g.activity === 'break' ? 1 : 2.5); [k.tx, k.tz] = this.crowd.pick(k.zone, this.r);
+          k.wait = 0.4 + this.r() * (k.g.activity === 'break' ? 1 : 2.5); [k.tx, k.tz] = this.crowd.pick(k.zone, this.r, k);
         }
         if (k.g.activity === 'break' && k.moving) k.pose = 'run';
         return;
@@ -558,9 +562,9 @@ export class SchoolDay {
     for (let i = 0; i < A.length; i++) {
       const a = A[i]; if (a.hidden) continue;
       for (let j = i + 1; j < A.length; j++) {
-        const b = A[j]; if (b.hidden || Math.abs(a.y - b.y) > 0.1 || (a.mode === 'sit' && b.mode === 'sit')) continue;
+        const b = A[j]; if (b.hidden || Math.abs(a.y - b.y) > 0.1 || (a.mode === 'sit' && b.mode === 'sit') || (a.mode === 'sit' && b.mode === 'toSeat') || (b.mode === 'sit' && a.mode === 'toSeat')) continue;
         const R = 0.038 * (a.s + b.s), dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz);
-        if (d >= R || d < 1e-5) continue;
+        if (!(d < R && d > 1e-5)) continue;
         const ux = dx / d, uz = dz / d, gap = R - d;
         if (a.mode === 'sit') { b.x += ux * gap; b.z += uz * gap; }
         else if (b.mode === 'sit') { a.x -= ux * gap; a.z -= uz * gap; }

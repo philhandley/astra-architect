@@ -106,7 +106,7 @@ export class Model {
   topAt(x, z) { let l = 0; while (this.occ.has(k3(x, z, l))) l++; return l; }
 
   // ---------- the rules ----------
-  check(b, ignore = new Set()) {
+  check(b, ignore = new Set(), moved = null) {
     if (b.w < 1 || b.d < 1 || b.h < 1) return { ok: false, why: 'small' };
     if (b.w > MAX_SIZE || b.d > MAX_SIZE) return { ok: false, why: 'big' };
     if (b.level + b.h > MAX_LEVELS) return { ok: false, why: 'high' };
@@ -121,8 +121,8 @@ export class Model {
       }
       if (b.level === 0) { if (!q.build) return { ok: false, why: q.zone === 'water' ? 'water' : q.zone === 'rocks' ? 'rocks' : 'forest' }; supported++; }
       else {
-        const below = this.at(x, z, b.level - 1);
-        if (below && !ignore.has(below.id)) {
+        const at = this.at(x, z, b.level - 1), below = moved?.get(k3(x, z, b.level - 1)) || (at && !ignore.has(at.id) ? at : null);
+        if (below) {
           const S = SHAPES[below.shape];
           if (S?.cap) return { ok: false, why: 'cap' };
           if (S?.flat) supported++;
@@ -181,9 +181,12 @@ export class Model {
     const dx = next.x - b.x, dz = next.z - b.z, dl = next.level - b.level;
     const riders = dx || dz || dl ? this.above(b) : [];
     const ignore = new Set([b.id, ...riders.map(r => r.id)]);
-    const r = this.check(next, ignore);
+    // Where everything that moves will be, so a room on top is held up by the room it rides on.
+    const after = [next, ...riders.map(t => ({ ...t, x: t.x + dx, z: t.z + dz, level: t.level + dl }))], moved = new Map();
+    for (const t of after) for (const [x, z] of this.squares(t)) for (let l = t.level; l < t.level + t.h; l++) moved.set(k3(x, z, l), t);
+    const r = this.check(next, ignore, moved);
     if (!r.ok) return r;
-    for (const t of riders) { const rc = this.check({ ...t, x: t.x + dx, z: t.z + dz, level: t.level + dl }, ignore); if (!rc.ok) return rc; }
+    for (const t of after.slice(1)) { const rc = this.check(t, ignore, moved); if (!rc.ok) return rc; }
     return { ok: true, riders, dx, dz, dl };
   }
   update(id, patch, { snapshot = true } = {}) {
@@ -194,9 +197,10 @@ export class Model {
     if (snapshot) this.snapshot();
     Object.assign(b, patch);
     for (const t of riders) { t.x += dx; t.z += dz; t.level += dl; }
-    // Growing taller may push things on top up; shrinking leaves nothing floating.
-    this.changed({ updated: id });
-    this.settle();
+    // Growing taller may push things on top up; shrinking leaves nothing floating. (Settle first: one redraw.)
+    this.reindex();
+    const fell = this.settle(true);
+    this.changed({ updated: id, fell });
     return { ok: true };
   }
   remove(id) {

@@ -167,7 +167,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       const planes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -(y0 + floorY + top)), new THREE.Plane(new THREE.Vector3(0, -1, 0), y0 + floorY - 0.003)];
       real.traverse(o => {
         if (!o.isMesh || o.userData.noInk || o.userData.keep) return;
-        const cl = m => { const c = m.clone(); c.clippingPlanes = planes; c.clipIntersection = true; c.clipShadows = true; c.side = THREE.DoubleSide; return c; };
+        const cl = m => { const c = m.clone(); c.userData = {}; c.clippingPlanes = planes; c.clipIntersection = true; c.clipShadows = true; c.side = THREE.DoubleSide; return c; };
         o.material = Array.isArray(o.material) ? o.material.map(cl) : cl(o.material);
       });
       const both = new THREE.Group(); both.add(real, g); g = both;
@@ -210,7 +210,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     if (S.inside) drawFloors();
     updateLaunch();
   }
-  model.onChange(() => { if (S.day) stopDay(); redraw(); });
+  model.onChange(w => { if (w?.style) return; if (S.day) stopDay(); redraw(); });
   // The sky button: day, sunset, night, rain.
   const mood = mountMood(world), MOOD_ICON = { day: 'sun', sunset: 'sunset', night: 'moon', rain: 'rain' };
   function setSky(m, { quiet = false } = {}) {
@@ -757,7 +757,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     const p = model.pad, grown = new Set(model.grown.map(([x, z]) => `${x},${z}`));
     const goes = (x, z) => x < p.w || z < p.n || x >= GRID.w - p.e || z >= GRID.d - p.s || grown.has(`${x},${z}`);
     const off = new Map();
-    for (const b of model.boxes) if (b.level === 0 && model.squares(b).some(([x, z]) => goes(x, z))) { off.set(b.id, b); for (const [id, t] of model.above(b)) off.set(id, t); }
+    for (const b of model.boxes) if (b.level === 0 && model.squares(b).some(([x, z]) => goes(x, z))) { off.set(b.id, b); for (const t of model.above(b)) off.set(t.id, t); }
     const sure = off.size
       ? `Put the site back as it was? ${off.size} room${off.size > 1 ? 's' : ''} on the extra land will be taken away.`
       : 'Put the site back as it was, with all its trees and hills?';
@@ -777,6 +777,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
 
   const onDown = e => {
     if (!ui.isConnected || ui.hidden) return;
+    if (S.drag && S.drag.start.id !== e.pointerId) return;      // (a second finger is for the camera: pinch and turn)
     ui.querySelector('.swatches')?.remove();
     const start = { x: e.clientX, y: e.clientY, id: e.pointerId };
     if (S.siteEdit) {
@@ -833,7 +834,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
       return;
     }
     if (e.pointerId !== d.start.id) return;
-    if (Math.hypot(e.clientX - d.start.x, e.clientY - d.start.y) > 8) d.moved = true;
+    if (Math.hypot(e.clientX - d.start.x, e.clientY - d.start.y) > (e.pointerType === 'touch' ? 14 : 8)) d.moved = true;
     if (d.mode === 'tap' && S.move) { const m = moveTarget(e.clientX, e.clientY); if (m) showGhost(m.box, m.ok); return; }
     if (d.mode === 'tap') { if (d.moved) clearGhost(); return; }
     if (!d.moved) return;
@@ -878,9 +879,9 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     }
   };
   const onUp = e => {
-    const d = S.drag; S.drag = null;
-    world.controls.enabled = true;
+    const d = S.drag;
     if (!d || e.pointerId !== d.start.id) return;
+    S.drag = null; world.controls.enabled = true;
     clearGhost();
     if (d.mode === 'turn') { const b = model.byId.get(S.selected); if (b) turnBox(b); return; }
     if (d.mode === 'resize') {
@@ -895,6 +896,8 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     }
     if (d.mode === 'move') {
       if (!d.moved) { handleTap(e.clientX, e.clientY); return; }
+      const cur = model.byId.get(S.selected), same = cur && d.patch && Object.keys(d.patch).every(k => d.patch[k] === cur[k]);
+      if (same) { redraw(); placeHandles(); return; }
       if (d.patch && d.ok) { model.update(S.selected, d.patch); sfx.place(d.patch.level); }
       else { sfx.no(); toast('It will not fit there.'); redraw(); }
       placeHandles();
@@ -909,6 +912,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
   canvas.addEventListener('pointerup', onUp);
   canvas.addEventListener('pointercancel', () => { S.drag = null; world.controls.enabled = true; clearGhost(); redraw(); });
   canvas.addEventListener('pointerleave', () => { if (!S.drag) clearGhost(); });
+  window.addEventListener('pointerup', e => { if (S.drag && S.drag.start.id === e.pointerId) { S.drag = null; world.controls.enabled = true; clearGhost(); } });
 
   function cheer(b) {
     crowd.cheer(b.id);
@@ -967,6 +971,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
 
   // ---------- walking inside ----------
   function startWalking() {
+    if (S.walking || S.touring) return;
     if (S.day) stopDay();
     select(null); S.tool = null; drawTray();
     S.walkMode = true; S.floor = 0;

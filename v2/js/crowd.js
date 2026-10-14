@@ -106,16 +106,20 @@ export class Crowd {
       this.people.push(p);
     }
   }
-  pick(z, r) {
+  // Somewhere in the zone to walk to. With `from` (where the walker is), the straight line there is checked too,
+  // so nobody cuts across a courtyard, through a table or through a building on the yard; on a big yard the
+  // next spot is near by. When nothing suits, they stay where they are.
+  pick(z, r, from) {
+    const clear = (x, zz) => !z.obstacles?.some(o => Math.hypot(x - o.x, zz - o.z) < o.r + 0.03);
+    const okAt = z.rect ? (x, zz) => (!z.ok || z.ok(x, zz)) && clear(x, zz) : (x, zz, m) => z.inside(x - z.ox, zz - z.oz, m) && clear(x, zz);
+    const walkable = (x, zz) => { if (!from) return true; for (let i = 1; i <= 5; i++) { const t = i / 6; if (!okAt(from.x + (x - from.x) * t, from.z + (zz - from.z) * t, 0.03)) return false; } return true; };
     for (let k = 0; k < 30; k++) {
-      if (z.rect) { const x = z.rect.x0 + r() * (z.rect.x1 - z.rect.x0), zz = z.rect.z0 + r() * (z.rect.z1 - z.rect.z0); if (!z.ok || z.ok(x, zz)) return [x, zz]; continue; }
-      const lx = (r() - 0.5) * z.w, lz = (r() - 0.5) * z.d;
-      if (!z.inside(lx, lz, z.margin ?? 0.08)) continue;
-      const wx = z.ox + lx, wz = z.oz + lz;
-      if (z.obstacles?.some(o => Math.hypot(wx - o.x, wz - o.z) < o.r + 0.03)) continue;      // (not on a table)
-      return [wx, wz];
+      let x, zz;
+      if (z.rect) { const R = z.rect; if (from && R.x1 - R.x0 > 3) { x = Math.min(R.x1, Math.max(R.x0, from.x + (r() - 0.5) * 3)); zz = Math.min(R.z1, Math.max(R.z0, from.z + (r() - 0.5) * 3)); } else { x = R.x0 + r() * (R.x1 - R.x0); zz = R.z0 + r() * (R.z1 - R.z0); } }
+      else { x = z.ox + (r() - 0.5) * z.w; zz = z.oz + (r() - 0.5) * z.d; }
+      if (okAt(x, zz, z.margin ?? 0.08) && walkable(x, zz)) return [x, zz];
     }
-    return [z.ox ?? 0, z.oz ?? 0];
+    return from ? [from.x, from.z] : z.rect ? [(z.rect.x0 + z.rect.x1) / 2, (z.rect.z0 + z.rect.z1) / 2] : [z.ox ?? 0, z.oz ?? 0];
   }
   // Send someone along a route (a list of Vector3), then let them wander in a zone when they arrive.
   route(p, path, then) { p.kind = 'path'; p.path = path; p.pi = 0; p.then = then; p.wait = p.r() * 1.2; }
@@ -148,7 +152,7 @@ export class Crowd {
         if (p.wait > 0) { p.wait -= dt; }
         else {
           const dx = p.tx - p.x, dz = p.tz - p.z, dd = Math.hypot(dx, dz);
-          if (dd < 0.02) { p.wait = 0.4 + p.r() * (p.kind === 'run' ? 0.3 : 2.2); [p.tx, p.tz] = this.pick(p.zone, p.r); }
+          if (dd < 0.02) { p.wait = 0.4 + p.r() * (p.kind === 'run' ? 0.3 : 2.2); [p.tx, p.tz] = this.pick(p.zone, p.r, p); }
           else { const st = Math.min(dd, p.speed * dt); p.x += dx / dd * st; p.z += dz / dd * st; p.yaw = Math.atan2(dx, dz); moving = true; if (p.zone?.obstacles) nudgeClear(p, p.zone.obstacles); }
         }
       }
@@ -156,7 +160,7 @@ export class Crowd {
       if (moving && p.kind === 'path' && this.onStep && p.y < 0.06 && (p.trail = (p.trail || 0) + dt) > 0.06 && steps++ < 160) { p.trail = 0; this.onStep(p.x, p.z); }
       this.pose(i, p, moving, t, dt);
     });
-    for (const m of this.all) m.instanceMatrix.needsUpdate = true;
+    for (const m of this.all) { const a = m.instanceMatrix; if (a.clearUpdateRanges) { a.clearUpdateRanges(); a.addUpdateRange(0, Math.max(1, m.count) * 16); } a.needsUpdate = true; }      // (only the people in use go to the GPU)
   }
   // Put one person's body parts in place for this moment.
   pose(i, p, moving, t, dt) {

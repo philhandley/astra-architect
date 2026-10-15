@@ -277,7 +277,7 @@ export function mountSite(root, world, model, siteView, thumbs, { viewer = false
     if (room) {
       const area = model.squares(b).length;
       const sw = room.swim;
-      out.push({ boxId: b.id, ox: cx, oy: y0 + room.floorY, oz: cz, w: b.w, d: b.d, inside: sw ? (x, z, m) => room.inside(x, z, m) && !(Math.abs(x) < sw.w / 2 + 0.1 && Math.abs(z) < sw.d / 2 + 0.1) : room.inside, margin: 0.12, seats: room.seats.map(([x, y, z]) => [x, y - room.floorY, z]), fill: 0.65,
+      out.push({ boxId: b.id, ox: cx, oy: y0 + room.floorY, oz: cz, w: b.w, d: b.d, inside: sw ? (x, z, m) => room.inside(x, z, m) && !(Math.abs(x) < sw.w / 2 + 0.1 && Math.abs(z) < sw.d / 2 + 0.1) : room.inside, margin: 0.12, seats: room.seats.map(([x, y, z, yaw]) => [x, y - room.floorY, z, yaw]), fill: 0.65,
         walkers: sw ? 2 : Math.max(1, Math.round((DENSITY[b.type] ?? 1) * area)), adults: true, kind: b.type === 'hall' ? 'run' : 'walk', speed: b.type === 'hall' ? 0.6 : 0.28 });
       if (sw) out.push({ boxId: b.id, ox: cx, oy: y0 + sw.y, oz: cz, w: sw.w, d: sw.d, inside: (x, z) => Math.abs(x) < sw.w / 2 && Math.abs(z) < sw.d / 2, margin: 0, walkers: Math.max(2, Math.round(area * 1.5)), kind: 'swim', speed: 0.25 });
       return out;

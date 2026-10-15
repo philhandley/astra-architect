@@ -28,7 +28,7 @@ const CREW = KIDS === 'crew', MUTED = KIDS === 'muted';
 export const HIP = CREW ? 0.086 : 0.088, SHOULDER = CREW ? 0.146 : 0.149, LEG_X = CREW ? 0.0135 : 0.0118, ARM_X = CREW ? 0.031 : 0.0285;
 export const SEAT = CREW ? 0.076 : 0.083;               // the bottom of the top: where a sitting child's bum is, above their feet
 export const REACH = SHOULDER + (CREW ? 0.057 : 0.063);  // how high their hands are with their arms straight up
-export const SIT_DROP = SEAT;                            // how far the crowd lowers a sitting child: bum on the seat
+export const SIT_DROP = SEAT;                            // how far the crowd lowers a sitting child, times its size: bum on the seat
 export const SWIM_DROP = 0.138;                          // and a swimmer, so the head is just out of the water
 export const FACE = true;                                // eyes (false: faceless, like a scale figure)
 const R = CREW ? 0.0335 : MUTED ? 0.0305 : 0.0295, HEAD_Y = 0.189;

@@ -563,16 +563,16 @@ export class SchoolDay {
   separate(dt) {
     // Nobody walks through anyone: two bodies keep about 0.038 of their combined scale apart; someone sitting
     // stays put and the walker steps round them.
-    const A = this.agents;
+    const A = this.agents, fixed = A.map(k => k.mode === 'sit' || (k.mode === 'toSeat' && k.seat && Math.hypot(k.x - k.seat[0], k.z - k.seat[2]) < 0.035));
     for (let i = 0; i < A.length; i++) {
       const a = A[i]; if (a.hidden) continue;
       for (let j = i + 1; j < A.length; j++) {
-        const b = A[j]; if (b.hidden || a.mode === 'riding' || b.mode === 'riding' || Math.abs(a.y - b.y) > 0.1 || (a.mode === 'sit' && b.mode === 'sit') || (a.mode === 'sit' && b.mode === 'toSeat') || (b.mode === 'sit' && a.mode === 'toSeat')) continue;
+        const b = A[j]; if (b.hidden || a.mode === 'riding' || b.mode === 'riding' || Math.abs(a.y - b.y) > 0.1 || (fixed[i] && fixed[j])) continue;
         const R = 0.038 * (a.s + b.s), dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz);
         if (!(d < R && d > 1e-5)) continue;
         const ux = dx / d, uz = dz / d, gap = R - d;
-        if (a.mode === 'sit') { b.x += ux * gap; b.z += uz * gap; }
-        else if (b.mode === 'sit') { a.x -= ux * gap; a.z -= uz * gap; }
+        if (fixed[i]) { b.x += ux * gap; b.z += uz * gap; }
+        else if (fixed[j]) { a.x -= ux * gap; a.z -= uz * gap; }
         else { const push = gap * 0.5; a.x -= ux * push; a.z -= uz * push; b.x += ux * push; b.z += uz * push; }
         // Two children playing bump into each other: sometimes they stop for a chat.
         if (a.mode === 'wander' && b.mode === 'wander' && a.g.activity === 'break' && this.r() < 0.006 && this.agents.filter(c => c.mode === 'chat').length < 6) {

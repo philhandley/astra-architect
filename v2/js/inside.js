@@ -213,7 +213,9 @@ export function cutRoom(b, hex, floorY, cutH = CUT, opts = {}) {
     for (const p of bag.parts) { p.traverse(m => { m.userData.noInk = true; }); moving.add(p); }
     g.add(moving);
   }
-  return { group: g, seats: seats.map(([x, z, h = 0, yaw]) => [x, floorY + 0.02 + h, z, yaw]), obstacles: placed.filter(p => !p.low).map(p => ({ x: p.x, z: p.z, r: p.r })), inside: o.inside, floorY: floorY + 0.02, segments, swim };
+  // (Two children side by side need about 0.06: a seat closer than that to one already kept is left out.)
+  const roomy = []; for (const s of seats) if (!roomy.some(q => Math.hypot(q[0] - s[0], q[1] - s[1]) < 0.06 && Math.abs((q[2] || 0) - (s[2] || 0)) < 0.05)) roomy.push(s);
+  return { group: g, seats: roomy.map(([x, z, h = 0, yaw]) => [x, floorY + 0.02 + h, z, yaw]), obstacles: placed.filter(p => !p.low).map(p => ({ x: p.x, z: p.z, r: p.r })), inside: o.inside, floorY: floorY + 0.02, segments, swim };
 }
 
 export { CUT, SINGLE as SINGLE_SPACE };

@@ -3,7 +3,7 @@
 // vanishing and popping out at the end. rideDriver(group) looks at a playground piece and returns
 // drive(k, u): u runs from 0 to 1 over the go, and it sets the child's place, facing, pose and tilt.
 import * as THREE from 'three';
-import { SEAT, SIT_DROP, REACH } from './kid.js';
+import { REACH } from './kid.js';
 
 const v = new THREE.Vector3(), w = new THREE.Vector3();
 // A point in a part's own frame, in the world (the part may be swinging or turning right now).
@@ -12,8 +12,8 @@ const at = (o, x, y, z) => { o.updateWorldMatrix(true, false); return o.localToW
 const yawOf = (o, x, z) => { o.updateWorldMatrix(true, false); v.set(0, 0, 0); w.set(x, 0, z); o.localToWorld(v); o.localToWorld(w); return Math.atan2(w.x - v.x, w.z - v.z); };
 const lerp = (a, b, f) => a + (b - a) * f;
 const ease = f => f * f * (3 - 2 * f);
-// Where to put a sitting child so their bottom is at height `bum` (the crowd lowers a sitter by SIT_DROP).
-const sitY = (k, bum) => bum + SIT_DROP - SEAT * k.s;
+// Where to put a sitting child so their bottom is at height `bum` (the crowd lowers a sitter by SIT_DROP times its size).
+const sitY = (k, bum) => bum;
 // Walk from where the go started (k.rideFrom) to a point, f of the way.
 function walkTo(k, p, f) {
   const [x0, y0, z0] = k.rideFrom;

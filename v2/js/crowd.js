@@ -129,9 +129,32 @@ export class Crowd {
     for (const p of this.people) if (p.boxId === boxId || p.zone?.boxId === boxId) { p.jumpT = 1.8 + p.ph * 0.05; n++; }
     return n;
   }
+  // Nobody walks through anybody: walkers keep a body's width apart (0.038 of their two sizes) and step round people
+  // sitting down. A push that would take someone through a wall or into furniture is not made.
+  separate() {
+    const P = this.people, n = P.length, moves = p => p.kind === 'walk' || p.kind === 'run' || p.kind === 'path' || p.kind === 'swim';
+    const room = (p, x, z) => { const zn = p.zone; if (!zn?.inside) return true; if (!zn.inside(x - zn.ox, z - zn.oz, 0.02)) return false; return !zn.obstacles?.some(o => Math.hypot(x - o.x, z - o.z) < o.r * 0.9); };
+    const shove = (p, dx, dz) => { if (room(p, p.x + dx, p.z + dz)) { p.x += dx; p.z += dz; } };
+    for (let i = 0; i < n; i++) {
+      const a = P[i]; if (a.kind === 'agent' || a.hidden) continue;
+      const am = moves(a);
+      for (let j = i + 1; j < n; j++) {
+        const b = P[j]; if (b.kind === 'agent' || b.hidden) continue;
+        const bm = moves(b);
+        if ((!am && !bm) || Math.abs(a.y - b.y) > 0.1) continue;
+        const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), R = 0.038 * (a.s + b.s);
+        if (!(d < R && d > 1e-5)) continue;
+        const ux = dx / d, uz = dz / d, gap = Math.min(R - d, 0.02);
+        if (!am) shove(b, ux * gap, uz * gap);
+        else if (!bm) shove(a, -ux * gap, -uz * gap);
+        else { shove(a, -ux * gap / 2, -uz * gap / 2); shove(b, ux * gap / 2, uz * gap / 2); }
+      }
+    }
+  }
   update(dt) {
     const t = (this.t = (this.t || 0) + dt);
     let steps = 0;
+    if (dt > 0) this.separate();
     this.people.forEach((p, i) => {
       let moving = false;
       if (p.kind === 'agent') moving = !!p.moving;
@@ -167,7 +190,7 @@ export class Crowd {
     const { base, part, rot, q, v, s, up, e } = this.tmp, M = this.meshes, kind = p.kind === 'agent' ? p.pose : p.kind;
     let legL = 0, legR = 0, armL = 0, armR = 0, outL = -0.12, outR = 0.12, y = p.y, lean = 0;
     const swing = Math.sin(p.walk || 0);
-    if (kind === 'sit') { legL = legR = -1.45; armL = armR = -0.55; y -= SIT_DROP; }
+    if (kind === 'sit') { legL = legR = -1.45; armL = armR = -0.55; y -= SIT_DROP * p.s; }      // (scaled like the child, so the bum lands on the seat)
     else if (kind === 'swim') { y -= SWIM_DROP; const w = t * 4 + p.ph; armL = Math.sin(w) * 2.6; armR = Math.sin(w + Math.PI) * 2.6; lean = 0.3; }
     else if (kind === 'hang') { legL = -0.35; legR = -0.2; armL = armR = -3.0; outL = -0.1; outR = 0.1; }
     else if (kind === 'hold') { armL = armR = -1.25; outL = -0.25; outR = 0.25; }
